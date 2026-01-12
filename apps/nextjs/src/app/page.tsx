@@ -22,7 +22,7 @@ import {
 // Демо данные для симуляции pipeline
 const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDisplayData => {
   const now = Date.now();
-  
+
   const basePipeline: PipelineDisplayData = {
     pipelineId: `pl_${now.toString(36)}`,
     pipelineType: 'data-processing-pipeline',
@@ -241,7 +241,7 @@ export default function HomePage() {
           <Typography variant="h6" sx={{ mb: 2, color: '#7c4dff' }}>
             Демонстрация
           </Typography>
-          
+
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
             <Button
               variant="contained"
@@ -409,11 +409,23 @@ export default function HomePage() {
         <Box sx={{ mt: 6, textAlign: 'center' }}>
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Построено с использованием{' '}
-            <Box component="span" sx={{ color: '#7c4dff' }}>
+            <Box
+              component="a"
+              href="https://www.npmjs.com/package/neuroline"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ color: '#7c4dff', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+            >
               neuroline
             </Box>{' '}
             +{' '}
-            <Box component="span" sx={{ color: '#00e5ff' }}>
+            <Box
+              component="a"
+              href="https://www.npmjs.com/package/neuroline-ui"
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ color: '#00e5ff', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+            >
               neuroline-ui
             </Box>{' '}
             +{' '}
