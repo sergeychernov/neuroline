@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # Нужно для git diff HEAD~1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -27,35 +29,30 @@ jobs:
       - name: Build packages
         run: yarn build:packages
 
-      # Заменяем workspace:* на реальную версию перед публикацией
-      - name: Prepare packages for publish
-        run: |
-          # Получаем версию neuroline
-          NEUROLINE_VERSION=$(node -p "require('./packages/neuroline/package.json').version")
-
-          # Заменяем workspace:* на версию в neuroline-nestjs
-          cd packages/neuroline-nestjs
-          sed -i "s/\"neuroline\": \"workspace:\*\"/\"neuroline\": \"^$NEUROLINE_VERSION\"/g" package.json
-          cd ../..
-
       - name: Auto-bump neuroline version if needed
         working-directory: packages/neuroline
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          # Проверяем, были ли изменения в src/ с последнего изменения package.json
+          # Проверяем, были ли изменения в src/ с последнего коммита
           if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "Нет изменений в src/, пропускаем публикацию"
             echo "SKIP_PUBLISH=true" >> $GITHUB_ENV
           else
             echo "Обнаружены изменения в src/"
             # Проверяем, опубликована ли текущая версия
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              npm version patch --no-git-tag-version
-              NEW_VERSION=$(node -p "require('./package.json').version")
-              echo "Новая версия: $NEW_VERSION"
+              # Вручную повышаем patch версию (npm version не работает с workspace:*)
+              node -e "
+                const fs = require('fs');
+                const pkg = require('./package.json');
+                const [major, minor, patch] = pkg.version.split('.').map(Number);
+                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
+                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+                console.log('Новая версия:', pkg.version);
+              "
               echo "SKIP_PUBLISH=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
@@ -70,6 +67,17 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # Заменяем workspace:* на реальную версию ПОСЛЕ auto-bump neuroline
+      - name: Prepare dependent packages for publish
+        run: |
+          NEUROLINE_VERSION=$(node -p "require('./packages/neuroline/package.json').version")
+          echo "Используем версию neuroline: $NEUROLINE_VERSION"
+
+          # Заменяем workspace:* на версию во всех зависимых пакетах
+          for pkg in neuroline-nestjs neuroline-nextjs; do
+            sed -i "s/\"neuroline\": \"workspace:\*\"/\"neuroline\": \"^$NEUROLINE_VERSION\"/g" packages/$pkg/package.json
+          done
+
       - name: Auto-bump neuroline-ui version if needed
         working-directory: packages/neuroline-ui
         run: |
@@ -77,15 +85,20 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "Нет изменений в src/, пропускаем публикацию"
             echo "SKIP_PUBLISH_UI=true" >> $GITHUB_ENV
           else
             echo "Обнаружены изменения в src/"
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              npm version patch --no-git-tag-version
-              NEW_VERSION=$(node -p "require('./package.json').version")
-              echo "Новая версия: $NEW_VERSION"
+              node -e "
+                const fs = require('fs');
+                const pkg = require('./package.json');
+                const [major, minor, patch] = pkg.version.split('.').map(Number);
+                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
+                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+                console.log('Новая версия:', pkg.version);
+              "
               echo "SKIP_PUBLISH_UI=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
@@ -107,15 +120,20 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "Нет изменений в src/, пропускаем публикацию"
             echo "SKIP_PUBLISH_NEXTJS=true" >> $GITHUB_ENV
           else
             echo "Обнаружены изменения в src/"
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              npm version patch --no-git-tag-version
-              NEW_VERSION=$(node -p "require('./package.json').version")
-              echo "Новая версия: $NEW_VERSION"
+              node -e "
+                const fs = require('fs');
+                const pkg = require('./package.json');
+                const [major, minor, patch] = pkg.version.split('.').map(Number);
+                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
+                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+                console.log('Новая версия:', pkg.version);
+              "
               echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
@@ -137,15 +155,20 @@ jobs:
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "Нет изменений в src/, пропускаем публикацию"
             echo "SKIP_PUBLISH_NESTJS=true" >> $GITHUB_ENV
           else
             echo "Обнаружены изменения в src/"
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              npm version patch --no-git-tag-version
-              NEW_VERSION=$(node -p "require('./package.json').version")
-              echo "Новая версия: $NEW_VERSION"
+              node -e "
+                const fs = require('fs');
+                const pkg = require('./package.json');
+                const [major, minor, patch] = pkg.version.split('.').map(Number);
+                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
+                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+                console.log('Новая версия:', pkg.version);
+              "
               echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
