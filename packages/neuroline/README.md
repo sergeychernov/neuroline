@@ -1,4 +1,503 @@
-# Pipeline Manager
+[English](#neuroline) | [Русский](#neuroline-1)
+
+# Neuroline
+
+Framework-agnostic pipeline orchestration library with support for:
+- Sequential and parallel job execution
+- Persistent state storage (MongoDB, in-memory, or custom)
+- Type-safe jobs with synapses for data transformation
+- Idempotency (re-running with same input data returns existing pipeline)
+
+## Installation
+
+```bash
+yarn add neuroline
+```
+
+For MongoDB storage:
+```bash
+yarn add neuroline mongoose
+```
+
+## Quick Start
+
+### 1. Creating a Job
+
+A Job is a pure function with a defined interface:
+
+```typescript
+import type { JobDefinition, JobContext } from 'neuroline';
+
+interface MyJobInput {
+    url: string;
+}
+
+interface MyJobOutput {
+    data: string;
+    fetchedAt: Date;
+}
+
+interface MyJobOptions {
+    timeout?: number;
+}
+
+export const fetchDataJob: JobDefinition<MyJobInput, MyJobOutput, MyJobOptions> = {
+    name: 'fetch-data',
+
+    async execute(input, options, ctx) {
+        ctx.logger.info('Fetching data', { url: input.url });
+
+        const timeout = options?.timeout ?? 5000;
+        const response = await fetch(input.url, { signal: AbortSignal.timeout(timeout) });
+        const data = await response.text();
+
+        ctx.logger.info('Data fetched', { length: data.length });
+
+        return {
+            data,
+            fetchedAt: new Date(),
+        };
+    },
+};
+```
+
+### 2. Pipeline Configuration
+
+```typescript
+import type { PipelineConfig, SynapseContext } from 'neuroline';
+import { fetchDataJob, processDataJob, saveResultJob } from './jobs';
+
+interface PipelineInput {
+    url: string;
+    userId: string;
+}
+
+export const myPipelineConfig: PipelineConfig<PipelineInput> = {
+    name: 'my-neuroline',
+
+    stages: [
+        // Stage 1: single job
+        fetchDataJob,
+
+        // Stage 2: two jobs execute in parallel
+        [
+            {
+                job: processDataJob,
+                // synapses transform data for the job
+                synapses: (ctx: SynapseContext<PipelineInput>) => ({
+                    rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
+                    userId: ctx.pipelineInput.userId,
+                }),
+            },
+            {
+                job: notifyJob,
+                synapses: (ctx) => ({
+                    userId: ctx.pipelineInput.userId,
+                    message: 'Processing started',
+                }),
+            },
+        ],
+
+        // Stage 3: final job
+        {
+            job: saveResultJob,
+            synapses: (ctx) => ({
+                processedData: ctx.getArtifact('process-data'),
+                userId: ctx.pipelineInput.userId,
+            }),
+        },
+    ],
+
+    // Optional: custom hash function
+    computeInputHash: (input) => `${input.userId}-${input.url}`,
+};
+```
+
+### 3. Creating and Using PipelineManager
+
+#### With In-Memory Storage (for testing)
+
+```typescript
+import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
+import { myPipelineConfig } from './pipelines';
+
+const storage = new InMemoryPipelineStorage();
+const manager = new PipelineManager({
+    storage,
+    logger: console, // or your logger
+});
+
+// Register pipeline
+manager.registerPipeline(myPipelineConfig);
+
+// Start pipeline
+const { pipelineId, isNew } = await manager.startPipeline('my-neuroline', {
+    data: { url: 'https://api.example.com/data', userId: 'user-123' },
+    jobOptions: {
+        'fetch-data': { timeout: 10000 },
+    },
+});
+
+// Poll status
+const status = await manager.getStatus(pipelineId);
+console.log(status);
+// { status: 'processing', currentJobIndex: 1, totalJobs: 4, currentJobName: 'process-data' }
+
+// Get results
+const result = await manager.getResult(pipelineId);
+console.log(result);
+// { status: 'done', artifacts: [...], jobNames: ['fetch-data', 'process-data', 'notify', 'save-result'] }
+```
+
+#### With MongoDB Storage
+
+```typescript
+import mongoose from 'mongoose';
+import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
+// or: import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
+
+// Create model
+const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
+
+// Create manager
+const storage = new MongoPipelineStorage(PipelineModel);
+const manager = new PipelineManager({ storage, logger: console });
+
+manager.registerPipeline(myPipelineConfig);
+```
+
+## API Reference
+
+### PipelineManager
+
+#### `constructor(options: PipelineManagerOptions)`
+
+```typescript
+interface PipelineManagerOptions {
+    storage: PipelineStorage;  // Required
+    logger?: JobLogger;        // Optional
+}
+```
+
+#### `registerPipeline(config: PipelineConfig): void`
+
+Registers a pipeline configuration. Must be called before `startPipeline`.
+
+#### `startPipeline<TData>(pipelineType: string, input: PipelineInput<TData>): Promise<StartPipelineResponse>`
+
+Starts a pipeline or returns existing one (if found by input data hash).
+
+```typescript
+interface PipelineInput<TData> {
+    data: TData;                              // Input data
+    jobOptions?: Record<string, unknown>;     // Options for jobs (key = job name)
+}
+
+interface StartPipelineResponse {
+    pipelineId: string;  // ID for polling
+    isNew: boolean;      // true if created, false if already existed
+}
+```
+
+#### `getStatus(pipelineId: string): Promise<PipelineStatusResponse>`
+
+Returns current pipeline status.
+
+```typescript
+interface PipelineStatusResponse {
+    status: 'processing' | 'done' | 'error';
+    currentJobIndex: number;
+    totalJobs: number;
+    currentJobName?: string;
+    error?: { message: string; jobName?: string };
+}
+```
+
+#### `getResult(pipelineId: string): Promise<PipelineResultResponse>`
+
+Returns results (artifacts) from all jobs.
+
+```typescript
+interface PipelineResultResponse {
+    status: 'processing' | 'done' | 'error';
+    artifacts: (unknown | null | undefined)[];  // undefined = not yet executed
+    jobNames: string[];
+}
+```
+
+#### `getPipeline(pipelineId: string): Promise<PipelineState | null>`
+
+Returns full pipeline state (for debugging).
+
+### JobDefinition
+
+```typescript
+interface JobDefinition<TInput, TOutput, TOptions> {
+    name: string;
+    execute: (
+        input: TInput,
+        options: TOptions | undefined,
+        context: JobContext
+    ) => Promise<TOutput | null>;
+}
+```
+
+#### JobContext
+
+```typescript
+interface JobContext {
+    pipelineId: string;
+    jobIndex: number;
+    logger: {
+        info: (msg: string, data?: Record<string, unknown>) => void;
+        error: (msg: string, data?: Record<string, unknown>) => void;
+        warn: (msg: string, data?: Record<string, unknown>) => void;
+    };
+}
+```
+
+### PipelineConfig
+
+```typescript
+interface PipelineConfig<TInput> {
+    name: string;
+    stages: PipelineStage[];
+    computeInputHash?: (input: TInput) => string;
+}
+
+// Stage: single job or array of jobs (parallel)
+type PipelineStage = StageItem | StageItem[];
+
+// StageItem: JobDefinition or JobInPipeline
+type StageItem = JobDefinition | JobInPipeline;
+
+interface JobInPipeline<TInput, TOutput, TOptions> {
+    job: JobDefinition<TInput, TOutput, TOptions>;
+    synapses?: (ctx: SynapseContext) => TInput;
+}
+```
+
+### SynapseContext
+
+Context for `synapses` function:
+
+```typescript
+interface SynapseContext<TPipelineInput> {
+    pipelineInput: TPipelineInput;
+    getArtifact: <T>(jobName: string) => T | undefined;
+}
+```
+
+## Storage
+
+### InMemoryPipelineStorage
+
+Built-in in-memory storage for testing and prototyping.
+
+```typescript
+import { InMemoryPipelineStorage } from 'neuroline';
+
+const storage = new InMemoryPipelineStorage();
+
+// For testing
+storage.clear();           // Clear all data
+storage.getAll();          // Get all pipelines
+```
+
+### MongoPipelineStorage
+
+MongoDB storage (requires `mongoose` as peer dependency).
+
+```typescript
+import mongoose from 'mongoose';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline';
+
+const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
+const storage = new MongoPipelineStorage(PipelineModel);
+```
+
+### Custom Storage
+
+Implement the `PipelineStorage` interface:
+
+```typescript
+import type { PipelineStorage, PipelineState, JobStatus, PipelineStatus } from 'neuroline';
+
+class MyCustomStorage implements PipelineStorage {
+    async findById(pipelineId: string): Promise<PipelineState | null> { ... }
+    async create(state: PipelineState): Promise<PipelineState> { ... }
+    async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> { ... }
+    async updateJobStatus(pipelineId: string, jobIndex: number, status: JobStatus, startedAt?: Date): Promise<void> { ... }
+    async updateJobArtifact(pipelineId: string, jobIndex: number, artifact: unknown, finishedAt: Date): Promise<void> { ... }
+    async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
+    async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
+}
+```
+
+## NestJS Integration
+
+```typescript
+import { Module, OnModuleInit } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
+
+@Module({
+    imports: [
+        MongooseModule.forFeature([
+            { name: 'Pipeline', schema: PipelineSchema },
+        ]),
+    ],
+})
+export class PipelineModule implements OnModuleInit {
+    private manager: PipelineManager;
+
+    constructor(
+        @InjectModel('Pipeline') private pipelineModel: Model<any>,
+        private logger: Logger,
+    ) {
+        const storage = new MongoPipelineStorage(this.pipelineModel);
+        this.manager = new PipelineManager({
+            storage,
+            logger: {
+                info: (msg, data) => this.logger.log({ msg, ...data }),
+                error: (msg, data) => this.logger.error({ msg, ...data }),
+                warn: (msg, data) => this.logger.warn({ msg, ...data }),
+            },
+        });
+    }
+
+    onModuleInit() {
+        this.manager.registerPipeline(myPipelineConfig);
+    }
+}
+```
+
+## Stages and Parallel Execution
+
+```
+Pipeline
+├── Stage 1: [jobA]                    ← sequential
+├── Stage 2: [jobB, jobC, jobD]        ← parallel within stage
+├── Stage 3: [jobE]                    ← sequential
+└── Stage 4: [jobF, jobG]              ← parallel within stage
+```
+
+- **Stages** execute **sequentially** (Stage 2 starts only after Stage 1 completes)
+- **Jobs within a stage** execute **in parallel**
+- If any job in a stage fails, the entire pipeline is marked as `error`
+
+## Idempotency
+
+Pipelines are identified by input data hash:
+
+```typescript
+// First call — creates pipeline
+const { pipelineId, isNew } = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+// isNew = true
+
+// Repeated call with same data — returns existing pipeline
+const result2 = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+// result2.pipelineId === pipelineId
+// result2.isNew = false
+```
+
+For custom hashing:
+
+```typescript
+const config: PipelineConfig<MyInput> = {
+    name: 'my-pipeline',
+    stages: [...],
+    computeInputHash: (input) => `${input.userId}-${input.date}`,
+};
+```
+
+## Invalidation on Configuration Changes
+
+When the pipeline structure changes (adding/removing/renaming jobs), old records are automatically invalidated:
+
+```typescript
+// Version 1: pipeline with two jobs
+const configV1: PipelineConfig = {
+    name: 'my-pipeline',
+    stages: [jobA, jobB],
+};
+manager.registerPipeline(configV1);
+
+// Start — creates record in storage
+await manager.startPipeline('my-pipeline', { data: { id: 1 } });
+// Pipeline saved with configHash = hash(['jobA', 'jobB'])
+
+// Version 2: added jobC
+const configV2: PipelineConfig = {
+    name: 'my-pipeline',
+    stages: [jobA, jobB, jobC],
+};
+manager.registerPipeline(configV2);
+
+// Start with same data
+await manager.startPipeline('my-pipeline', { data: { id: 1 } });
+// configHash changed → old record deleted → pipeline starts fresh
+```
+
+This is useful when:
+- Adding new jobs to pipeline
+- Removing obsolete jobs
+- Changing execution order
+- Renaming jobs
+
+## Types
+
+All types are available for import:
+
+```typescript
+import type {
+    // Job
+    JobDefinition,
+    JobContext,
+    JobLogger,
+    JobStatus,
+    JobState,
+
+    // Pipeline
+    PipelineConfig,
+    PipelineStage,
+    PipelineInput,
+    PipelineStatus,
+    PipelineState,
+
+    // Synapse
+    SynapseContext,
+    JobInPipeline,
+    StageItem,
+
+    // Responses
+    StartPipelineResponse,
+    PipelineStatusResponse,
+    PipelineResultResponse,
+
+    // Storage
+    PipelineStorage,
+
+    // MongoDB
+    MongoPipelineDocument,
+    MongoPipelineJobState,
+} from 'neuroline';
+```
+
+## Exports
+
+| Import path | Contents |
+|-------------|----------|
+| `neuroline` | Everything: types, classes, MongoDB |
+| `neuroline/mongo` | MongoDB only: `MongoPipelineStorage`, `PipelineSchema`, document types |
+
+## License
+
+UNLICENSED
+
+---
+
+# Neuroline
 
 Фреймворк-агностик библиотека для оркестрации пайплайнов с поддержкой:
 - Последовательного и параллельного выполнения jobs
@@ -479,7 +978,7 @@ import type {
     // MongoDB
     MongoPipelineDocument,
     MongoPipelineJobState,
-} from neuroline';
+} from 'neuroline';
 ```
 
 ## Exports
@@ -492,4 +991,3 @@ import type {
 ## License
 
 UNLICENSED
-
