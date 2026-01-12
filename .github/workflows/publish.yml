@@ -38,41 +38,124 @@ jobs:
           sed -i "s/\"neuroline\": \"workspace:\*\"/\"neuroline\": \"^$NEUROLINE_VERSION\"/g" package.json
           cd ../..
 
-      - name: Publish neuroline
+      - name: Auto-bump neuroline version if needed
         working-directory: packages/neuroline
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-            echo "Версия $PACKAGE_VERSION уже опубликована, пропускаем"
+
+          # Проверяем, были ли изменения в src/ с последнего изменения package.json
+          if git diff HEAD~1 HEAD --quiet -- src/; then
+            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "SKIP_PUBLISH=true" >> $GITHUB_ENV
           else
-            npm publish --access public
+            echo "Обнаружены изменения в src/"
+            # Проверяем, опубликована ли текущая версия
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
+              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
+              npm version patch --no-git-tag-version
+              NEW_VERSION=$(node -p "require('./package.json').version")
+              echo "Новая версия: $NEW_VERSION"
+              echo "SKIP_PUBLISH=false" >> $GITHUB_ENV
+            else
+              echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
+              echo "SKIP_PUBLISH=false" >> $GITHUB_ENV
+            fi
           fi
+
+      - name: Publish neuroline
+        if: env.SKIP_PUBLISH != 'true'
+        working-directory: packages/neuroline
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish neuroline-ui
+      - name: Auto-bump neuroline-ui version if needed
         working-directory: packages/neuroline-ui
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-            echo "Версия $PACKAGE_VERSION уже опубликована, пропускаем"
+
+          if git diff HEAD~1 HEAD --quiet -- src/; then
+            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "SKIP_PUBLISH_UI=true" >> $GITHUB_ENV
           else
-            npm publish --access public
+            echo "Обнаружены изменения в src/"
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
+              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
+              npm version patch --no-git-tag-version
+              NEW_VERSION=$(node -p "require('./package.json').version")
+              echo "Новая версия: $NEW_VERSION"
+              echo "SKIP_PUBLISH_UI=false" >> $GITHUB_ENV
+            else
+              echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
+              echo "SKIP_PUBLISH_UI=false" >> $GITHUB_ENV
+            fi
           fi
+
+      - name: Publish neuroline-ui
+        if: env.SKIP_PUBLISH_UI != 'true'
+        working-directory: packages/neuroline-ui
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Publish neuroline-nestjs
+      - name: Auto-bump neuroline-nextjs version if needed
+        working-directory: packages/neuroline-nextjs
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if git diff HEAD~1 HEAD --quiet -- src/; then
+            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "SKIP_PUBLISH_NEXTJS=true" >> $GITHUB_ENV
+          else
+            echo "Обнаружены изменения в src/"
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
+              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
+              npm version patch --no-git-tag-version
+              NEW_VERSION=$(node -p "require('./package.json').version")
+              echo "Новая версия: $NEW_VERSION"
+              echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
+            else
+              echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
+              echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: Publish neuroline-nextjs
+        if: env.SKIP_PUBLISH_NEXTJS != 'true'
+        working-directory: packages/neuroline-nextjs
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Auto-bump neuroline-nestjs version if needed
         working-directory: packages/neuroline-nestjs
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-            echo "Версия $PACKAGE_VERSION уже опубликована, пропускаем"
+
+          if git diff HEAD~1 HEAD --quiet -- src/; then
+            echo "Нет изменений в src/, пропускаем проверку версии"
+            echo "SKIP_PUBLISH_NESTJS=true" >> $GITHUB_ENV
           else
-            npm publish --access public
+            echo "Обнаружены изменения в src/"
+            if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
+              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
+              npm version patch --no-git-tag-version
+              NEW_VERSION=$(node -p "require('./package.json').version")
+              echo "Новая версия: $NEW_VERSION"
+              echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
+            else
+              echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
+              echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
+            fi
           fi
+
+      - name: Publish neuroline-nestjs
+        if: env.SKIP_PUBLISH_NESTJS != 'true'
+        working-directory: packages/neuroline-nestjs
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

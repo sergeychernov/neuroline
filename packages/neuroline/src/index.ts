@@ -18,4 +18,3 @@ export type { PipelineStorage, PaginatedResult, PaginationParams } from './stora
 export { MongoPipelineStorage } from './mongo-storage';
 export { PipelineSchema } from './mongoose-schema';
 export type { MongoPipelineDocument, MongoPipelineJobState } from './mongo-storage';
-
