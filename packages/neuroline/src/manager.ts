@@ -429,21 +429,21 @@ export class PipelineManager {
             throw new Error(`Pipeline ${pipelineId} not found`);
         }
 
-        const artifacts = pipeline.jobs.map((job) => {
+        const artifacts: Record<string, unknown | null | undefined> = {};
+
+        for (const job of pipeline.jobs) {
             if (job.status === 'done') {
                 // Job завершена - возвращаем артефакт (может быть null)
-                return job.artifact ?? null;
+                artifacts[job.name] = job.artifact ?? null;
+            } else {
+                // Job ещё выполняется или в очереди
+                artifacts[job.name] = undefined;
             }
-            // Job ещё выполняется или в очереди
-            return undefined;
-        });
-
-        const jobNames = pipeline.jobs.map((job) => job.name);
+        }
 
         return {
             status: pipeline.status,
             artifacts,
-            jobNames,
         };
     }
 

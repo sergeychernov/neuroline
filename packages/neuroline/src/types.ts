@@ -221,14 +221,12 @@ export interface PipelineResultResponse {
     /** Статус пайплайна */
     status: PipelineStatus;
     /**
-     * Массив артефактов
+     * Артефакты по именам jobs (jobName -> artifact)
      * - undefined: job ещё выполняется или в очереди
-     * - null: job не возвращает результат
+     * - null: job завершена, но не возвращает результат
      * - значение: артефакт job
      */
-    artifacts: (unknown | null | undefined)[];
-    /** Имена jobs для маппинга */
-    jobNames: string[];
+    artifacts: Record<string, unknown | null | undefined>;
 }
 
 
