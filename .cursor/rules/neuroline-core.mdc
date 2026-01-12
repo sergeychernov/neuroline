@@ -1,0 +1,96 @@
+---
+description: Правила для core пакета neuroline
+globs: packages/neuroline/**/*
+---
+
+# Пакет: neuroline (Core)
+
+## Назначение
+
+Ядро библиотеки — PipelineManager, Storage абстракции, типы. Фреймворк-агностик, без внешних зависимостей.
+
+## Принципы
+
+- **Без внешних runtime зависимостей** (только Node.js built-ins)
+- Все peer dependencies — **optional** (mongoose, react, mui)
+- Dual exports: `neuroline` и `neuroline/mongo`
+- Storage — абстракция через интерфейс `PipelineStorage`
+
+## Структура
+
+```
+src/
+├── index.ts           # Публичные экспорты
+├── types.ts           # Все типы и интерфейсы
+├── manager.ts         # PipelineManager класс
+├── storage.ts         # InMemoryPipelineStorage + интерфейс
+├── mongo-storage.ts   # MongoPipelineStorage
+├── mongoose-schema.ts # Mongoose схема
+└── mongo.ts           # Экспорты для neuroline/mongo
+```
+
+## Ключевые сущности
+
+### JobDefinition
+
+Чистая функция с типизированным интерфейсом:
+
+```typescript
+export const myJob: JobDefinition<Input, Output, Options> = {
+    name: 'my-job',
+    async execute(input, options, ctx) {
+        ctx.logger.info('Processing', { input });
+        return { result: 'done' };
+    },
+};
+```
+
+### synapses
+
+Функция `(ctx: SynapseContext) => TInput` для подготовки входных данных job:
+
+```typescript
+{
+    job: processJob,
+    synapses: (ctx) => ({
+        data: ctx.getArtifact<FetchResult>('fetch-data')?.data,
+        userId: ctx.pipelineInput.userId,
+    }),
+}
+```
+
+### PipelineConfig
+
+```typescript
+const config: PipelineConfig<MyInput> = {
+    name: 'my-pipeline',
+    stages: [
+        jobA,                    // Stage 1: одна job
+        [jobB, jobC],            // Stage 2: параллельно
+        { job: jobD, synapses }, // Stage 3: с трансформацией
+    ],
+    computeInputHash: (input) => `${input.userId}`, // Опционально
+};
+```
+
+### PipelineStorage
+
+Интерфейс для хранилища. Реализации:
+- `InMemoryPipelineStorage` — для тестов
+- `MongoPipelineStorage` — для продакшена
+
+## Правила
+
+1. **Job должна быть чистой функцией** — не обращаться к глобальному состоянию
+2. **Артефакты immutable** — не мутировать результаты других jobs
+3. **Типизация обязательна** — `JobDefinition<TInput, TOutput, TOptions>`
+4. **Имена jobs уникальны** в рамках pipeline
+5. **synapses** — единственный способ получить данные из других jobs
+
+## Идемпотентность
+
+Pipeline ID = hash(pipelineType + input). Повторный запуск с теми же данными возвращает существующий pipeline.
+
+## Инвалидация
+
+При изменении структуры pipeline (добавление/удаление/переименование jobs) старые записи автоматически инвалидируются по `configHash`.

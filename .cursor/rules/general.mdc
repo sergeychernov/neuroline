@@ -1,0 +1,116 @@
+---
+description: Общие правила для всего монорепозитория Neuroline
+globs: **/*
+---
+
+# Neuroline — Pipeline Orchestration Library
+
+## Обзор проекта
+
+Neuroline — фреймворк-агностик библиотека для оркестрации пайплайнов с "нейронной" метафорой:
+- **Job = Нейрон** — атомарная единица работы
+- **synapses** — функция трансформации входных данных (собирает артефакты предыдущих jobs)
+- **Stage** — слой обработки (jobs внутри stage выполняются параллельно)
+- **Pipeline** — последовательность stages
+- **Storage** — память (in-memory / MongoDB)
+
+## Стек технологий
+
+| Область | Технология |
+|---------|------------|
+| Язык | TypeScript 5.3+ (strict mode) |
+| Runtime | Node.js 18+ |
+| Package Manager | **Yarn 4** (Berry) с workspaces |
+| Bundler | tsup (ESM + CJS + DTS) |
+| Testing | Vitest |
+
+## Архитектура монорепозитория
+
+```
+neuroline/
+├── packages/           # Публикуемые пакеты
+│   ├── neuroline/      # Core: PipelineManager, Storage, Types
+│   ├── neuroline-nestjs/   # NestJS интеграция
+│   ├── neuroline-nextjs/   # Next.js App Router handlers
+│   └── neuroline-ui/       # React компоненты визуализации
+├── apps/               # Примеры / демо приложения
+│   ├── nestjs/         # NestJS example app
+│   └── nextjs/         # Next.js example app
+├── package.json        # Корневой workspace config
+└── tsconfig.base.json  # Общие TS настройки
+```
+
+## Соглашения по коду
+
+### Язык
+
+- **Комментарии и документация**: русский
+- **Git commit messages**: русский, Conventional Commits (`feat:`, `fix:`, `chore:`)
+- Первая строка коммита ≤ 100 символов
+
+### Форматирование
+
+- Tabs для отступов (4 spaces width)
+- Одинарные кавычки для строк
+- Trailing comma в многострочных структурах
+- Точка с запятой обязательна
+
+### Типизация
+
+- Явные типы для публичных API
+- Type inference для внутренних переменных
+- JSDoc для всех экспортируемых функций/интерфейсов
+
+### Именование
+
+| Сущность | Стиль | Пример |
+|----------|-------|--------|
+| Интерфейсы/Типы | PascalCase | `JobDefinition`, `PipelineConfig` |
+| Функции/переменные | camelCase | `startPipeline`, `jobOptions` |
+| Константы | SCREAMING_SNAKE | `NEUROLINE_OPTIONS` |
+| Файлы | kebab-case | `mongo-storage.ts`, `route-handler.ts` |
+| React компоненты | PascalCase файл | `PipelineViewer.tsx` |
+
+### Секционирование в файлах
+
+Используй разделители для группировки:
+
+```typescript
+// ============================================================================
+// Section Name
+// ============================================================================
+```
+
+### Структура файлов в пакете
+
+```
+src/
+├── index.ts          # Публичные экспорты
+├── types.ts          # Типы и интерфейсы
+├── [feature].ts      # Основная логика
+└── [feature]-*.ts    # Связанные модули
+```
+
+## Терминология (метафора мозга)
+
+| Термин | Neuroline | Описание |
+|--------|-----------|----------|
+| Нейрон | `Job` | Атомарная единица работы |
+| Синапс | `synapses` | Функция подготовки входных данных |
+| Импульс | `artifact` | Результат выполнения job |
+| Слой | `Stage` | Группа jobs (параллельно внутри) |
+| Нейросеть | `Pipeline` | Последовательность stages |
+| Память | `Storage` | Персистентное хранилище состояния |
+| Контекст | `SynapseContext` | Доступ к pipelineInput и артефактам |
+
+## Команды
+
+```bash
+yarn dev              # Next.js app
+yarn dev:nestjs       # NestJS app
+yarn storybook        # UI компоненты
+yarn build            # Все пакеты и приложения
+yarn build:packages   # Только пакеты
+yarn lint             # TypeScript проверка
+yarn test             # Vitest тесты
+```

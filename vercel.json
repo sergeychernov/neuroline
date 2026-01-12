@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "yarn build:packages && yarn workspace @neuroline/nextjs build",
+  "installCommand": "yarn install",
+  "framework": "nextjs",
+  "outputDirectory": "apps/nextjs/.next",
+  "git": {
+    "deploymentEnabled": {
+      "main": true
+    }
+  }
+}
+

@@ -1,0 +1,88 @@
+---
+description: Правила для пакета neuroline-ui
+globs: packages/neuroline-ui/**/*
+---
+
+# Пакет: neuroline-ui
+
+## Назначение
+
+React компоненты для визуализации pipelines: статусы, графы, прогресс.
+
+## Стек
+
+- React 18 (функциональные компоненты)
+- MUI 5 (Material UI)
+- Storybook 8 для разработки
+
+## Структура
+
+```
+src/
+├── index.ts              # Публичные экспорты
+├── types.ts              # Типы для компонентов
+├── theme.ts              # MUI тема / цвета
+└── components/
+    ├── PipelineViewer.tsx
+    ├── PipelineViewer.stories.tsx
+    ├── JobNode.tsx
+    ├── JobNode.stories.tsx
+    ├── StageColumn.tsx
+    └── StatusBadge.tsx
+```
+
+## Соглашения React
+
+- **Функциональные компоненты** с хуками
+- **Props interface** с суффиксом `Props`: `PipelineViewerProps`
+- **Деструктуризация props** в параметрах
+- **Мемоизация** через `useMemo`/`useCallback` для тяжёлых вычислений
+
+## Компоненты
+
+### PipelineViewer
+
+Основной компонент визуализации pipeline:
+
+```tsx
+<PipelineViewer
+    status={pipelineStatus}
+    showTiming
+    onJobClick={(payload) => console.log(payload)}
+/>
+```
+
+### Storybook
+
+Каждый компонент имеет `.stories.tsx`:
+
+```tsx
+// JobNode.stories.tsx
+import type { Meta, StoryObj } from '@storybook/react';
+import { JobNode } from './JobNode';
+
+const meta: Meta<typeof JobNode> = {
+    component: JobNode,
+    title: 'Components/JobNode',
+};
+
+export default meta;
+type Story = StoryObj<typeof JobNode>;
+
+export const Default: Story = {
+    args: { ... },
+};
+```
+
+## Стилизация
+
+- Используй MUI `sx` prop для инлайн стилей
+- Цвета статусов из `theme.ts`
+- Респонсивность через MUI breakpoints
+
+## Правила
+
+1. **Все компоненты экспортируются** из `index.ts`
+2. **Stories обязательны** для каждого компонента
+3. **Props типизированы** через interface
+4. **Без внешнего состояния** — компоненты controlled

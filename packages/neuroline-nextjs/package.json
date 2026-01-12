@@ -1,0 +1,32 @@
+{
+  "name": "neuroline-nextjs",
+  "version": "0.1.0",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --external next --external neuroline",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch --external next --external neuroline",
+    "lint": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "neuroline": "workspace:*",
+    "next": ">=14.0.0"
+  },
+  "devDependencies": {
+    "neuroline": "workspace:*",
+    "next": "^14.1.0",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}

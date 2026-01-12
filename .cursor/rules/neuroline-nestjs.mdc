@@ -1,0 +1,68 @@
+---
+description: Правила для пакета neuroline-nestjs
+globs: packages/neuroline-nestjs/**/*
+---
+
+# Пакет: neuroline-nestjs
+
+## Назначение
+
+NestJS интеграция: модуль, контроллер, сервис для работы с Pipeline Manager.
+
+## Структура
+
+```
+src/
+├── index.ts              # Публичные экспорты
+├── constants.ts          # Injection tokens
+├── dto.ts                # DTO классы для валидации
+├── neuroline.module.ts   # DynamicModule
+├── neuroline.controller.ts   # REST endpoints
+└── neuroline.service.ts  # Бизнес-логика
+```
+
+## Соглашения NestJS
+
+- Следуй NestJS conventions (Module, Controller, Service)
+- Используй декораторы для DI (`@Injectable`, `@Controller`, etc.)
+- DTO классы для валидации входных данных
+- Swagger декораторы для документации API
+
+## Регистрация модуля
+
+```typescript
+// Статическая
+NeurolineModule.register({
+    manager: new PipelineManager({ storage }),
+    storage,
+    pipelines: [myPipeline],
+});
+
+// Асинхронная (с MongoDB)
+NeurolineModule.registerAsync({
+    imports: [MongooseModule],
+    useFactory: async (model) => ({
+        manager: new PipelineManager({ storage: new MongoPipelineStorage(model) }),
+        storage,
+        pipelines: [myPipeline],
+    }),
+    inject: [getModelToken('Pipeline')],
+});
+```
+
+## REST API Endpoints
+
+| Method | Path | Описание |
+|--------|------|----------|
+| POST | `/pipeline/:type/start` | Запуск pipeline |
+| GET | `/pipeline/:id/status` | Статус pipeline |
+| GET | `/pipeline/:id/result` | Результаты (артефакты) |
+| GET | `/pipeline/:id` | Полное состояние |
+| GET | `/pipelines` | Список всех pipelines |
+
+## Правила
+
+1. **Injection tokens** в `constants.ts`
+2. **DTO** для всех входных данных контроллера
+3. **Service** инкапсулирует логику работы с PipelineManager
+4. **Controller** только маршрутизация и валидация

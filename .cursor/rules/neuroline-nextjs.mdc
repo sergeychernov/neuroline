@@ -1,0 +1,55 @@
+---
+description: Правила для пакета neuroline-nextjs
+globs: packages/neuroline-nextjs/**/*
+---
+
+# Пакет: neuroline-nextjs
+
+## Назначение
+
+Next.js App Router интеграция: route handlers для API routes.
+
+## Структура
+
+```
+src/
+├── index.ts          # Публичные экспорты
+├── types.ts          # Типы для handlers
+├── handlers.ts       # Функции-обработчики
+└── route-handler.ts  # createPipelineHandlers factory
+```
+
+## Использование
+
+```typescript
+// app/api/pipeline/[...path]/route.ts
+import { createPipelineHandlers } from 'neuroline-nextjs';
+
+const handlers = createPipelineHandlers({
+    manager,
+    storage,
+});
+
+export const GET = handlers.GET;
+export const POST = handlers.POST;
+```
+
+## Соглашения Next.js App Router
+
+- Используй `NextRequest` / `NextResponse`
+- Route handlers экспортируют именованные функции (`GET`, `POST`)
+- Динамические сегменты через `[param]` или `[...path]`
+
+## API Routes
+
+| Method | Path | Описание |
+|--------|------|----------|
+| POST | `/api/pipeline/[type]/start` | Запуск |
+| GET | `/api/pipeline/[id]/status` | Статус |
+| GET | `/api/pipeline/[id]/result` | Результаты |
+
+## Правила
+
+1. **Stateless handlers** — manager/storage передаются в factory
+2. **Типизация** — `NextRequest`, `NextResponse`
+3. **Error handling** — возвращай JSON с кодом ошибки

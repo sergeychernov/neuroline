@@ -1,0 +1,234 @@
+/**
+ * Pipeline Manager - базовые типы
+ * Не зависит от NestJS, MongoDB или других фреймворков
+ */
+
+// ============================================================================
+// Job Types
+// ============================================================================
+
+/** Статус отдельной job */
+export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
+
+/** Статус всего пайплайна */
+export type PipelineStatus = 'processing' | 'done' | 'error';
+
+/**
+ * Логгер для job
+ */
+export interface JobLogger {
+    info: (msg: string, data?: Record<string, unknown>) => void;
+    error: (msg: string, data?: Record<string, unknown>) => void;
+    warn: (msg: string, data?: Record<string, unknown>) => void;
+}
+
+/**
+ * Контекст выполнения job — только метаданные и логгер
+ * Job не имеет доступа к pipelineInput и артефактам напрямую
+ */
+export interface JobContext {
+    /** ID пайплайна */
+    pipelineId: string;
+    /** Индекс текущей job */
+    jobIndex: number;
+    /** Логгер */
+    logger: JobLogger;
+}
+
+/**
+ * Определение job — чистая функция, легко тестируемая
+ * TInput - тип входных данных
+ * TOutput - тип выходных данных (артефакт)
+ * TOptions - тип опций для этой job
+ */
+export interface JobDefinition<TInput = unknown, TOutput = unknown, TOptions = unknown> {
+    /** Уникальное имя job */
+    name: string;
+    /**
+     * Функция выполнения job
+     * @param input - входные данные (подготовленные через synapses)
+     * @param options - опции для этой job
+     * @param context - контекст выполнения (логгер, метаданные)
+     * @returns артефакт или null, если job не возвращает результат
+     */
+    execute: (input: TInput, options: TOptions | undefined, context: JobContext) => Promise<TOutput | null>;
+}
+
+// ============================================================================
+// Synapse Types
+// ============================================================================
+
+/**
+ * Контекст для synapses — доступ к данным пайплайна
+ */
+export interface SynapseContext<TPipelineInput = unknown> {
+    /** Исходные входные данные пайплайна */
+    pipelineInput: TPipelineInput;
+    /**
+     * Получить артефакт предыдущей job по имени
+     * @returns артефакт или undefined, если job не найдена или ещё не выполнена
+     */
+    getArtifact: <T = unknown>(jobName: string) => T | undefined;
+}
+
+/**
+ * Job в конфигурации pipeline с опциональным маппером входных данных
+ */
+export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = unknown> {
+    /** Определение job */
+    job: JobDefinition<TInput, TOutput, TOptions>;
+    /**
+     * Функция подготовки входных данных для job
+     * Если не указана, job получает pipelineInput (для первого stage) или артефакт предыдущей job
+     */
+    synapses?: (ctx: SynapseContext) => TInput;
+}
+
+// ============================================================================
+// Stage Types
+// ============================================================================
+
+/**
+ * Элемент stage — job или job с маппером
+ * - JobDefinition: job без маппера (получает дефолтный input)
+ * - JobInPipeline: job с кастомным synapses
+ */
+export type StageItem = JobDefinition | JobInPipeline;
+
+/**
+ * Stage пайплайна - один элемент или массив для параллельного выполнения
+ * - StageItem: одиночная job
+ * - StageItem[]: массив jobs, выполняемых параллельно
+ */
+export type PipelineStage = StageItem | StageItem[];
+
+// ============================================================================
+// Pipeline Config Types
+// ============================================================================
+
+/** Конфигурация пайплайна */
+export interface PipelineConfig<TInput = unknown> {
+    /** Уникальное имя типа пайплайна */
+    name: string;
+    /**
+     * Stages пайплайна (выполняются последовательно)
+     * Каждый stage может быть:
+     * - одной job/JobInPipeline
+     * - массивом jobs/JobInPipeline (выполняются параллельно внутри stage)
+     */
+    stages: PipelineStage[];
+    /** Функция для вычисления хеша входных данных */
+    computeInputHash?: (input: TInput) => string;
+}
+
+/** Входные данные для запуска пайплайна */
+export interface PipelineInput<TData = unknown, TJobOptions = Record<string, unknown>> {
+    /** Входные данные пайплайна */
+    data: TData;
+    /** Опции для каждой job (ключ - имя job) */
+    jobOptions?: TJobOptions;
+}
+
+// ============================================================================
+// Job State Types (для хранилища)
+// ============================================================================
+
+/** Состояние отдельной job в документе пайплайна */
+export interface JobState {
+    /** Имя job */
+    name: string;
+    /** Статус выполнения */
+    status: JobStatus;
+    /** Артефакт (результат выполнения) */
+    artifact?: unknown;
+    /** Информация об ошибке */
+    error?: { message: string; stack?: string };
+    /** Время начала выполнения */
+    startedAt?: Date;
+    /** Время завершения */
+    finishedAt?: Date;
+}
+
+/** Состояние пайплайна (для хранилища) */
+export interface PipelineState {
+    /** ID пайплайна */
+    pipelineId: string;
+    /** Тип пайплайна */
+    pipelineType: string;
+    /** Статус пайплайна */
+    status: PipelineStatus;
+    /** Индекс текущей job */
+    currentJobIndex: number;
+    /** Входные данные */
+    input: unknown;
+    /** Опции для jobs */
+    jobOptions?: Record<string, unknown>;
+    /** Состояния всех jobs */
+    jobs: JobState[];
+    /**
+     * Хеш структуры pipeline (имена jobs в порядке выполнения)
+     * Используется для инвалидации при изменении конфигурации
+     */
+    configHash?: string;
+    /** Время создания */
+    createdAt?: Date;
+    /** Время обновления */
+    updatedAt?: Date;
+}
+
+// ============================================================================
+// Response Types
+// ============================================================================
+
+/** Ответ на запуск пайплайна */
+export interface StartPipelineResponse {
+    /** ID пайплайна (хеш от входных данных) */
+    pipelineId: string;
+    /** Был ли пайплайн создан заново или уже существовал */
+    isNew: boolean;
+}
+
+/** Ответ на запрос статуса пайплайна */
+export interface PipelineStatusResponse {
+    /** ID пайплайна */
+    pipelineId: string;
+    /** Тип пайплайна */
+    pipelineType: string;
+    /** Статус пайплайна */
+    status: PipelineStatus;
+    /** Индекс текущей job (0-based) */
+    currentJobIndex: number;
+    /** Общее количество jobs */
+    totalJobs: number;
+    /** Имя текущей job */
+    currentJobName?: string;
+    /** Группировка jobs по stage (без индексных полей) */
+    stages: Array<{
+        jobs: Array<{
+            name: string;
+            status: JobStatus;
+            startedAt?: Date;
+            finishedAt?: Date;
+            error?: { message: string; stack?: string };
+        }>;
+    }>;
+    /** Информация об ошибке (если status === 'error') */
+    error?: { message: string; jobName?: string };
+}
+
+/** Ответ на запрос результатов пайплайна */
+export interface PipelineResultResponse {
+    /** Статус пайплайна */
+    status: PipelineStatus;
+    /**
+     * Массив артефактов
+     * - undefined: job ещё выполняется или в очереди
+     * - null: job не возвращает результат
+     * - значение: артефакт job
+     */
+    artifacts: (unknown | null | undefined)[];
+    /** Имена jobs для маппинга */
+    jobNames: string[];
+}
+
+

@@ -1,0 +1,60 @@
+---
+description: Правила для example приложений
+globs: apps/**/*
+---
+
+# Приложения (apps/)
+
+## Назначение
+
+Демо-приложения для тестирования и демонстрации библиотеки.
+
+## apps/nextjs
+
+Next.js 14 App Router приложение.
+
+```
+apps/nextjs/
+├── src/app/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   ├── providers.tsx
+│   └── api/
+│       └── network/
+│           └── route.ts
+├── next.config.js
+└── package.json
+```
+
+### Зависимости
+
+- `neuroline` — core
+- `neuroline-ui` — компоненты
+- MUI 5 + Emotion
+
+## apps/nestjs
+
+NestJS example приложение.
+
+```
+apps/nestjs/
+├── src/
+│   ├── main.ts
+│   ├── app.module.ts
+│   └── pipelines/
+│       └── index.ts    # Определения pipelines
+├── nest-cli.json
+└── package.json
+```
+
+### Зависимости
+
+- `neuroline` — core
+- `neuroline-nestjs` — модуль
+
+## Правила для apps
+
+1. **Private packages** (`"private": true`)
+2. **Workspace dependencies** (`"neuroline": "workspace:*"`)
+3. **Pipelines в отдельной папке** (`src/pipelines/`)
+4. **Конфигурация** через environment variables
