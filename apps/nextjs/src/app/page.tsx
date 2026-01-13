@@ -1,221 +1,204 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import {
-  Box,
-  Container,
-  Typography,
-  Button,
-  Paper,
-  TextField,
-  Stack,
-  Chip,
-  Alert,
-  CircularProgress,
-} from '@mui/material';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Box, Container, Typography, Paper, CircularProgress } from '@mui/material';
 import {
   PipelineViewer,
   JobDetailsPanel,
   type PipelineDisplayData,
   type JobDisplayInfo,
 } from 'neuroline-ui';
+import { PipelineManager, InMemoryPipelineStorage, type PipelineConfig } from 'neuroline';
+import type { SerializableValue } from 'neuroline-ui';
+import { PipelineControlPanel } from './components/PipelineControlPanel';
+import {
+  successPipeline,
+  errorPipeline,
+  type SuccessPipelineInput,
+  type ErrorPipelineInput,
+} from '../pipelines';
 
-// Демо данные для симуляции pipeline
-const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDisplayData => {
-  const now = Date.now();
+// ============================================================================
+// Pipeline Manager Singleton
+// ============================================================================
 
-  const basePipeline: PipelineDisplayData = {
-    pipelineId: `pl_${now.toString(36)}`,
-    pipelineType: 'data-processing-pipeline',
-    status,
-    input: {
-      url: 'https://api.example.com/data',
-      userId: 'user-123',
-      options: { timeout: 5000 },
-    },
-    stages: [
-      {
-        index: 0,
-        jobs: [
-          {
-            name: 'fetch-data',
-            status: 'done',
-            startedAt: new Date(now - 15000),
-            finishedAt: new Date(now - 12000),
-            input: {
-              url: 'https://api.example.com/data',
-              headers: { Authorization: 'Bearer ***' },
-            },
-            options: {
-              timeout: 5000,
-              retries: 3,
-            },
-            artifact: { data: '{"users": [...]}', size: 2048 },
-          },
-        ],
-      },
-      {
-        index: 1,
-        jobs: [
-          {
-            name: 'validate-schema',
-            status: 'done',
-            startedAt: new Date(now - 12000),
-            finishedAt: new Date(now - 10000),
-            input: {
-              data: '{"users": [...]}',
-              schemaVersion: 'v2',
-            },
-            options: {
-              strictMode: true,
-              allowUnknownFields: false,
-            },
-            artifact: { valid: true, recordCount: 150 },
-          },
-          {
-            name: 'notify-start',
-            status: 'done',
-            startedAt: new Date(now - 12000),
-            finishedAt: new Date(now - 11000),
-            input: {
-              userId: 'user-123',
-              event: 'pipeline_started',
-            },
-            options: {
-              channel: 'slack',
-              priority: 'low',
-            },
-            artifact: { notified: true },
-          },
-        ],
-      },
-      {
-        index: 2,
-        jobs: [
-          {
-            name: 'transform-data',
-            status: status === 'processing' ? 'processing' : 'done',
-            startedAt: new Date(now - 8000),
-            finishedAt: status !== 'processing' ? new Date(now - 3000) : undefined,
-            input: {
-              records: 150,
-              format: 'json',
-            },
-            options: {
-              batchSize: 50,
-              parallel: true,
-            },
-            artifact: status !== 'processing' ? { transformed: true } : undefined,
-          },
-        ],
-      },
-      {
-        index: 3,
-        jobs: [
-          {
-            name: 'save-to-db',
-            status: status === 'done' ? 'done' : status === 'error' ? 'error' : 'pending',
-            startedAt: status !== 'processing' ? new Date(now - 3000) : undefined,
-            finishedAt: status === 'done' ? new Date(now - 1000) : status === 'error' ? new Date(now - 500) : undefined,
-            input: {
-              collection: 'users',
-              recordCount: 150,
-            },
-            options: {
-              upsert: true,
-              connectionPool: 10,
-            },
-            artifact: status === 'done' ? { savedCount: 150 } : undefined,
-            error: status === 'error' ? { message: 'Database connection timeout' } : undefined,
-          },
-          {
-            name: 'update-cache',
-            status: status === 'done' ? 'done' : 'pending',
-            startedAt: status === 'done' ? new Date(now - 3000) : undefined,
-            finishedAt: status === 'done' ? new Date(now - 2000) : undefined,
-            input: {
-              cacheKey: 'users:all',
-              ttl: 3600,
-            },
-            options: {
-              invalidateOld: true,
-            },
-          },
-        ],
-      },
-      {
-        index: 4,
-        jobs: [
-          {
-            name: 'notify-complete',
-            status: status === 'done' ? 'done' : 'pending',
-            startedAt: status === 'done' ? new Date(now - 1000) : undefined,
-            finishedAt: status === 'done' ? new Date(now - 500) : undefined,
-            input: {
-              userId: 'user-123',
-              event: 'pipeline_completed',
-              summary: { processed: 150, errors: 0 },
-            },
-            options: {
-              channel: 'email',
-              priority: 'normal',
-            },
-          },
-        ],
-      },
-    ],
-    error: status === 'error' ? { message: 'Database connection timeout', jobName: 'save-to-db' } : undefined,
-  };
+let managerInstance: PipelineManager | null = null;
+let storageInstance: InMemoryPipelineStorage | null = null;
 
-  return basePipeline;
-};
+function getPipelineManager() {
+  if (!managerInstance) {
+    storageInstance = new InMemoryPipelineStorage();
+    managerInstance = new PipelineManager({
+      storage: storageInstance,
+      logger: {
+        info: (msg, data) => console.log(`[INFO] ${msg}`, data),
+        error: (msg, data) => console.error(`[ERROR] ${msg}`, data),
+        warn: (msg, data) => console.warn(`[WARN] ${msg}`, data),
+      },
+    });
+    managerInstance.registerPipeline(successPipeline as PipelineConfig);
+    managerInstance.registerPipeline(errorPipeline as PipelineConfig);
+  }
+  return { manager: managerInstance, storage: storageInstance! };
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/**
+ * Преобразует PipelineStatusResponse в PipelineDisplayData
+ */
+async function fetchPipelineDisplay(
+  manager: PipelineManager,
+  storage: InMemoryPipelineStorage,
+  pipelineId: string,
+): Promise<PipelineDisplayData | null> {
+  try {
+    const status = await manager.getStatus(pipelineId);
+    const result = await manager.getResult(pipelineId);
+    const state = await storage.findById(pipelineId);
+
+    if (!status || !state) return null;
+
+    const displayData: PipelineDisplayData = {
+      pipelineId: status.pipelineId,
+      pipelineType: status.pipelineType,
+      status: status.status,
+      input: state.input as SerializableValue,
+      stages: status.stages.map((stage, index) => ({
+        index,
+        jobs: stage.jobs.map((job) => ({
+          name: job.name,
+          status: job.status,
+          startedAt: job.startedAt,
+          finishedAt: job.finishedAt,
+          error: job.error,
+          artifact: result.artifacts[job.name] as SerializableValue | undefined,
+        })),
+      })),
+      error: status.error,
+    };
+
+    return displayData;
+  } catch (e) {
+    console.error('Failed to fetch pipeline display', e);
+    return null;
+  }
+}
+
+// ============================================================================
+// Component
+// ============================================================================
 
 export default function HomePage() {
   const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
   const [showArtifacts, setShowArtifacts] = useState(false);
   const [showInput, setShowInput] = useState(true);
-  const [isPolling, setIsPolling] = useState(true);
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentPipelineType, setCurrentPipelineType] = useState<string | undefined>();
   const [mounted, setMounted] = useState(false);
 
-  // Инициализация на клиенте (избегаем hydration mismatch)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const currentPipelineIdRef = useRef<string | null>(null);
+
+  // Инициализация на клиенте
   useEffect(() => {
     setMounted(true);
-    setPipeline(createDemoPipeline('processing'));
-  }, []);
-
-  // Симуляция polling (в реальном приложении это будет API вызов)
-  useEffect(() => {
-    if (!mounted || !pipeline || !isPolling || pipeline.status !== 'processing') return;
-
-    const timer = setTimeout(() => {
-      // Случайно выбираем следующий статус
-      const rand = Math.random();
-      if (rand > 0.7) {
-        setPipeline(createDemoPipeline('done'));
-        setIsPolling(false);
-      } else if (rand > 0.9) {
-        setPipeline(createDemoPipeline('error'));
-        setIsPolling(false);
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
       }
-      // Иначе продолжаем processing
-    }, 2000);
-
-    return () => clearTimeout(timer);
-  }, [mounted, isPolling, pipeline?.status]);
+    };
+  }, []);
 
   const handleJobClick = useCallback((job: JobDisplayInfo) => {
     setSelectedJob(job);
   }, []);
 
-  const handleNewPipeline = useCallback((status: 'processing' | 'done' | 'error') => {
-    setPipeline(createDemoPipeline(status));
-    setSelectedJob(null);
-    setIsPolling(status === 'processing');
+  const startPolling = useCallback((pipelineId: string) => {
+    const { manager, storage } = getPipelineManager();
+
+    // Очищаем предыдущий polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    currentPipelineIdRef.current = pipelineId;
+
+    const poll = async () => {
+      if (currentPipelineIdRef.current !== pipelineId) return;
+
+      const displayData = await fetchPipelineDisplay(manager, storage, pipelineId);
+      if (!displayData) return;
+
+      setPipeline(displayData);
+
+      if (displayData.status !== 'processing') {
+        setIsRunning(false);
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+        }
+      }
+    };
+
+    // Первый запрос сразу
+    poll();
+
+    // Потом каждые 500ms
+    pollingRef.current = setInterval(poll, 500);
   }, []);
 
-  // Не рендерим до монтирования (избегаем hydration mismatch)
-  if (!mounted || !pipeline) {
+  const handleStartSuccess = useCallback(async () => {
+    const { manager } = getPipelineManager();
+
+    setIsRunning(true);
+    setCurrentPipelineType('success-pipeline');
+    setSelectedJob(null);
+    setPipeline(null);
+
+    const input: SuccessPipelineInput = {
+      seed: Math.floor(Math.random() * 1000),
+      name: `test-${Date.now()}`,
+      iterations: 10,
+    };
+
+    try {
+      const { pipelineId } = await manager.startPipeline('success-pipeline', { data: input });
+      startPolling(pipelineId);
+    } catch (e) {
+      console.error('Failed to start success pipeline', e);
+      setIsRunning(false);
+    }
+  }, [startPolling]);
+
+  const handleStartError = useCallback(async () => {
+    const { manager } = getPipelineManager();
+
+    setIsRunning(true);
+    setCurrentPipelineType('error-pipeline');
+    setSelectedJob(null);
+    setPipeline(null);
+
+    const input: ErrorPipelineInput = {
+      seed: Math.floor(Math.random() * 1000),
+      name: `test-${Date.now()}`,
+      iterations: 10,
+    };
+
+    try {
+      const { pipelineId } = await manager.startPipeline('error-pipeline', { data: input });
+      startPolling(pipelineId);
+    } catch (e) {
+      console.error('Failed to start error pipeline', e);
+      setIsRunning(false);
+    }
+  }, [startPolling]);
+
+  // Loading state
+  if (!mounted) {
     return (
       <Box
         sx={{
@@ -236,10 +219,10 @@ export default function HomePage() {
       sx={{
         minHeight: '100vh',
         background: `
-          radial-gradient(ellipse at 10% 20%, rgba(124, 77, 255, 0.12) 0%, transparent 50%),
-          radial-gradient(ellipse at 90% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
-          linear-gradient(135deg, #050508 0%, #0a0a12 50%, #0f0f1a 100%)
-        `,
+					radial-gradient(ellipse at 10% 20%, rgba(124, 77, 255, 0.12) 0%, transparent 50%),
+					radial-gradient(ellipse at 90% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
+					linear-gradient(135deg, #050508 0%, #0a0a12 50%, #0f0f1a 100%)
+				`,
         py: 4,
       }}
     >
@@ -285,92 +268,50 @@ export default function HomePage() {
         </Box>
 
         {/* Панель управления */}
-        <Paper
-          elevation={0}
-          sx={{
-            p: 3,
-            mb: 4,
-            backgroundColor: 'rgba(19, 19, 26, 0.6)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(124, 77, 255, 0.2)',
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2, color: '#7c4dff' }}>
-            Демонстрация
-          </Typography>
-
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
-            <Button
-              variant="contained"
-              onClick={() => handleNewPipeline('processing')}
-              startIcon={isPolling ? <CircularProgress size={16} color="inherit" /> : undefined}
-              sx={{
-                background: 'linear-gradient(135deg, #00e5ff 0%, #00b2cc 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #6effff 0%, #00e5ff 100%)',
-                },
-              }}
-            >
-              Новый Pipeline (processing)
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => handleNewPipeline('done')}
-              sx={{
-                background: 'linear-gradient(135deg, #00e676 0%, #00c853 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #69f0ae 0%, #00e676 100%)',
-                },
-              }}
-            >
-              Завершённый Pipeline
-            </Button>
-            <Button
-              variant="contained"
-              onClick={() => handleNewPipeline('error')}
-              sx={{
-                background: 'linear-gradient(135deg, #ff1744 0%, #d50000 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #ff5252 0%, #ff1744 100%)',
-                },
-              }}
-            >
-              Pipeline с ошибкой
-            </Button>
-          </Stack>
-
-          <Stack direction="row" spacing={2}>
-            <Chip
-              label={showArtifacts ? '📦 Артефакты: ON' : '📦 Артефакты: OFF'}
-              onClick={() => setShowArtifacts(!showArtifacts)}
-              sx={{
-                cursor: 'pointer',
-                backgroundColor: showArtifacts ? 'rgba(124, 77, 255, 0.2)' : 'rgba(160, 160, 160, 0.15)',
-                color: showArtifacts ? '#7c4dff' : 'text.secondary',
-                border: `1px solid ${showArtifacts ? 'rgba(124, 77, 255, 0.3)' : 'rgba(160, 160, 160, 0.3)'}`,
-              }}
-            />
-            <Chip
-              label={showInput ? '📥 Input: ON' : '📥 Input: OFF'}
-              onClick={() => setShowInput(!showInput)}
-              sx={{
-                cursor: 'pointer',
-                backgroundColor: showInput ? 'rgba(0, 230, 118, 0.2)' : 'rgba(160, 160, 160, 0.15)',
-                color: showInput ? '#00e676' : 'text.secondary',
-                border: `1px solid ${showInput ? 'rgba(0, 230, 118, 0.3)' : 'rgba(160, 160, 160, 0.3)'}`,
-              }}
-            />
-          </Stack>
-        </Paper>
+        <PipelineControlPanel
+          showArtifacts={showArtifacts}
+          onShowArtifactsChange={setShowArtifacts}
+          showInput={showInput}
+          onShowInputChange={setShowInput}
+          onStartSuccess={handleStartSuccess}
+          onStartError={handleStartError}
+          isRunning={isRunning}
+          currentPipelineType={currentPipelineType}
+        />
 
         {/* Визуализация Pipeline */}
-        <PipelineViewer
-          pipeline={pipeline}
-          onJobClick={handleJobClick}
-          selectedJobName={selectedJob?.name}
-          showArtifacts={showArtifacts}
-          showInput={showInput}
-        />
+        {pipeline ? (
+          <PipelineViewer
+            pipeline={pipeline}
+            onJobClick={handleJobClick}
+            selectedJobName={selectedJob?.name}
+            showArtifacts={showArtifacts}
+            showInput={showInput}
+          />
+        ) : (
+          <Paper
+            elevation={0}
+            sx={{
+              p: 6,
+              textAlign: 'center',
+              backgroundColor: 'rgba(19, 19, 26, 0.6)',
+              border: '1px solid rgba(160, 160, 160, 0.2)',
+            }}
+          >
+            {isRunning ? (
+              <>
+                <CircularProgress sx={{ color: '#7c4dff', mb: 2 }} />
+                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                  Запуск pipeline...
+                </Typography>
+              </>
+            ) : (
+              <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                Нажмите кнопку для запуска pipeline
+              </Typography>
+            )}
+          </Paper>
+        )}
 
         {/* Детали выбранной Job */}
         {selectedJob && <JobDetailsPanel job={selectedJob} />}
