@@ -7,7 +7,7 @@ React components for visualizing Neuroline pipelines with Material-UI.
 ## Installation
 
 ```bash
-yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
+yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-material
 ```
 
 **Note:** This package has peer dependencies on React, MUI, and Emotion.
@@ -16,8 +16,12 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
 
 - **PipelineViewer** - visual representation of pipeline execution flow
 - **JobNode** - individual job status display with timing information
+- **JobDetailsPanel** - detailed job information with tabs for artifact, input, options
 - **StageColumn** - stage grouping with parallel job visualization
 - **StatusBadge** - color-coded status indicators
+- **ArtifactView** - job artifact display
+- **InputView** - job input data display with edit button
+- **OptionsView** - job options display with edit button
 - **TypeScript Support** - full type safety
 - **Storybook** - interactive component documentation
 
@@ -26,42 +30,42 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
 ```typescript
 'use client';
 
-import { PipelineViewer } from 'neuroline-ui';
-import { useEffect, useState } from 'react';
+import { PipelineViewer, JobDetailsPanel } from 'neuroline-ui';
+import type { PipelineDisplayData, JobDisplayInfo } from 'neuroline-ui';
+import { useEffect, useState, useCallback } from 'react';
 
 export function PipelineDemo() {
-  const [status, setStatus] = useState(null);
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
 
   useEffect(() => {
-    if (!pipelineId) return;
+    // Fetch pipeline status
+    fetch('/api/pipeline/status')
+      .then(res => res.json())
+      .then(setPipeline);
+  }, []);
 
-    const pollStatus = async () => {
-      const response = await fetch(`/api/pipeline/${pipelineId}/status`);
-      const data = await response.json();
-      setStatus(data);
-
-      if (data.status === 'processing') {
-        setTimeout(pollStatus, 1000);
-      }
-    };
-
-    pollStatus();
-  }, [pipelineId]);
-
-  const handleStart = async () => {
-    const response = await fetch('/api/pipeline/my-pipeline/start', {
-      method: 'POST',
-      body: JSON.stringify({ data: { url: 'https://example.com' } }),
-    });
-    const result = await response.json();
-    setPipelineId(result.pipelineId);
-  };
+  const handleJobClick = useCallback((job: JobDisplayInfo) => {
+    setSelectedJob(job);
+  }, []);
 
   return (
     <div>
-      <button onClick={handleStart}>Start Pipeline</button>
-      {status && <PipelineViewer status={status} showTiming />}
+      {pipeline && (
+        <PipelineViewer
+          pipeline={pipeline}
+          onJobClick={handleJobClick}
+          selectedJobName={selectedJob?.name}
+          showArtifacts
+        />
+      )}
+      {selectedJob && (
+        <JobDetailsPanel
+          job={selectedJob}
+          onInputEditClick={(job) => console.log('Edit input:', job)}
+          onOptionsEditClick={(job) => console.log('Edit options:', job)}
+        />
+      )}
     </div>
   );
 }
@@ -77,39 +81,41 @@ Main component for visualizing pipeline execution.
 import { PipelineViewer } from 'neuroline-ui';
 
 <PipelineViewer
-  status={{
+  pipeline={{
+    pipelineId: 'pl_123',
+    pipelineType: 'data-processing',
     status: 'processing',
-    currentJobIndex: 2,
-    totalJobs: 5,
     stages: [
       {
+        index: 0,
         jobs: [
           {
             name: 'fetch-data',
             status: 'done',
-            startedAt: '2024-01-01T00:00:00Z',
-            finishedAt: '2024-01-01T00:00:02Z',
+            startedAt: new Date('2024-01-01T00:00:00Z'),
+            finishedAt: new Date('2024-01-01T00:00:02Z'),
+            artifact: { size: 2048 },
           },
         ],
       },
       {
+        index: 1,
         jobs: [
           {
             name: 'process-data',
             status: 'processing',
-            startedAt: '2024-01-01T00:00:02Z',
-          },
-          {
-            name: 'notify',
-            status: 'processing',
-            startedAt: '2024-01-01T00:00:02Z',
+            startedAt: new Date('2024-01-01T00:00:02Z'),
+            input: { records: 150 },
+            options: { batchSize: 50 },
           },
         ],
       },
     ],
   }}
-  showTiming={true}
-  onJobClick={(payload) => console.log('Job clicked:', payload)}
+  showArtifacts={true}
+  showInput={true}
+  onJobClick={(job) => console.log('Job clicked:', job)}
+  selectedJobName="fetch-data"
 />
 ```
 
@@ -117,9 +123,41 @@ import { PipelineViewer } from 'neuroline-ui';
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `status` | `ExtendedPipelineStatus` | Required | Pipeline status with stages |
-| `showTiming` | `boolean` | `false` | Show execution timing for jobs |
-| `onJobClick` | `(payload: JobClickPayload) => void` | - | Click handler for job nodes |
+| `pipeline` | `PipelineDisplayData` | Required | Pipeline data with stages |
+| `showArtifacts` | `boolean` | `false` | Show artifacts in job nodes |
+| `showInput` | `boolean` | `false` | Show pipeline input |
+| `onJobClick` | `(job: JobDisplayInfo) => void` | - | Click handler for job nodes |
+| `selectedJobName` | `string` | - | Name of currently selected job |
+
+### JobDetailsPanel
+
+Panel for displaying detailed job information with tabs.
+
+```typescript
+import { JobDetailsPanel } from 'neuroline-ui';
+
+<JobDetailsPanel
+  job={{
+    name: 'process-data',
+    status: 'done',
+    startedAt: new Date(),
+    finishedAt: new Date(),
+    artifact: { processed: true, count: 150 },
+    input: { records: 150, format: 'json' },
+    options: { batchSize: 50, parallel: true },
+  }}
+  onInputEditClick={(job) => console.log('Edit input:', job)}
+  onOptionsEditClick={(job) => console.log('Edit options:', job)}
+/>
+```
+
+**Props:**
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `job` | `JobDisplayInfo` | Required | Job to display |
+| `onInputEditClick` | `(job: JobDisplayInfo) => void` | - | Edit input callback |
+| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | - | Edit options callback |
 
 ### JobNode
 
@@ -129,12 +167,16 @@ Individual job display component.
 import { JobNode } from 'neuroline-ui';
 
 <JobNode
-  name="fetch-data"
-  status="done"
-  startedAt="2024-01-01T00:00:00Z"
-  finishedAt="2024-01-01T00:00:02Z"
-  showTiming={true}
-  onClick={() => console.log('Clicked')}
+  job={{
+    name: 'fetch-data',
+    status: 'done',
+    startedAt: new Date(),
+    finishedAt: new Date(),
+    artifact: { size: 2048 },
+  }}
+  isSelected={true}
+  showArtifact={true}
+  onClick={(job) => console.log('Clicked:', job)}
 />
 ```
 
@@ -142,13 +184,10 @@ import { JobNode } from 'neuroline-ui';
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `name` | `string` | Required | Job name |
-| `status` | `'pending' \| 'processing' \| 'done' \| 'error'` | Required | Job status |
-| `startedAt` | `string` | - | ISO date string |
-| `finishedAt` | `string` | - | ISO date string |
-| `error` | `{ message: string }` | - | Error information |
-| `showTiming` | `boolean` | `false` | Show timing info |
-| `onClick` | `() => void` | - | Click handler |
+| `job` | `JobDisplayInfo` | Required | Job data |
+| `isSelected` | `boolean` | `false` | Highlight as selected |
+| `showArtifact` | `boolean` | `false` | Show artifact preview |
+| `onClick` | `(job: JobDisplayInfo) => void` | - | Click handler |
 
 ### StageColumn
 
@@ -158,13 +197,16 @@ Stage grouping component for parallel jobs.
 import { StageColumn } from 'neuroline-ui';
 
 <StageColumn
-  stageIndex={1}
-  jobs={[
-    { name: 'job1', status: 'done' },
-    { name: 'job2', status: 'done' },
-  ]}
-  showTiming={true}
-  onJobClick={(payload) => console.log(payload)}
+  stage={{
+    index: 1,
+    jobs: [
+      { name: 'job1', status: 'done' },
+      { name: 'job2', status: 'done' },
+    ],
+  }}
+  showArtifacts={true}
+  selectedJobName="job1"
+  onJobClick={(job) => console.log(job)}
 />
 ```
 
@@ -175,64 +217,105 @@ Status indicator with color coding.
 ```typescript
 import { StatusBadge } from 'neuroline-ui';
 
-<StatusBadge status="processing" />
+<StatusBadge status="processing" size="small" />
 ```
 
 **Status colors:**
 - `pending` - Gray
-- `processing` - Blue (animated)
+- `processing` - Cyan (animated)
 - `done` - Green
 - `error` - Red
+
+### ArtifactView
+
+Display job artifact data.
+
+```typescript
+import { ArtifactView } from 'neuroline-ui';
+
+<ArtifactView artifact={{ processed: true, count: 150 }} />
+```
+
+### InputView
+
+Display job input data with optional edit button.
+
+```typescript
+import { InputView } from 'neuroline-ui';
+
+<InputView
+  input={{ records: 150, format: 'json' }}
+  onEditClick={() => console.log('Edit input')}
+/>
+```
+
+### OptionsView
+
+Display job options with optional edit button.
+
+```typescript
+import { OptionsView } from 'neuroline-ui';
+
+<OptionsView
+  options={{ batchSize: 50, parallel: true }}
+  onEditClick={() => console.log('Edit options')}
+/>
+```
 
 ## Types
 
 ```typescript
 import type {
-  ExtendedPipelineStatus,
-  JobInStage,
-  StageStatus,
-  JobClickPayload,
+  PipelineDisplayData,
+  StageDisplayInfo,
+  JobDisplayInfo,
+  JobStatus,
+  PipelineStatus,
+  SerializableValue,
 } from 'neuroline-ui';
 ```
 
-### ExtendedPipelineStatus
+### JobDisplayInfo
 
 ```typescript
-interface ExtendedPipelineStatus {
+interface JobDisplayInfo {
+  name: string;
+  status: 'pending' | 'processing' | 'done' | 'error';
+  startedAt?: Date;
+  finishedAt?: Date;
+  error?: { message: string; stack?: string };
+  artifact?: SerializableValue;
+  input?: SerializableValue;
+  options?: SerializableValue;
+}
+```
+
+### StageDisplayInfo
+
+```typescript
+interface StageDisplayInfo {
+  index: number;
+  jobs: JobDisplayInfo[];
+}
+```
+
+### PipelineDisplayData
+
+```typescript
+interface PipelineDisplayData {
+  pipelineId: string;
+  pipelineType: string;
   status: 'processing' | 'done' | 'error';
-  currentJobIndex?: number;
-  totalJobs?: number;
-  currentJobName?: string;
-  stages: StageStatus[];
+  stages: StageDisplayInfo[];
+  input?: SerializableValue;
   error?: { message: string; jobName?: string };
 }
 ```
 
-### JobInStage
+### SerializableValue
 
 ```typescript
-interface JobInStage {
-  name: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  startedAt?: string;
-  finishedAt?: string;
-  error?: { message: string; stack?: string };
-}
-```
-
-### JobClickPayload
-
-```typescript
-interface JobClickPayload {
-  jobName: string;
-  status: string;
-  stageIndex: number;
-  timing?: {
-    startedAt?: string;
-    finishedAt?: string;
-    duration?: number;
-  };
-}
+type SerializableValue = Record<string, unknown> | string | number | boolean | null;
 ```
 
 ## Styling
@@ -247,14 +330,15 @@ import { PipelineViewer } from 'neuroline-ui';
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#1976d2' },
-    success: { main: '#2e7d32' },
-    error: { main: '#d32f2f' },
+    primary: { main: '#7c4dff' },
+    success: { main: '#00e676' },
+    error: { main: '#ff1744' },
+    info: { main: '#00e5ff' },
   },
 });
 
 <ThemeProvider theme={theme}>
-  <PipelineViewer status={status} />
+  <PipelineViewer pipeline={pipeline} />
 </ThemeProvider>
 ```
 
@@ -275,17 +359,20 @@ This will start Storybook on `http://localhost:6006` with live examples of all c
 ```typescript
 'use client';
 
-import { PipelineViewer } from 'neuroline-ui';
-import { Box, Container, Typography } from '@mui/material';
+import { PipelineViewer, JobDetailsPanel } from 'neuroline-ui';
+import type { PipelineDisplayData, JobDisplayInfo } from 'neuroline-ui';
+import { Container, Typography } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
 
 export default function PipelinePage({ params }: { params: { id: string } }) {
-  const [status, setStatus] = useState(null);
+  const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
 
   useEffect(() => {
     const pollStatus = async () => {
       const res = await fetch(`/api/pipeline/${params.id}/status`);
       const data = await res.json();
-      setStatus(data);
+      setPipeline(data);
 
       if (data.status === 'processing') {
         setTimeout(pollStatus, 1000);
@@ -295,53 +382,25 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     pollStatus();
   }, [params.id]);
 
+  const handleJobClick = useCallback((job: JobDisplayInfo) => {
+    setSelectedJob(job);
+  }, []);
+
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
         Pipeline: {params.id}
       </Typography>
-      {status && (
+      {pipeline && (
         <PipelineViewer
-          status={status}
-          showTiming
-          onJobClick={(payload) => {
-            console.log('Job clicked:', payload);
-          }}
+          pipeline={pipeline}
+          onJobClick={handleJobClick}
+          selectedJobName={selectedJob?.name}
+          showArtifacts
         />
       )}
+      {selectedJob && <JobDetailsPanel job={selectedJob} />}
     </Container>
-  );
-}
-```
-
-### With NestJS Backend
-
-```typescript
-'use client';
-
-import { PipelineViewer } from 'neuroline-ui';
-import { useState } from 'react';
-
-export function PipelineMonitor() {
-  const [pipelineId, setPipelineId] = useState('');
-  const [status, setStatus] = useState(null);
-
-  const loadStatus = async () => {
-    const res = await fetch(`http://localhost:3000/pipeline/${pipelineId}/status`);
-    const data = await res.json();
-    setStatus(data);
-  };
-
-  return (
-    <div>
-      <input
-        value={pipelineId}
-        onChange={(e) => setPipelineId(e.target.value)}
-        placeholder="Pipeline ID"
-      />
-      <button onClick={loadStatus}>Load Status</button>
-      {status && <PipelineViewer status={status} showTiming />}
-    </div>
   );
 }
 ```
@@ -373,7 +432,7 @@ React компоненты для визуализации Neuroline пайпл�
 ## Установка
 
 ```bash
-yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
+yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-material
 ```
 
 **Примечание:** Этот пакет имеет peer-зависимости от React, MUI и Emotion.
@@ -382,8 +441,12 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
 
 - **PipelineViewer** - визуальное представление процесса выполнения pipeline
 - **JobNode** - отображение статуса отдельной job с информацией о времени
+- **JobDetailsPanel** - детальная информация о job с табами для artifact, input, options
 - **StageColumn** - группировка stage с визуализацией параллельных jobs
 - **StatusBadge** - цветные индикаторы статуса
+- **ArtifactView** - отображение артефакта job
+- **InputView** - отображение входных данных job с кнопкой редактирования
+- **OptionsView** - отображение опций job с кнопкой редактирования
 - **TypeScript поддержка** - полная типобезопасность
 - **Storybook** - интерактивная документация компонентов
 
@@ -392,42 +455,42 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled
 ```typescript
 'use client';
 
-import { PipelineViewer } from 'neuroline-ui';
-import { useEffect, useState } from 'react';
+import { PipelineViewer, JobDetailsPanel } from 'neuroline-ui';
+import type { PipelineDisplayData, JobDisplayInfo } from 'neuroline-ui';
+import { useEffect, useState, useCallback } from 'react';
 
 export function PipelineDemo() {
-  const [status, setStatus] = useState(null);
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
 
   useEffect(() => {
-    if (!pipelineId) return;
+    // Получение статуса pipeline
+    fetch('/api/pipeline/status')
+      .then(res => res.json())
+      .then(setPipeline);
+  }, []);
 
-    const pollStatus = async () => {
-      const response = await fetch(`/api/pipeline/${pipelineId}/status`);
-      const data = await response.json();
-      setStatus(data);
-
-      if (data.status === 'processing') {
-        setTimeout(pollStatus, 1000);
-      }
-    };
-
-    pollStatus();
-  }, [pipelineId]);
-
-  const handleStart = async () => {
-    const response = await fetch('/api/pipeline/my-pipeline/start', {
-      method: 'POST',
-      body: JSON.stringify({ data: { url: 'https://example.com' } }),
-    });
-    const result = await response.json();
-    setPipelineId(result.pipelineId);
-  };
+  const handleJobClick = useCallback((job: JobDisplayInfo) => {
+    setSelectedJob(job);
+  }, []);
 
   return (
     <div>
-      <button onClick={handleStart}>Запустить Pipeline</button>
-      {status && <PipelineViewer status={status} showTiming />}
+      {pipeline && (
+        <PipelineViewer
+          pipeline={pipeline}
+          onJobClick={handleJobClick}
+          selectedJobName={selectedJob?.name}
+          showArtifacts
+        />
+      )}
+      {selectedJob && (
+        <JobDetailsPanel
+          job={selectedJob}
+          onInputEditClick={(job) => console.log('Редактировать input:', job)}
+          onOptionsEditClick={(job) => console.log('Редактировать options:', job)}
+        />
+      )}
     </div>
   );
 }
@@ -443,39 +506,41 @@ export function PipelineDemo() {
 import { PipelineViewer } from 'neuroline-ui';
 
 <PipelineViewer
-  status={{
+  pipeline={{
+    pipelineId: 'pl_123',
+    pipelineType: 'data-processing',
     status: 'processing',
-    currentJobIndex: 2,
-    totalJobs: 5,
     stages: [
       {
+        index: 0,
         jobs: [
           {
             name: 'fetch-data',
             status: 'done',
-            startedAt: '2024-01-01T00:00:00Z',
-            finishedAt: '2024-01-01T00:00:02Z',
+            startedAt: new Date('2024-01-01T00:00:00Z'),
+            finishedAt: new Date('2024-01-01T00:00:02Z'),
+            artifact: { size: 2048 },
           },
         ],
       },
       {
+        index: 1,
         jobs: [
           {
             name: 'process-data',
             status: 'processing',
-            startedAt: '2024-01-01T00:00:02Z',
-          },
-          {
-            name: 'notify',
-            status: 'processing',
-            startedAt: '2024-01-01T00:00:02Z',
+            startedAt: new Date('2024-01-01T00:00:02Z'),
+            input: { records: 150 },
+            options: { batchSize: 50 },
           },
         ],
       },
     ],
   }}
-  showTiming={true}
-  onJobClick={(payload) => console.log('Job clicked:', payload)}
+  showArtifacts={true}
+  showInput={true}
+  onJobClick={(job) => console.log('Job clicked:', job)}
+  selectedJobName="fetch-data"
 />
 ```
 
@@ -483,9 +548,41 @@ import { PipelineViewer } from 'neuroline-ui';
 
 | Проп | Тип | По умолчанию | Описание |
 |------|-----|--------------|----------|
-| `status` | `ExtendedPipelineStatus` | Обязательно | Статус pipeline со stages |
-| `showTiming` | `boolean` | `false` | Показывать время выполнения jobs |
-| `onJobClick` | `(payload: JobClickPayload) => void` | - | Обработчик клика по job |
+| `pipeline` | `PipelineDisplayData` | Обязательно | Данные pipeline со stages |
+| `showArtifacts` | `boolean` | `false` | Показывать артефакты в job nodes |
+| `showInput` | `boolean` | `false` | Показывать входные данные pipeline |
+| `onJobClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика по job |
+| `selectedJobName` | `string` | - | Имя выбранной job |
+
+### JobDetailsPanel
+
+Панель для отображения детальной информации о job с табами.
+
+```typescript
+import { JobDetailsPanel } from 'neuroline-ui';
+
+<JobDetailsPanel
+  job={{
+    name: 'process-data',
+    status: 'done',
+    startedAt: new Date(),
+    finishedAt: new Date(),
+    artifact: { processed: true, count: 150 },
+    input: { records: 150, format: 'json' },
+    options: { batchSize: 50, parallel: true },
+  }}
+  onInputEditClick={(job) => console.log('Редактировать input:', job)}
+  onOptionsEditClick={(job) => console.log('Редактировать options:', job)}
+/>
+```
+
+**Пропсы:**
+
+| Проп | Тип | По умолчанию | Описание |
+|------|-----|--------------|----------|
+| `job` | `JobDisplayInfo` | Обязательно | Job для отображения |
+| `onInputEditClick` | `(job: JobDisplayInfo) => void` | - | Callback редактирования input |
+| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | - | Callback редактирования options |
 
 ### JobNode
 
@@ -495,12 +592,16 @@ import { PipelineViewer } from 'neuroline-ui';
 import { JobNode } from 'neuroline-ui';
 
 <JobNode
-  name="fetch-data"
-  status="done"
-  startedAt="2024-01-01T00:00:00Z"
-  finishedAt="2024-01-01T00:00:02Z"
-  showTiming={true}
-  onClick={() => console.log('Clicked')}
+  job={{
+    name: 'fetch-data',
+    status: 'done',
+    startedAt: new Date(),
+    finishedAt: new Date(),
+    artifact: { size: 2048 },
+  }}
+  isSelected={true}
+  showArtifact={true}
+  onClick={(job) => console.log('Clicked:', job)}
 />
 ```
 
@@ -508,13 +609,10 @@ import { JobNode } from 'neuroline-ui';
 
 | Проп | Тип | По умолчанию | Описание |
 |------|-----|--------------|----------|
-| `name` | `string` | Обязательно | Имя job |
-| `status` | `'pending' \| 'processing' \| 'done' \| 'error'` | Обязательно | Статус job |
-| `startedAt` | `string` | - | ISO строка даты |
-| `finishedAt` | `string` | - | ISO строка даты |
-| `error` | `{ message: string }` | - | Информация об ошибке |
-| `showTiming` | `boolean` | `false` | Показывать время |
-| `onClick` | `() => void` | - | Обработчик клика |
+| `job` | `JobDisplayInfo` | Обязательно | Данные job |
+| `isSelected` | `boolean` | `false` | Подсветить как выбранную |
+| `showArtifact` | `boolean` | `false` | Показывать превью артефакта |
+| `onClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика |
 
 ### StageColumn
 
@@ -524,13 +622,16 @@ import { JobNode } from 'neuroline-ui';
 import { StageColumn } from 'neuroline-ui';
 
 <StageColumn
-  stageIndex={1}
-  jobs={[
-    { name: 'job1', status: 'done' },
-    { name: 'job2', status: 'done' },
-  ]}
-  showTiming={true}
-  onJobClick={(payload) => console.log(payload)}
+  stage={{
+    index: 1,
+    jobs: [
+      { name: 'job1', status: 'done' },
+      { name: 'job2', status: 'done' },
+    ],
+  }}
+  showArtifacts={true}
+  selectedJobName="job1"
+  onJobClick={(job) => console.log(job)}
 />
 ```
 
@@ -541,64 +642,105 @@ import { StageColumn } from 'neuroline-ui';
 ```typescript
 import { StatusBadge } from 'neuroline-ui';
 
-<StatusBadge status="processing" />
+<StatusBadge status="processing" size="small" />
 ```
 
 **Цвета статусов:**
 - `pending` - Серый
-- `processing` - Синий (анимированный)
+- `processing` - Бирюзовый (анимированный)
 - `done` - Зелёный
 - `error` - Красный
+
+### ArtifactView
+
+Отображение артефакта job.
+
+```typescript
+import { ArtifactView } from 'neuroline-ui';
+
+<ArtifactView artifact={{ processed: true, count: 150 }} />
+```
+
+### InputView
+
+Отображение входных данных job с опциональной кнопкой редактирования.
+
+```typescript
+import { InputView } from 'neuroline-ui';
+
+<InputView
+  input={{ records: 150, format: 'json' }}
+  onEditClick={() => console.log('Редактировать input')}
+/>
+```
+
+### OptionsView
+
+Отображение опций job с опциональной кнопкой редактирования.
+
+```typescript
+import { OptionsView } from 'neuroline-ui';
+
+<OptionsView
+  options={{ batchSize: 50, parallel: true }}
+  onEditClick={() => console.log('Редактировать options')}
+/>
+```
 
 ## Типы
 
 ```typescript
 import type {
-  ExtendedPipelineStatus,
-  JobInStage,
-  StageStatus,
-  JobClickPayload,
+  PipelineDisplayData,
+  StageDisplayInfo,
+  JobDisplayInfo,
+  JobStatus,
+  PipelineStatus,
+  SerializableValue,
 } from 'neuroline-ui';
 ```
 
-### ExtendedPipelineStatus
+### JobDisplayInfo
 
 ```typescript
-interface ExtendedPipelineStatus {
+interface JobDisplayInfo {
+  name: string;
+  status: 'pending' | 'processing' | 'done' | 'error';
+  startedAt?: Date;
+  finishedAt?: Date;
+  error?: { message: string; stack?: string };
+  artifact?: SerializableValue;
+  input?: SerializableValue;
+  options?: SerializableValue;
+}
+```
+
+### StageDisplayInfo
+
+```typescript
+interface StageDisplayInfo {
+  index: number;
+  jobs: JobDisplayInfo[];
+}
+```
+
+### PipelineDisplayData
+
+```typescript
+interface PipelineDisplayData {
+  pipelineId: string;
+  pipelineType: string;
   status: 'processing' | 'done' | 'error';
-  currentJobIndex?: number;
-  totalJobs?: number;
-  currentJobName?: string;
-  stages: StageStatus[];
+  stages: StageDisplayInfo[];
+  input?: SerializableValue;
   error?: { message: string; jobName?: string };
 }
 ```
 
-### JobInStage
+### SerializableValue
 
 ```typescript
-interface JobInStage {
-  name: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  startedAt?: string;
-  finishedAt?: string;
-  error?: { message: string; stack?: string };
-}
-```
-
-### JobClickPayload
-
-```typescript
-interface JobClickPayload {
-  jobName: string;
-  status: string;
-  stageIndex: number;
-  timing?: {
-    startedAt?: string;
-    finishedAt?: string;
-    duration?: number;
-  };
-}
+type SerializableValue = Record<string, unknown> | string | number | boolean | null;
 ```
 
 ## Стилизация
@@ -613,14 +755,15 @@ import { PipelineViewer } from 'neuroline-ui';
 
 const theme = createTheme({
   palette: {
-    primary: { main: '#1976d2' },
-    success: { main: '#2e7d32' },
-    error: { main: '#d32f2f' },
+    primary: { main: '#7c4dff' },
+    success: { main: '#00e676' },
+    error: { main: '#ff1744' },
+    info: { main: '#00e5ff' },
   },
 });
 
 <ThemeProvider theme={theme}>
-  <PipelineViewer status={status} />
+  <PipelineViewer pipeline={pipeline} />
 </ThemeProvider>
 ```
 
@@ -641,17 +784,20 @@ yarn workspace neuroline-ui storybook
 ```typescript
 'use client';
 
-import { PipelineViewer } from 'neuroline-ui';
-import { Box, Container, Typography } from '@mui/material';
+import { PipelineViewer, JobDetailsPanel } from 'neuroline-ui';
+import type { PipelineDisplayData, JobDisplayInfo } from 'neuroline-ui';
+import { Container, Typography } from '@mui/material';
+import { useState, useEffect, useCallback } from 'react';
 
 export default function PipelinePage({ params }: { params: { id: string } }) {
-  const [status, setStatus] = useState(null);
+  const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
+  const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
 
   useEffect(() => {
     const pollStatus = async () => {
       const res = await fetch(`/api/pipeline/${params.id}/status`);
       const data = await res.json();
-      setStatus(data);
+      setPipeline(data);
 
       if (data.status === 'processing') {
         setTimeout(pollStatus, 1000);
@@ -661,53 +807,25 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
     pollStatus();
   }, [params.id]);
 
+  const handleJobClick = useCallback((job: JobDisplayInfo) => {
+    setSelectedJob(job);
+  }, []);
+
   return (
     <Container>
       <Typography variant="h4" gutterBottom>
         Pipeline: {params.id}
       </Typography>
-      {status && (
+      {pipeline && (
         <PipelineViewer
-          status={status}
-          showTiming
-          onJobClick={(payload) => {
-            console.log('Job clicked:', payload);
-          }}
+          pipeline={pipeline}
+          onJobClick={handleJobClick}
+          selectedJobName={selectedJob?.name}
+          showArtifacts
         />
       )}
+      {selectedJob && <JobDetailsPanel job={selectedJob} />}
     </Container>
-  );
-}
-```
-
-### С NestJS бэкендом
-
-```typescript
-'use client';
-
-import { PipelineViewer } from 'neuroline-ui';
-import { useState } from 'react';
-
-export function PipelineMonitor() {
-  const [pipelineId, setPipelineId] = useState('');
-  const [status, setStatus] = useState(null);
-
-  const loadStatus = async () => {
-    const res = await fetch(`http://localhost:3000/pipeline/${pipelineId}/status`);
-    const data = await res.json();
-    setStatus(data);
-  };
-
-  return (
-    <div>
-      <input
-        value={pipelineId}
-        onChange={(e) => setPipelineId(e.target.value)}
-        placeholder="Pipeline ID"
-      />
-      <button onClick={loadStatus}>Загрузить статус</button>
-      {status && <PipelineViewer status={status} showTiming />}
-    </div>
   );
 }
 ```

@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import {
   PipelineViewer,
+  JobDetailsPanel,
   type PipelineDisplayData,
   type JobDisplayInfo,
 } from 'neuroline-ui';
@@ -41,6 +42,14 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: 'done',
             startedAt: new Date(now - 15000),
             finishedAt: new Date(now - 12000),
+            input: {
+              url: 'https://api.example.com/data',
+              headers: { Authorization: 'Bearer ***' },
+            },
+            options: {
+              timeout: 5000,
+              retries: 3,
+            },
             artifact: { data: '{"users": [...]}', size: 2048 },
           },
         ],
@@ -53,6 +62,14 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: 'done',
             startedAt: new Date(now - 12000),
             finishedAt: new Date(now - 10000),
+            input: {
+              data: '{"users": [...]}',
+              schemaVersion: 'v2',
+            },
+            options: {
+              strictMode: true,
+              allowUnknownFields: false,
+            },
             artifact: { valid: true, recordCount: 150 },
           },
           {
@@ -60,6 +77,14 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: 'done',
             startedAt: new Date(now - 12000),
             finishedAt: new Date(now - 11000),
+            input: {
+              userId: 'user-123',
+              event: 'pipeline_started',
+            },
+            options: {
+              channel: 'slack',
+              priority: 'low',
+            },
             artifact: { notified: true },
           },
         ],
@@ -72,6 +97,14 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: status === 'processing' ? 'processing' : 'done',
             startedAt: new Date(now - 8000),
             finishedAt: status !== 'processing' ? new Date(now - 3000) : undefined,
+            input: {
+              records: 150,
+              format: 'json',
+            },
+            options: {
+              batchSize: 50,
+              parallel: true,
+            },
             artifact: status !== 'processing' ? { transformed: true } : undefined,
           },
         ],
@@ -84,6 +117,14 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: status === 'done' ? 'done' : status === 'error' ? 'error' : 'pending',
             startedAt: status !== 'processing' ? new Date(now - 3000) : undefined,
             finishedAt: status === 'done' ? new Date(now - 1000) : status === 'error' ? new Date(now - 500) : undefined,
+            input: {
+              collection: 'users',
+              recordCount: 150,
+            },
+            options: {
+              upsert: true,
+              connectionPool: 10,
+            },
             artifact: status === 'done' ? { savedCount: 150 } : undefined,
             error: status === 'error' ? { message: 'Database connection timeout' } : undefined,
           },
@@ -92,6 +133,13 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: status === 'done' ? 'done' : 'pending',
             startedAt: status === 'done' ? new Date(now - 3000) : undefined,
             finishedAt: status === 'done' ? new Date(now - 2000) : undefined,
+            input: {
+              cacheKey: 'users:all',
+              ttl: 3600,
+            },
+            options: {
+              invalidateOld: true,
+            },
           },
         ],
       },
@@ -103,6 +151,15 @@ const createDemoPipeline = (status: 'processing' | 'done' | 'error'): PipelineDi
             status: status === 'done' ? 'done' : 'pending',
             startedAt: status === 'done' ? new Date(now - 1000) : undefined,
             finishedAt: status === 'done' ? new Date(now - 500) : undefined,
+            input: {
+              userId: 'user-123',
+              event: 'pipeline_completed',
+              summary: { processed: 150, errors: 0 },
+            },
+            options: {
+              channel: 'email',
+              priority: 'normal',
+            },
           },
         ],
       },
@@ -316,69 +373,7 @@ export default function HomePage() {
         />
 
         {/* Детали выбранной Job */}
-        {selectedJob && (
-          <Paper
-            elevation={0}
-            sx={{
-              mt: 4,
-              p: 3,
-              backgroundColor: 'rgba(124, 77, 255, 0.1)',
-              border: '1px solid rgba(124, 77, 255, 0.3)',
-            }}
-          >
-            <Typography variant="h6" sx={{ mb: 2, color: '#7c4dff' }}>
-              📋 Детали Job: {selectedJob.name}
-            </Typography>
-            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              <Chip
-                label={`Статус: ${selectedJob.status}`}
-                sx={{
-                  backgroundColor: 'rgba(0, 229, 255, 0.2)',
-                  color: '#00e5ff',
-                }}
-              />
-              {selectedJob.startedAt && (
-                <Chip
-                  label={`Начало: ${new Date(selectedJob.startedAt).toLocaleTimeString()}`}
-                  variant="outlined"
-                />
-              )}
-              {selectedJob.finishedAt && (
-                <Chip
-                  label={`Конец: ${new Date(selectedJob.finishedAt).toLocaleTimeString()}`}
-                  variant="outlined"
-                />
-              )}
-            </Stack>
-
-            {selectedJob.artifact && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-                  Артефакт:
-                </Typography>
-                <Paper
-                  sx={{
-                    p: 2,
-                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-                    fontFamily: 'monospace',
-                    fontSize: '0.8rem',
-                    color: '#00e676',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {JSON.stringify(selectedJob.artifact, null, 2)}
-                </Paper>
-              </Box>
-            )}
-
-            {selectedJob.error && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {selectedJob.error.message}
-              </Alert>
-            )}
-          </Paper>
-        )}
+        {selectedJob && <JobDetailsPanel job={selectedJob} />}
 
         {/* Инструкция */}
         <Paper

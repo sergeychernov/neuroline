@@ -9,6 +9,10 @@ export * from './types';
 // Components
 export * from './components/PipelineViewer';
 export * from './components/JobNode';
+export * from './components/JobDetailsPanel';
+export * from './components/ArtifactView';
+export * from './components/InputView';
+export * from './components/OptionsView';
 export * from './components/StageColumn';
 export * from './components/StatusBadge';
 

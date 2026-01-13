@@ -9,6 +9,9 @@ export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
 /** Статус всего пайплайна */
 export type PipelineStatus = 'processing' | 'done' | 'error';
 
+/** Тип для сериализуемых данных */
+export type SerializableValue = Record<string, unknown> | string | number | boolean | null;
+
 /** Информация о job для отображения */
 export interface JobDisplayInfo {
   /** Имя job */
@@ -22,7 +25,11 @@ export interface JobDisplayInfo {
   /** Ошибка (если есть) */
   error?: { message: string; stack?: string };
   /** Артефакт (результат) - любые сериализуемые данные */
-  artifact?: Record<string, unknown> | string | number | boolean | null;
+  artifact?: SerializableValue;
+  /** Входные данные job (результат synapses) */
+  input?: SerializableValue;
+  /** Опции job */
+  options?: SerializableValue;
 }
 
 /** Stage для отображения */
