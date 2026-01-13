@@ -1523,6 +1523,7 @@ __metadata:
     "@emotion/cache": "npm:^11.11.0"
     "@emotion/react": "npm:^11.11.3"
     "@emotion/styled": "npm:^11.11.0"
+    "@mui/icons-material": "npm:^5.15.4"
     "@mui/material": "npm:^5.15.4"
     "@mui/material-nextjs": "npm:^5.15.4"
     "@types/node": "npm:^20.11.5"
@@ -7642,6 +7643,7 @@ __metadata:
     "@chromatic-com/storybook": "npm:^1.0.0"
     "@emotion/react": "npm:^11.11.3"
     "@emotion/styled": "npm:^11.11.0"
+    "@mui/icons-material": "npm:^5.15.4"
     "@mui/material": "npm:^5.15.4"
     "@storybook/addon-essentials": "npm:^8.0.0"
     "@storybook/addon-interactions": "npm:^8.0.0"
@@ -7661,6 +7663,7 @@ __metadata:
   peerDependencies:
     "@emotion/react": ^11.11.0
     "@emotion/styled": ^11.11.0
+    "@mui/icons-material": ^5.15.0
     "@mui/material": ^5.15.0
     react: ^18.2.0
     react-dom: ^18.2.0

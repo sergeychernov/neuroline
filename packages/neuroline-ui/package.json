@@ -15,8 +15,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts --external react",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --external react --watch",
+    "build": "tsup src/index.ts --format cjs,esm --dts --external react --external @mui/material --external @mui/icons-material --external @emotion/react --external @emotion/styled",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --external react --external @mui/material --external @mui/icons-material --external @emotion/react --external @emotion/styled --watch",
     "lint": "tsc --noEmit",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
@@ -24,6 +24,7 @@
   "peerDependencies": {
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.0",
     "@mui/material": "^5.15.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
@@ -32,6 +33,7 @@
     "@chromatic-com/storybook": "^1.0.0",
     "@emotion/react": "^11.11.3",
     "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.4",
     "@mui/material": "^5.15.4",
     "@storybook/addon-essentials": "^8.0.0",
     "@storybook/addon-interactions": "^8.0.0",
