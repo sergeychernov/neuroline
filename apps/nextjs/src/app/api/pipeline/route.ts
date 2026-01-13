@@ -11,7 +11,7 @@
  */
 
 import { createPipelineRouteHandler } from 'neuroline-nextjs';
-import { getPipelineManager, pipelines } from '@/lib/pipeline-server';
+import { ensurePipelineStorageReady, getPipelineManager, pipelines } from '@/lib/pipeline-server';
 
 const { manager, storage } = getPipelineManager();
 
@@ -21,5 +21,12 @@ const handlers = createPipelineRouteHandler({
 	pipelines,
 });
 
-export const POST = handlers.POST;
-export const GET = handlers.GET;
+export const POST = async (request: Request) => {
+	await ensurePipelineStorageReady();
+	return handlers.POST(request);
+};
+
+export const GET = async (request: Request) => {
+	await ensurePipelineStorageReady();
+	return handlers.GET(request);
+};
