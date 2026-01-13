@@ -1,11 +1,9 @@
 /**
  * Neuroline NestJS Module
- * Готовый модуль с контроллером для NestJS приложений
+ * Интеграция neuroline с NestJS
  */
 
-export * from './neuroline.module';
-export * from './neuroline.controller';
-export * from './neuroline.service';
-export * from './dto';
-export * from './constants';
-
+export { createPipelineController, type CreatePipelineControllerOptions } from './pipeline-controller.factory';
+export { NeurolineService, type NeurolineModuleOptions } from './neuroline.service';
+export { NEUROLINE_OPTIONS } from './constants';
+export type { ApiResponse } from './dto';

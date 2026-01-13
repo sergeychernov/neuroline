@@ -9,7 +9,7 @@
 		"dev": "yarn workspace @neuroline/nextjs dev",
 		"dev:nestjs": "yarn workspace @neuroline/nestjs-example dev",
 		"build": "yarn workspaces foreach -Apt run build",
-		"build:packages": "yarn workspace neuroline build && yarn workspace neuroline-ui build && yarn workspace neuroline-nextjs build && yarn workspace neuroline-nestjs build",
+		"build:packages": "yarn workspace neuroline build && yarn workspace demo-pipelines build && yarn workspace neuroline-ui build && yarn workspace neuroline-nextjs build && yarn workspace neuroline-nestjs build",
 		"lint": "yarn workspaces foreach -Ap run lint",
 		"test": "yarn workspaces foreach -Ap run test",
 		"storybook": "yarn workspace neuroline-ui storybook",

@@ -2,101 +2,69 @@
 
 # neuroline-nestjs
 
+[![npm](https://img.shields.io/npm/v/neuroline-nestjs)](https://www.npmjs.com/package/neuroline-nestjs)
 [![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
-NestJS integration package for Neuroline - provides module, controller, and service for pipeline orchestration.
+NestJS integration for Neuroline — provides `createPipelineController` factory for creating API controllers compatible with `PipelineClient`.
 
 ## Installation
 
 ```bash
 yarn add neuroline neuroline-nestjs
+# or
+npm install neuroline neuroline-nestjs
 ```
 
 ## Features
 
-- **Dynamic Module** - flexible configuration with sync/async registration
-- **REST API Controller** - ready-to-use endpoints for pipeline management
-- **Service Layer** - encapsulated business logic for working with PipelineManager
-- **TypeScript Support** - full type safety with DTO validation
+- **Controller Factory** — `createPipelineController` creates a controller for a specific pipeline
+- **PipelineClient Compatible** — API format matches `neuroline/client` expectations
+- **One Controller = One Pipeline** — clean separation, easy to add multiple pipelines
+- **Full TypeScript Support** — type-safe configuration
 
 ## Quick Start
 
-### Basic Setup (In-Memory Storage)
-
 ```typescript
 import { Module } from '@nestjs/common';
-import { NeurolineModule } from 'neuroline-nestjs';
 import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
-import { myPipelineConfig } from './pipelines';
+import { createPipelineController } from 'neuroline-nestjs';
+import { myPipeline } from './pipelines';
 
+// Create storage and manager
 const storage = new InMemoryPipelineStorage();
 const manager = new PipelineManager({ storage });
 
-@Module({
-  imports: [
-    NeurolineModule.register({
-      manager,
-      storage,
-      pipelines: [myPipelineConfig],
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-### With MongoDB Storage
-
-```typescript
-import { Module } from '@nestjs/common';
-import { MongooseModule, getModelToken } from '@nestjs/mongoose';
-import { NeurolineModule } from 'neuroline-nestjs';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
-import { myPipelineConfig } from './pipelines';
+// Create controller for the pipeline
+const MyPipelineController = createPipelineController({
+  path: 'api/pipeline/my-pipeline',
+  manager,
+  storage,
+  pipeline: myPipeline,
+});
 
 @Module({
-  imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/neuroline'),
-    MongooseModule.forFeature([
-      { name: 'Pipeline', schema: PipelineSchema },
-    ]),
-    NeurolineModule.registerAsync({
-      imports: [MongooseModule],
-      useFactory: (pipelineModel) => {
-        const storage = new MongoPipelineStorage(pipelineModel);
-        const manager = new PipelineManager({ storage });
-        return {
-          manager,
-          storage,
-          pipelines: [myPipelineConfig],
-        };
-      },
-      inject: [getModelToken('Pipeline')],
-    }),
-  ],
+  controllers: [MyPipelineController],
 })
 export class AppModule {}
 ```
 
 ## API Endpoints
 
-The module provides the following REST endpoints:
+The created controller exposes the following endpoints:
 
-### POST `/pipeline/:type/start`
+### POST `/api/pipeline/my-pipeline`
 
-Start a new pipeline or return existing one.
+Start a new pipeline.
 
 **Request:**
 ```bash
-curl -X POST http://localhost:3000/pipeline/my-pipeline/start \
+curl -X POST http://localhost:3000/api/pipeline/my-pipeline \
   -H "Content-Type: application/json" \
   -d '{
-    "data": {
-      "url": "https://api.example.com/data",
-      "userId": "user-123"
-    },
+    "input": { "seed": 123, "name": "test" },
     "jobOptions": {
-      "fetch-data": { "timeout": 10000 }
+      "compute": { "multiplier": 2.0 }
     }
   }'
 ```
@@ -104,138 +72,218 @@ curl -X POST http://localhost:3000/pipeline/my-pipeline/start \
 **Response:**
 ```json
 {
-  "pipelineId": "abc123xyz",
-  "isNew": true
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "isNew": true
+  }
 }
 ```
 
-### GET `/pipeline/:id/status`
+### GET `/api/pipeline/my-pipeline?action=status&id=xxx`
 
-Get current pipeline status.
+Get pipeline status.
 
 **Request:**
 ```bash
-curl http://localhost:3000/pipeline/abc123xyz/status
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=status&id=demo_123_test_ok"
 ```
 
 **Response:**
 ```json
 {
-  "status": "processing",
-  "currentJobIndex": 1,
-  "totalJobs": 4,
-  "currentJobName": "process-data"
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "pipelineType": "my-pipeline",
+    "status": "processing",
+    "stages": [...]
+  }
 }
 ```
 
-### GET `/pipeline/:id/result`
+### GET `/api/pipeline/my-pipeline?action=result&id=xxx`
 
 Get pipeline results (artifacts).
 
 **Request:**
 ```bash
-curl http://localhost:3000/pipeline/abc123xyz/result
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=result&id=demo_123_test_ok"
 ```
 
 **Response:**
 ```json
 {
-  "status": "done",
-  "artifacts": [
-    { "data": "...", "fetchedAt": "2024-01-01T00:00:00Z" },
-    { "processed": "..." }
-  ],
-  "jobNames": ["fetch-data", "process-data"]
-}
-```
-
-### GET `/pipeline/:id`
-
-Get full pipeline state (for debugging).
-
-**Request:**
-```bash
-curl http://localhost:3000/pipeline/abc123xyz
-```
-
-### GET `/pipelines`
-
-List all pipelines with pagination.
-
-**Request:**
-```bash
-curl "http://localhost:3000/pipelines?page=1&limit=10"
-```
-
-**Response:**
-```json
-{
-  "items": [...],
-  "total": 25,
-  "page": 1,
-  "limit": 10,
-  "totalPages": 3
-}
-```
-
-## Module Configuration
-
-### Sync Registration
-
-```typescript
-NeurolineModule.register({
-  manager: PipelineManager,        // Required
-  storage: PipelineStorage,        // Required
-  pipelines: PipelineConfig[],     // Optional
-});
-```
-
-### Async Registration
-
-```typescript
-NeurolineModule.registerAsync({
-  imports: [SomeModule],
-  useFactory: (dep1, dep2) => ({
-    manager: new PipelineManager({ ... }),
-    storage: new CustomStorage(),
-    pipelines: [config1, config2],
-  }),
-  inject: [Dep1, Dep2],
-});
-```
-
-## Custom Controller
-
-If you need custom endpoints, you can use `NeurolineService` directly:
-
-```typescript
-import { Controller, Get } from '@nestjs/common';
-import { NeurolineService } from 'neuroline-nestjs';
-
-@Controller('custom-pipelines')
-export class CustomPipelineController {
-  constructor(private readonly neurolineService: NeurolineService) {}
-
-  @Get('active')
-  async getActivePipelines() {
-    return this.neurolineService.listPipelines({
-      page: 1,
-      limit: 100,
-      // Custom filtering logic here
-    });
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "status": "done",
+    "artifacts": {
+      "init": { "initialized": true, "processId": "..." },
+      "compute": { "result": 456.78 }
+    }
   }
 }
+```
+
+### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
+
+Get specific job details (input, options, artifact).
+
+**Request:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=job&id=demo_123_test_ok&jobName=compute"
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "name": "compute",
+    "status": "done",
+    "input": { "seed": 123, "iterations": 10 },
+    "options": { "multiplier": 2.0 },
+    "artifact": { "result": 456.78 }
+  }
+}
+```
+
+### GET `/api/pipeline/my-pipeline?action=list&page=1&limit=10`
+
+List pipelines with pagination.
+
+**Request:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=list&page=1&limit=10"
+```
+
+## Multiple Pipelines
+
+```typescript
+import { Module } from '@nestjs/common';
+import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
+import { createPipelineController } from 'neuroline-nestjs';
+import { demoPipeline, analyticsPipeline } from './pipelines';
+
+const storage = new InMemoryPipelineStorage();
+const manager = new PipelineManager({ storage });
+
+const DemoController = createPipelineController({
+  path: 'api/pipeline/demo',
+  manager,
+  storage,
+  pipeline: demoPipeline,
+});
+
+const AnalyticsController = createPipelineController({
+  path: 'api/pipeline/analytics',
+  manager,
+  storage,
+  pipeline: analyticsPipeline,
+});
+
+@Module({
+  controllers: [DemoController, AnalyticsController],
+})
+export class AppModule {}
+```
+
+## With MongoDB Storage
+
+```typescript
+import { Module } from '@nestjs/common';
+import { MongooseModule, getModelToken, InjectModel } from '@nestjs/mongoose';
+import { PipelineManager } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema, MongoPipelineDocument } from 'neuroline/mongo';
+import { createPipelineController } from 'neuroline-nestjs';
+import { myPipeline } from './pipelines';
+import { Model } from 'mongoose';
+
+// Note: With Mongoose, you need to create the controller after model is available
+// This requires a slightly different setup
+
+@Module({
+  imports: [
+    MongooseModule.forRoot('mongodb://localhost:27017/neuroline'),
+    MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }]),
+  ],
+})
+export class AppModule {
+  constructor(
+    @InjectModel('Pipeline') pipelineModel: Model<MongoPipelineDocument>,
+  ) {
+    const storage = new MongoPipelineStorage(pipelineModel);
+    const manager = new PipelineManager({ storage });
+    
+    // Register pipeline
+    manager.registerPipeline(myPipeline);
+  }
+}
+```
+
+## Using with PipelineClient
+
+The API format is fully compatible with `PipelineClient` from `neuroline/client`:
+
+```typescript
+import { PipelineClient } from 'neuroline/client';
+
+const client = new PipelineClient({
+  baseUrl: 'http://localhost:3000/api/pipeline/demo',
+});
+
+// Start pipeline and poll for updates
+const { pipelineId, completed } = await client.startAndPoll(
+  { input: { seed: 123, name: 'test' } },
+  (event) => {
+    console.log('Status:', event.status.status);
+    console.log('Artifacts:', event.result.artifacts);
+  },
+);
+
+await completed;
+console.log('Pipeline finished!');
 ```
 
 ## Exports
 
 | Export | Type | Description |
 |--------|------|-------------|
-| `NeurolineModule` | Module | Dynamic module for NestJS |
-| `NeurolineController` | Controller | REST API endpoints |
-| `NeurolineService` | Service | Business logic layer |
-| `StartPipelineDto` | DTO | Validation for start endpoint |
-| `ListPipelinesDto` | DTO | Validation for list endpoint |
+| `createPipelineController` | Function | Factory for creating pipeline controllers |
+| `CreatePipelineControllerOptions` | Type | Options for the factory |
+| `NeurolineService` | Class | Service for custom implementations |
+| `ApiResponse` | Type | Standard API response type |
+
+## Migration from v0.1.x
+
+In v0.2.0, the API changed from module-based to factory-based:
+
+**Before (v0.1.x):**
+```typescript
+// Old API - deprecated
+NeurolineModule.register({
+  manager,
+  storage,
+  pipelines: [myPipeline],
+});
+```
+
+**After (v0.2.0):**
+```typescript
+// New API
+const MyController = createPipelineController({
+  path: 'api/pipeline/my-pipeline',
+  manager,
+  storage,
+  pipeline: myPipeline,
+});
+
+@Module({
+  controllers: [MyController],
+})
+export class AppModule {}
+```
 
 ## License
 
@@ -245,101 +293,69 @@ UNLICENSED
 
 # neuroline-nestjs
 
+[![npm](https://img.shields.io/npm/v/neuroline-nestjs)](https://www.npmjs.com/package/neuroline-nestjs)
 [![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
-Пакет интеграции с NestJS для Neuroline - предоставляет модуль, контроллер и сервис для оркестрации пайплайнов.
+Интеграция NestJS для Neuroline — предоставляет фабрику `createPipelineController` для создания API-контроллеров, совместимых с `PipelineClient`.
 
 ## Установка
 
 ```bash
 yarn add neuroline neuroline-nestjs
+# или
+npm install neuroline neuroline-nestjs
 ```
 
 ## Возможности
 
-- **Динамический модуль** - гибкая конфигурация с синхронной/асинхронной регистрацией
-- **REST API контроллер** - готовые эндпоинты для управления пайплайнами
-- **Слой сервиса** - инкапсулированная бизнес-логика для работы с PipelineManager
-- **TypeScript поддержка** - полная типобезопасность с валидацией DTO
+- **Фабрика контроллеров** — `createPipelineController` создаёт контроллер для конкретного pipeline
+- **Совместимость с PipelineClient** — формат API соответствует ожиданиям `neuroline/client`
+- **Один контроллер = один pipeline** — чистое разделение, легко добавить несколько pipelines
+- **Полная поддержка TypeScript** — типобезопасная конфигурация
 
 ## Быстрый старт
 
-### Базовая настройка (In-Memory хранилище)
-
 ```typescript
 import { Module } from '@nestjs/common';
-import { NeurolineModule } from 'neuroline-nestjs';
 import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
-import { myPipelineConfig } from './pipelines';
+import { createPipelineController } from 'neuroline-nestjs';
+import { myPipeline } from './pipelines';
 
+// Создаём storage и manager
 const storage = new InMemoryPipelineStorage();
 const manager = new PipelineManager({ storage });
 
-@Module({
-  imports: [
-    NeurolineModule.register({
-      manager,
-      storage,
-      pipelines: [myPipelineConfig],
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-### С MongoDB хранилищем
-
-```typescript
-import { Module } from '@nestjs/common';
-import { MongooseModule, getModelToken } from '@nestjs/mongoose';
-import { NeurolineModule } from 'neuroline-nestjs';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
-import { myPipelineConfig } from './pipelines';
+// Создаём контроллер для pipeline
+const MyPipelineController = createPipelineController({
+  path: 'api/pipeline/my-pipeline',
+  manager,
+  storage,
+  pipeline: myPipeline,
+});
 
 @Module({
-  imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/neuroline'),
-    MongooseModule.forFeature([
-      { name: 'Pipeline', schema: PipelineSchema },
-    ]),
-    NeurolineModule.registerAsync({
-      imports: [MongooseModule],
-      useFactory: (pipelineModel) => {
-        const storage = new MongoPipelineStorage(pipelineModel);
-        const manager = new PipelineManager({ storage });
-        return {
-          manager,
-          storage,
-          pipelines: [myPipelineConfig],
-        };
-      },
-      inject: [getModelToken('Pipeline')],
-    }),
-  ],
+  controllers: [MyPipelineController],
 })
 export class AppModule {}
 ```
 
 ## API Эндпоинты
 
-Модуль предоставляет следующие REST эндпоинты:
+Созданный контроллер предоставляет следующие эндпоинты:
 
-### POST `/pipeline/:type/start`
+### POST `/api/pipeline/my-pipeline`
 
-Запустить новый pipeline или вернуть существующий.
+Запустить новый pipeline.
 
 **Запрос:**
 ```bash
-curl -X POST http://localhost:3000/pipeline/my-pipeline/start \
+curl -X POST http://localhost:3000/api/pipeline/my-pipeline \
   -H "Content-Type: application/json" \
   -d '{
-    "data": {
-      "url": "https://api.example.com/data",
-      "userId": "user-123"
-    },
+    "input": { "seed": 123, "name": "test" },
     "jobOptions": {
-      "fetch-data": { "timeout": 10000 }
+      "compute": { "multiplier": 2.0 }
     }
   }'
 ```
@@ -347,139 +363,186 @@ curl -X POST http://localhost:3000/pipeline/my-pipeline/start \
 **Ответ:**
 ```json
 {
-  "pipelineId": "abc123xyz",
-  "isNew": true
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "isNew": true
+  }
 }
 ```
 
-### GET `/pipeline/:id/status`
+### GET `/api/pipeline/my-pipeline?action=status&id=xxx`
 
-Получить текущий статус pipeline.
+Получить статус pipeline.
 
 **Запрос:**
 ```bash
-curl http://localhost:3000/pipeline/abc123xyz/status
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=status&id=demo_123_test_ok"
 ```
 
 **Ответ:**
 ```json
 {
-  "status": "processing",
-  "currentJobIndex": 1,
-  "totalJobs": 4,
-  "currentJobName": "process-data"
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "pipelineType": "my-pipeline",
+    "status": "processing",
+    "stages": [...]
+  }
 }
 ```
 
-### GET `/pipeline/:id/result`
+### GET `/api/pipeline/my-pipeline?action=result&id=xxx`
 
 Получить результаты pipeline (артефакты).
 
 **Запрос:**
 ```bash
-curl http://localhost:3000/pipeline/abc123xyz/result
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=result&id=demo_123_test_ok"
 ```
 
 **Ответ:**
 ```json
 {
-  "status": "done",
-  "artifacts": [
-    { "data": "...", "fetchedAt": "2024-01-01T00:00:00Z" },
-    { "processed": "..." }
-  ],
-  "jobNames": ["fetch-data", "process-data"]
-}
-```
-
-### GET `/pipeline/:id`
-
-Получить полное состояние pipeline (для отладки).
-
-**Запрос:**
-```bash
-curl http://localhost:3000/pipeline/abc123xyz
-```
-
-### GET `/pipelines`
-
-Список всех pipelines с пагинацией.
-
-**Запрос:**
-```bash
-curl "http://localhost:3000/pipelines?page=1&limit=10"
-```
-
-**Ответ:**
-```json
-{
-  "items": [...],
-  "total": 25,
-  "page": 1,
-  "limit": 10,
-  "totalPages": 3
-}
-```
-
-## Конфигурация модуля
-
-### Синхронная регистрация
-
-```typescript
-NeurolineModule.register({
-  manager: PipelineManager,        // Обязательно
-  storage: PipelineStorage,        // Обязательно
-  pipelines: PipelineConfig[],     // Опционально
-});
-```
-
-### Асинхронная регистрация
-
-```typescript
-NeurolineModule.registerAsync({
-  imports: [SomeModule],
-  useFactory: (dep1, dep2) => ({
-    manager: new PipelineManager({ ... }),
-    storage: new CustomStorage(),
-    pipelines: [config1, config2],
-  }),
-  inject: [Dep1, Dep2],
-});
-```
-
-## Кастомный контроллер
-
-Если вам нужны свои эндпоинты, вы можете использовать `NeurolineService` напрямую:
-
-```typescript
-import { Controller, Get } from '@nestjs/common';
-import { NeurolineService } from 'neuroline-nestjs';
-
-@Controller('custom-pipelines')
-export class CustomPipelineController {
-  constructor(private readonly neurolineService: NeurolineService) {}
-
-  @Get('active')
-  async getActivePipelines() {
-    return this.neurolineService.listPipelines({
-      page: 1,
-      limit: 100,
-      // Ваша логика фильтрации здесь
-    });
+  "success": true,
+  "data": {
+    "pipelineId": "demo_123_test_ok",
+    "status": "done",
+    "artifacts": {
+      "init": { "initialized": true, "processId": "..." },
+      "compute": { "result": 456.78 }
+    }
   }
 }
+```
+
+### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
+
+Получить детали конкретной job (input, options, artifact).
+
+**Запрос:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=job&id=demo_123_test_ok&jobName=compute"
+```
+
+**Ответ:**
+```json
+{
+  "success": true,
+  "data": {
+    "name": "compute",
+    "status": "done",
+    "input": { "seed": 123, "iterations": 10 },
+    "options": { "multiplier": 2.0 },
+    "artifact": { "result": 456.78 }
+  }
+}
+```
+
+### GET `/api/pipeline/my-pipeline?action=list&page=1&limit=10`
+
+Список pipelines с пагинацией.
+
+**Запрос:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=list&page=1&limit=10"
+```
+
+## Несколько Pipelines
+
+```typescript
+import { Module } from '@nestjs/common';
+import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
+import { createPipelineController } from 'neuroline-nestjs';
+import { demoPipeline, analyticsPipeline } from './pipelines';
+
+const storage = new InMemoryPipelineStorage();
+const manager = new PipelineManager({ storage });
+
+const DemoController = createPipelineController({
+  path: 'api/pipeline/demo',
+  manager,
+  storage,
+  pipeline: demoPipeline,
+});
+
+const AnalyticsController = createPipelineController({
+  path: 'api/pipeline/analytics',
+  manager,
+  storage,
+  pipeline: analyticsPipeline,
+});
+
+@Module({
+  controllers: [DemoController, AnalyticsController],
+})
+export class AppModule {}
+```
+
+## Использование с PipelineClient
+
+Формат API полностью совместим с `PipelineClient` из `neuroline/client`:
+
+```typescript
+import { PipelineClient } from 'neuroline/client';
+
+const client = new PipelineClient({
+  baseUrl: 'http://localhost:3000/api/pipeline/demo',
+});
+
+// Запускаем pipeline и получаем обновления
+const { pipelineId, completed } = await client.startAndPoll(
+  { input: { seed: 123, name: 'test' } },
+  (event) => {
+    console.log('Статус:', event.status.status);
+    console.log('Артефакты:', event.result.artifacts);
+  },
+);
+
+await completed;
+console.log('Pipeline завершён!');
 ```
 
 ## Экспорты
 
 | Экспорт | Тип | Описание |
 |---------|-----|----------|
-| `NeurolineModule` | Module | Динамический модуль для NestJS |
-| `NeurolineController` | Controller | REST API эндпоинты |
-| `NeurolineService` | Service | Слой бизнес-логики |
-| `StartPipelineDto` | DTO | Валидация для старта pipeline |
-| `ListPipelinesDto` | DTO | Валидация для списка pipelines |
+| `createPipelineController` | Function | Фабрика для создания контроллеров |
+| `CreatePipelineControllerOptions` | Type | Опции для фабрики |
+| `NeurolineService` | Class | Сервис для кастомных реализаций |
+| `ApiResponse` | Type | Стандартный тип ответа API |
 
-## License
+## Миграция с v0.1.x
+
+В v0.2.0 API изменился с модульного на фабричный:
+
+**До (v0.1.x):**
+```typescript
+// Старый API - устарел
+NeurolineModule.register({
+  manager,
+  storage,
+  pipelines: [myPipeline],
+});
+```
+
+**После (v0.2.0):**
+```typescript
+// Новый API
+const MyController = createPipelineController({
+  path: 'api/pipeline/my-pipeline',
+  manager,
+  storage,
+  pipeline: myPipeline,
+});
+
+@Module({
+  controllers: [MyController],
+})
+export class AppModule {}
+```
+
+## Лицензия
 
 UNLICENSED

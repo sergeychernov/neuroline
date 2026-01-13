@@ -15,7 +15,7 @@
 
 import { createPipelineRouteHandler } from 'neuroline-nextjs';
 import { ensurePipelineStorageReady, getPipelineManager } from '@/lib/pipeline-server';
-import { demoPipeline } from '@/pipelines';
+import { demoPipeline } from 'demo-pipelines';
 import type { PipelineConfig } from 'neuroline';
 
 const { manager, storage } = getPipelineManager();

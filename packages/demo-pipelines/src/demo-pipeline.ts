@@ -1,6 +1,6 @@
 import type { PipelineConfig, JobInPipeline, PipelineStage } from 'neuroline';
-import { initJob, type InitJobInput, type InitJobArtifact } from './jobs/init-job';
-import { validateJob, type ValidateJobArtifact } from './jobs/validate-job';
+import { initJob, type InitJobArtifact } from './jobs/init-job';
+import { validateJob } from './jobs/validate-job';
 import { computeJob, type ComputeJobArtifact } from './jobs/compute-job';
 import { transformJob, type TransformJobArtifact } from './jobs/transform-job';
 import { failingJob } from './jobs/failing-job';
@@ -21,9 +21,6 @@ export interface DemoPipelineInput {
 	/** Если true — pipeline упадёт на failing-task */
 	fail?: boolean;
 }
-
-/** @deprecated Используй DemoPipelineInput */
-export type SuccessPipelineInput = DemoPipelineInput;
 
 // ============================================================================
 // Synapses (трансформация данных между jobs)
@@ -112,14 +109,14 @@ const toFinalize: JobInPipeline['synapses'] = (ctx) => {
 
 /**
  * Demo Pipeline — демонстрация работы neuroline
- * 
+ *
  * Структура stages:
  * 1. [init] - инициализация (1 сек)
  * 2. [validate, compute] - параллельно валидация и вычисления (1 сек)
  * 3. [transform] - трансформация данных (1.2 сек)
  * 4. [failing-task] - условно падающая задача (если fail=true)
  * 5. [finalize] - финализация и сборка результата (1 сек)
- * 
+ *
  * Если input.fail === true, pipeline упадёт на stage 4
  * Общее время: ~5-6 секунд (при успехе)
  */
@@ -146,6 +143,3 @@ export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
 	] as PipelineStage[],
 	computeInputHash: (input) => `demo_${input.seed}_${input.name}_${input.fail ? 'fail' : 'ok'}`,
 };
-
-/** @deprecated Используй demoPipeline */
-export const successPipeline = demoPipeline;

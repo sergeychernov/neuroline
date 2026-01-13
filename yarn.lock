@@ -1508,6 +1508,7 @@ __metadata:
     "@nestjs/platform-express": "npm:^10.3.0"
     "@types/express": "npm:^4.17.21"
     "@types/node": "npm:^20.10.0"
+    demo-pipelines: "workspace:*"
     neuroline: "workspace:*"
     neuroline-nestjs: "workspace:*"
     reflect-metadata: "npm:^0.2.1"
@@ -1529,10 +1530,12 @@ __metadata:
     "@types/node": "npm:^20.11.5"
     "@types/react": "npm:^18.2.48"
     "@types/react-dom": "npm:^18.2.18"
+    demo-pipelines: "workspace:*"
     eslint: "npm:^8.56.0"
     eslint-config-next: "npm:14.1.0"
     mongoose: "npm:^8.0.0"
     neuroline: "workspace:*"
+    neuroline-nextjs: "workspace:*"
     neuroline-ui: "workspace:*"
     next: "npm:14.1.0"
     react: "npm:^18.2.0"
@@ -4548,6 +4551,16 @@ __metadata:
   checksum: 10c0/88a152319ffe1396ccc6ded510a3896e77efac7a1bfbaa174a7b00414a1747377e0bb525d303794a47cf30e805c2ec84e575758512c6e44a993076d29fd4e6c3
   languageName: node
   linkType: hard
+
+"demo-pipelines@workspace:*, demo-pipelines@workspace:packages/demo-pipelines":
+  version: 0.0.0-use.local
+  resolution: "demo-pipelines@workspace:packages/demo-pipelines"
+  dependencies:
+    neuroline: "workspace:*"
+    tsup: "npm:^8.0.1"
+    typescript: "npm:^5.3.3"
+  languageName: unknown
+  linkType: soft
 
 "depd@npm:2.0.0":
   version: 2.0.0
@@ -7623,7 +7636,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"neuroline-nextjs@workspace:packages/neuroline-nextjs":
+"neuroline-nextjs@workspace:*, neuroline-nextjs@workspace:packages/neuroline-nextjs":
   version: 0.0.0-use.local
   resolution: "neuroline-nextjs@workspace:packages/neuroline-nextjs"
   dependencies:

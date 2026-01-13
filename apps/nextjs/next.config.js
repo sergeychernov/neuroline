@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['neuroline', 'neuroline-ui'],
+  transpilePackages: ['neuroline', 'neuroline-ui', 'neuroline-nextjs', 'demo-pipelines'],
   experimental: {
     optimizePackageImports: ['@mui/material'],
   },

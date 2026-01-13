@@ -12,7 +12,7 @@ import type { SerializableValue } from 'neuroline-ui';
 import { PipelineClient } from 'neuroline/client';
 import type { PipelineStatusResponse, PipelineResultResponse, JobStatus } from 'neuroline';
 import { PipelineControlPanel } from './components/PipelineControlPanel';
-import type { DemoPipelineInput } from '../pipelines';
+import type { DemoPipelineInput } from 'demo-pipelines';
 
 // ============================================================================
 // Helpers
@@ -87,9 +87,14 @@ export default function HomePage() {
 
   const stopRef = useRef<(() => void) | null>(null);
   const currentPipelineIdRef = useRef<string | null>(null);
+  const currentClientRef = useRef<PipelineClient | null>(null);
 
-  // Один клиент для demo pipeline
-  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/demo' }), []);
+  // Клиенты для разных API
+  const nextjsClient = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/demo' }), []);
+  const nestjsClient = useMemo(
+    () => new PipelineClient({ baseUrl: 'http://localhost:3003/api/pipeline/demo' }),
+    [],
+  );
 
   // Инициализация на клиенте
   useEffect(() => {
@@ -104,9 +109,10 @@ export default function HomePage() {
       // Сразу показываем job с базовой информацией
       setSelectedJob(job);
 
-      // Если есть pipelineId, запрашиваем полные детали job (input, options)
+      // Если есть pipelineId и клиент, запрашиваем полные детали job (input, options)
       const pipelineId = currentPipelineIdRef.current;
-      if (pipelineId) {
+      const client = currentClientRef.current;
+      if (pipelineId && client) {
         try {
           const details = await client.getJobDetails(pipelineId, job.name);
           // Обновляем selectedJob с полными данными
@@ -120,7 +126,7 @@ export default function HomePage() {
         }
       }
     },
-    [client],
+    [],
   );
 
   const handleUpdate = useCallback((event: UpdateEvent) => {
@@ -137,83 +143,70 @@ export default function HomePage() {
     setIsRunning(false);
   }, []);
 
-  const handleStartSuccess = useCallback(async () => {
-    // Остановить предыдущий polling
-    stopRef.current?.();
+  const startPipeline = useCallback(
+    async (client: PipelineClient, pipelineTypeLabel: string, fail: boolean) => {
+      // Остановить предыдущий polling
+      stopRef.current?.();
 
-    setIsRunning(true);
-    setCurrentPipelineType('demo-success');
-    setSelectedJob(null);
-    setPipeline(null);
+      setIsRunning(true);
+      setCurrentPipelineType(pipelineTypeLabel);
+      setSelectedJob(null);
+      setPipeline(null);
+      currentClientRef.current = client;
 
-    const input: DemoPipelineInput = {
-      seed: Math.floor(Math.random() * 1000),
-      name: `test-${Date.now()}`,
-      iterations: 10,
-      fail: false,
-    };
+      const input: DemoPipelineInput = {
+        seed: Math.floor(Math.random() * 1000),
+        name: `test-${Date.now()}`,
+        iterations: 10,
+        fail,
+      };
 
-    try {
-      const polling = await client.startAndPoll(
-        {
-          input,
-          jobOptions: {
-            compute: {
-              multiplier: 2.0,
-              iterationDelayMs: 80,
+      try {
+        const polling = await client.startAndPoll(
+          {
+            input,
+            jobOptions: {
+              compute: {
+                multiplier: 2.0,
+                iterationDelayMs: 80,
+              },
             },
           },
-        },
-        handleUpdate,
-        handleError,
-      );
+          handleUpdate,
+          handleError,
+        );
 
-      currentPipelineIdRef.current = polling.pipelineId;
-      stopRef.current = polling.stop;
-    } catch (e) {
-      console.error('Failed to start demo pipeline (success)', e);
-      setIsRunning(false);
-    }
-  }, [client, handleUpdate, handleError]);
+        currentPipelineIdRef.current = polling.pipelineId;
+        stopRef.current = polling.stop;
+      } catch (e) {
+        console.error('Failed to start pipeline', e);
+        setIsRunning(false);
+      }
+    },
+    [handleUpdate, handleError],
+  );
 
-  const handleStartError = useCallback(async () => {
-    // Остановить предыдущий polling
-    stopRef.current?.();
+  // Next.js handlers
+  const handleNextjsSuccess = useCallback(
+    () => startPipeline(nextjsClient, 'nextjs-success', false),
+    [nextjsClient, startPipeline],
+  );
 
-    setIsRunning(true);
-    setCurrentPipelineType('demo-error');
-    setSelectedJob(null);
-    setPipeline(null);
+  const handleNextjsError = useCallback(
+    () => startPipeline(nextjsClient, 'nextjs-error', true),
+    [nextjsClient, startPipeline],
+  );
 
-    const input: DemoPipelineInput = {
-      seed: Math.floor(Math.random() * 1000),
-      name: `test-${Date.now()}`,
-      iterations: 10,
-      fail: true,
-    };
+  // NestJS handlers
+  const handleNestjsSuccess = useCallback(
+    () => startPipeline(nestjsClient, 'nestjs-success', false),
+    [nestjsClient, startPipeline],
+  );
 
-    try {
-      const polling = await client.startAndPoll(
-        {
-          input,
-          jobOptions: {
-            compute: {
-              multiplier: 2.0,
-              iterationDelayMs: 80,
-            },
-          },
-        },
-        handleUpdate,
-        handleError,
-      );
-
-      currentPipelineIdRef.current = polling.pipelineId;
-      stopRef.current = polling.stop;
-    } catch (e) {
-      console.error('Failed to start demo pipeline (error)', e);
-      setIsRunning(false);
-    }
-  }, [client, handleUpdate, handleError]);
+  const handleNestjsError = useCallback(
+    () => startPipeline(nestjsClient, 'nestjs-error', true),
+    [nestjsClient, startPipeline],
+  );
 
   // Loading state
   if (!mounted) {
@@ -291,8 +284,10 @@ export default function HomePage() {
           onShowArtifactsChange={setShowArtifacts}
           showInput={showInput}
           onShowInputChange={setShowInput}
-          onStartSuccess={handleStartSuccess}
-          onStartError={handleStartError}
+          onNextjsSuccess={handleNextjsSuccess}
+          onNextjsError={handleNextjsError}
+          onNestjsSuccess={handleNestjsSuccess}
+          onNestjsError={handleNestjsError}
           isRunning={isRunning}
           currentPipelineType={currentPipelineType}
         />
@@ -423,7 +418,7 @@ export default function HomePage() {
               >
                 <strong>neuroline-nestjs</strong>
               </Box>{' '}
-              — интеграция для NestJS: модуль/контроллер/сервис и REST API для управления pipelines.
+              — интеграция для NestJS: createPipelineController для создания API-контроллеров.
             </Box>
           </Box>
         </Paper>
