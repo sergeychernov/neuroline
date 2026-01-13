@@ -1531,6 +1531,7 @@ __metadata:
     "@types/react-dom": "npm:^18.2.18"
     eslint: "npm:^8.56.0"
     eslint-config-next: "npm:14.1.0"
+    mongoose: "npm:^8.0.0"
     neuroline: "workspace:*"
     neuroline-ui: "workspace:*"
     next: "npm:14.1.0"

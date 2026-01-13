@@ -15,9 +15,9 @@
     "@mui/icons-material": "^5.15.4",
     "@mui/material": "^5.15.4",
     "@mui/material-nextjs": "^5.15.4",
+    "mongoose": "^8.0.0",
     "neuroline": "workspace:*",
     "neuroline-ui": "workspace:*",
-    "mongoose": "^8.0.0",
     "next": "14.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
