@@ -203,6 +203,9 @@ export class PipelineClient {
 
 	/**
 	 * Polling для отслеживания выполнения pipeline
+	 *
+	 * Оптимизация: запрашиваем result только когда статус jobs изменился,
+	 * а не при каждом poll-запросе
 	 */
 	poll(
 		pipelineId: string,
@@ -211,9 +214,48 @@ export class PipelineClient {
 	): PollingResult {
 		let stopped = false;
 		let attempts = 0;
+		// Храним предыдущий статус для сравнения
+		let prevJobStatuses: Map<string, JobStatus> | null = null;
+		// Кешируем результаты
+		let cachedResult: PipelineResultResponse | null = null;
 
 		const stop = () => {
 			stopped = true;
+		};
+
+		/**
+		 * Проверяет, изменился ли статус какой-либо job на done/error
+		 * (т.е. появились новые артефакты)
+		 */
+		const hasNewCompletedJobs = (status: PipelineStatusResponse): boolean => {
+			if (!prevJobStatuses) {
+				// Первый запрос — нужно получить результаты
+				return true;
+			}
+
+			for (const stage of status.stages) {
+				for (const job of stage.jobs) {
+					const prevStatus = prevJobStatuses.get(job.name);
+					// Job завершилась с прошлого poll
+					if (prevStatus !== job.status && (job.status === 'done' || job.status === 'error')) {
+						return true;
+					}
+				}
+			}
+
+			return false;
+		};
+
+		/**
+		 * Сохраняет текущие статусы jobs для сравнения
+		 */
+		const saveJobStatuses = (status: PipelineStatusResponse): void => {
+			prevJobStatuses = new Map();
+			for (const stage of status.stages) {
+				for (const job of stage.jobs) {
+					prevJobStatuses.set(job.name, job.status);
+				}
+			}
 		};
 
 		const completed = new Promise<PipelineUpdateEvent>((resolve, reject) => {
@@ -224,10 +266,25 @@ export class PipelineClient {
 				}
 
 				try {
-					const event = await this.getPipelineData(pipelineId);
+					// Всегда запрашиваем статус
+					const status = await this.getStatus(pipelineId);
+
+					// Запрашиваем result только если есть новые завершённые jobs
+					if (hasNewCompletedJobs(status)) {
+						cachedResult = await this.getResult(pipelineId);
+					}
+
+					// Сохраняем текущие статусы для следующего сравнения
+					saveJobStatuses(status);
+
+					const event: PipelineUpdateEvent = {
+						status,
+						result: cachedResult ?? { status: status.status, artifacts: {} },
+					};
+
 					onUpdate?.(event);
 
-					if (event.status.status !== 'processing') {
+					if (status.status !== 'processing') {
 						// Pipeline завершён
 						resolve(event);
 						return;
