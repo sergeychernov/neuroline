@@ -16,20 +16,18 @@ function jsonResponse<T>(data: T, init?: ResponseInit): Response {
 
 /**
  * Хендлер для POST /pipeline - запуск pipeline
+ *
+ * @param request - HTTP запрос
+ * @param manager - PipelineManager инстанс
+ * @param pipelineType - тип pipeline (определяется route)
  */
 export async function handleStartPipeline(
 	request: Request,
 	manager: PipelineManager,
+	pipelineType: string,
 ): Promise<Response> {
 	try {
 		const body: StartPipelineBody = await request.json();
-
-		if (!body.pipelineType) {
-			return jsonResponse<ApiResponse>(
-				{ success: false, error: 'pipelineType is required' },
-				{ status: 400 },
-			);
-		}
 
 		if (body.input === undefined) {
 			return jsonResponse<ApiResponse>(
@@ -38,7 +36,7 @@ export async function handleStartPipeline(
 			);
 		}
 
-		const result = await manager.startPipeline(body.pipelineType, {
+		const result = await manager.startPipeline(pipelineType, {
 			data: body.input,
 			jobOptions: body.jobOptions,
 		});
@@ -126,16 +124,20 @@ export async function handleGetResult(
 
 /**
  * Хендлер для GET /pipeline/list - список pipeline с пагинацией
+ *
+ * @param request - HTTP запрос
+ * @param storage - PipelineStorage инстанс
+ * @param pipelineType - тип pipeline (определяется route, фильтрует результаты)
  */
 export async function handleGetList(
 	request: Request,
 	storage: PipelineStorage,
+	pipelineType: string,
 ): Promise<Response> {
 	try {
 		const { searchParams } = new URL(request.url);
 		const page = parseInt(searchParams.get('page') ?? '1', 10);
 		const limit = parseInt(searchParams.get('limit') ?? '10', 10);
-		const pipelineType = searchParams.get('pipelineType') ?? undefined;
 
 		const result = await storage.findAll({
 			page: Math.max(1, page),

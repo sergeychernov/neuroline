@@ -36,8 +36,6 @@ export interface PipelineClientConfig {
 
 /** Параметры запуска pipeline */
 export interface StartPipelineParams<TData = unknown> {
-	/** Тип pipeline */
-	pipelineType: string;
 	/** Входные данные */
 	input: TData;
 	/** Опции для jobs */
@@ -73,13 +71,15 @@ export interface PollingResult {
 /**
  * Клиент для работы с Pipeline API
  *
+ * Один клиент = один pipeline. URL определяет какой pipeline запускается.
+ *
  * @example
  * ```typescript
- * const client = new PipelineClient({ baseUrl: '/api/pipeline' });
+ * // Клиент для конкретного pipeline
+ * const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
  *
  * // Запуск pipeline с polling
  * const { stop, completed } = client.startAndPoll({
- *   pipelineType: 'my-pipeline',
  *   input: { userId: 123 },
  * }, (event) => {
  *   console.log('Status:', event.status.status);

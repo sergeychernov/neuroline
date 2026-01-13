@@ -3,10 +3,9 @@
  * Этот файл используется только на сервере (API routes)
  */
 
-import { PipelineManager, InMemoryPipelineStorage, type PipelineConfig, type PipelineStorage } from 'neuroline';
+import { PipelineManager, InMemoryPipelineStorage, type PipelineStorage } from 'neuroline';
 import { MongoPipelineStorage, PipelineSchema, type MongoPipelineDocument } from 'neuroline/mongo';
 import mongoose, { type Model } from 'mongoose';
-import { successPipeline, errorPipeline } from '../pipelines';
 
 // ============================================================================
 // Singleton instances
@@ -86,14 +85,3 @@ export function getPipelineManager() {
 	return { manager: managerInstance, storage: storageInstance! };
 }
 
-// ============================================================================
-// Pipelines
-// ============================================================================
-
-/**
- * Все зарегистрированные pipeline конфигурации
- */
-export const pipelines: PipelineConfig[] = [
-	successPipeline as PipelineConfig,
-	errorPipeline as PipelineConfig,
-];

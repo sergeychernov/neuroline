@@ -517,16 +517,18 @@ interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
 
 Client module for browser-side interaction with Pipeline API.
 
+**Note:** One client = one pipeline. The URL determines which pipeline to run.
+
 ### PipelineClient
 
 ```typescript
 import { PipelineClient } from 'neuroline/client';
 
-const client = new PipelineClient({ baseUrl: '/api/pipeline' });
+// Client for a specific pipeline
+const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
 
 // Start pipeline
 const { pipelineId, isNew } = await client.start({
-  pipelineType: 'my-pipeline',
   input: { userId: 123 },
   jobOptions: { 'fetch-data': { timeout: 5000 } },
 });
@@ -560,10 +562,12 @@ stop();
 ### Start with Polling
 
 ```typescript
+// Client for specific pipeline
+const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
+
 // Start pipeline and immediately begin polling
 const { pipelineId, stop, completed } = await client.startAndPoll(
   {
-    pipelineType: 'my-pipeline',
     input: { url: 'https://example.com' },
   },
   (event) => {
@@ -580,7 +584,7 @@ const { pipelineId, stop, completed } = await client.startAndPoll(
 ### React Hook Factory
 
 ```typescript
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createUsePipelineHook, PipelineClient } from 'neuroline/client';
 
 // Create hook with React dependencies
@@ -588,11 +592,12 @@ const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, us
 
 // In component
 function MyComponent() {
-  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  // One client per pipeline
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' }), []);
   const { start, status, result, isRunning, error } = usePipeline(client);
 
   const handleStart = async () => {
-    await start({ pipelineType: 'my-pipeline', input: { userId: 123 } });
+    await start({ input: { userId: 123 } });
   };
 
   return (
@@ -1135,16 +1140,18 @@ interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
 
 Клиентский модуль для взаимодействия с Pipeline API из браузера.
 
+**Примечание:** Один клиент = один pipeline. URL определяет какой pipeline запускается.
+
 ### PipelineClient
 
 ```typescript
 import { PipelineClient } from 'neuroline/client';
 
-const client = new PipelineClient({ baseUrl: '/api/pipeline' });
+// Клиент для конкретного pipeline
+const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
 
 // Запуск pipeline
 const { pipelineId, isNew } = await client.start({
-  pipelineType: 'my-pipeline',
   input: { userId: 123 },
   jobOptions: { 'fetch-data': { timeout: 5000 } },
 });
@@ -1178,10 +1185,12 @@ stop();
 ### Запуск с Polling
 
 ```typescript
+// Клиент для конкретного pipeline
+const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
+
 // Запуск pipeline и немедленное начало polling
 const { pipelineId, stop, completed } = await client.startAndPoll(
   {
-    pipelineType: 'my-pipeline',
     input: { url: 'https://example.com' },
   },
   (event) => {
@@ -1198,7 +1207,7 @@ const { pipelineId, stop, completed } = await client.startAndPoll(
 ### Фабрика React хука
 
 ```typescript
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createUsePipelineHook, PipelineClient } from 'neuroline/client';
 
 // Создание хука с зависимостями React
@@ -1206,11 +1215,12 @@ const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, us
 
 // В компоненте
 function MyComponent() {
-  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  // Один клиент на pipeline
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' }), []);
   const { start, status, result, isRunning, error } = usePipeline(client);
 
   const handleStart = async () => {
-    await start({ pipelineType: 'my-pipeline', input: { userId: 123 } });
+    await start({ input: { userId: 123 } });
   };
 
   return (

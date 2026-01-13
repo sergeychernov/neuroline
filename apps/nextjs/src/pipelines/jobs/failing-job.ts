@@ -16,9 +16,12 @@ export interface FailingJobInput {
     shouldFail?: boolean;
 }
 
-/** Артефакт (результат) failing job - никогда не возвращается */
+/** Артефакт (результат) failing job */
 export interface FailingJobArtifact {
-    neverReached: true;
+    /** Job завершилась успешно (shouldFail было false) */
+    passed: boolean;
+    /** ProcessId из входных данных */
+    processId: string;
 }
 
 /** Опции для failing job */
@@ -34,32 +37,48 @@ export interface FailingJobOptions {
 // ============================================================================
 
 /**
- * Failing Job — job, которая всегда падает с ошибкой
- * Используется для демонстрации обработки ошибок в pipeline
+ * Failing Job — условно падающая job
+ * Если input.shouldFail === true — падает с ошибкой
+ * Иначе — успешно завершается
  */
 export const failingJob: JobDefinition<FailingJobInput, FailingJobArtifact, FailingJobOptions> = {
     name: 'failing-task',
     async execute(input, options, ctx) {
         const delayMs = options?.delayMs ?? 1500;
         const errorMessage = options?.errorMessage ?? 'Критическая ошибка обработки данных';
+        const shouldFail = input.shouldFail ?? false;
         
-        ctx.logger.info('Начинаю выполнение задачи', { processId: input.processId });
+        ctx.logger.info('Начинаю выполнение задачи', { 
+            processId: input.processId,
+            shouldFail,
+        });
         
-        // Симулируем работу перед падением
+        // Симулируем работу
         await delay(delayMs);
         
-        ctx.logger.warn('Обнаружена проблема, операция будет прервана', {
+        if (shouldFail) {
+            ctx.logger.warn('Обнаружена проблема, операция будет прервана', {
+                processId: input.processId,
+            });
+            
+            // Симулируем ещё немного работы перед падением
+            await delay(500);
+            
+            ctx.logger.error('Невозможно продолжить выполнение', { 
+                reason: 'simulated_failure',
+            });
+            
+            // Бросаем ошибку
+            throw new Error(errorMessage);
+        }
+        
+        ctx.logger.info('Задача выполнена успешно', { 
             processId: input.processId,
         });
         
-        // Симулируем ещё немного работы
-        await delay(500);
-        
-        ctx.logger.error('Невозможно продолжить выполнение', { 
-            reason: 'simulated_failure',
-        });
-        
-        // Бросаем ошибку
-        throw new Error(errorMessage);
+        return {
+            passed: true,
+            processId: input.processId,
+        };
     },
 };

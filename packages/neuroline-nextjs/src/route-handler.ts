@@ -13,8 +13,8 @@ export interface PipelineRouteHandlerOptions {
 	manager: PipelineManager;
 	/** Storage для списка */
 	storage: PipelineStorage;
-	/** Конфигурации pipeline для регистрации */
-	pipelines?: PipelineConfig[];
+	/** Конфигурация pipeline для этого route */
+	pipeline: PipelineConfig;
 }
 
 export interface PipelineRouteHandlers {
@@ -27,41 +27,43 @@ export interface PipelineRouteHandlers {
 /**
  * Создаёт обработчики для Next.js App Router
  *
+ * Один route = один pipeline. Тип pipeline определяется конфигурацией,
+ * а не параметром в запросе.
+ *
  * @example
  * ```typescript
- * // app/api/pipeline/route.ts
+ * // app/api/pipeline/success/route.ts
  * import { createPipelineRouteHandler } from 'neuroline-nextjs';
- * import { manager, storage, pipelines } from '@/lib/pipeline';
+ * import { manager, storage } from '@/lib/pipeline';
+ * import { successPipeline } from '@/pipelines';
  *
- * const handlers = createPipelineRouteHandler({ manager, storage, pipelines });
+ * const handlers = createPipelineRouteHandler({ manager, storage, pipeline: successPipeline });
  *
  * export const POST = handlers.POST;
  * export const GET = handlers.GET;
  * ```
  *
  * Endpoints:
- * - POST /api/pipeline - запуск pipeline
- * - GET /api/pipeline?action=status&id=xxx - статус
- * - GET /api/pipeline?action=result&id=xxx - результаты
- * - GET /api/pipeline?action=job&id=xxx&jobName=yyy - данные job
- * - GET /api/pipeline?action=pipeline&id=xxx - полные данные pipeline
- * - GET /api/pipeline?action=list&page=1&limit=10 - список
+ * - POST /api/pipeline/success - запуск pipeline
+ * - GET /api/pipeline/success?action=status&id=xxx - статус
+ * - GET /api/pipeline/success?action=result&id=xxx - результаты
+ * - GET /api/pipeline/success?action=job&id=xxx&jobName=yyy - данные job
+ * - GET /api/pipeline/success?action=pipeline&id=xxx - полные данные pipeline
+ * - GET /api/pipeline/success?action=list&page=1&limit=10 - список (фильтр по типу)
  */
 export function createPipelineRouteHandler(
 	options: PipelineRouteHandlerOptions,
 ): PipelineRouteHandlers {
-	const { manager, storage, pipelines } = options;
+	const { manager, storage, pipeline } = options;
 
 	// Регистрируем pipeline при создании
-	if (pipelines) {
-		for (const config of pipelines) {
-			manager.registerPipeline(config);
-		}
-	}
+	manager.registerPipeline(pipeline);
+
+	const pipelineType = pipeline.name;
 
 	return {
 		POST: async (request: Request) => {
-			return handleStartPipeline(request, manager);
+			return handleStartPipeline(request, manager, pipelineType);
 		},
 
 		GET: async (request: Request) => {
@@ -78,7 +80,7 @@ export function createPipelineRouteHandler(
 				case 'pipeline':
 					return handleGetPipeline(request, storage);
 				case 'list':
-					return handleGetList(request, storage);
+					return handleGetList(request, storage, pipelineType);
 				default:
 					return new Response(
 						JSON.stringify({

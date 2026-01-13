@@ -45,8 +45,8 @@ export function PipelineControlPanel({
 	isRunning,
 	currentPipelineType,
 }: PipelineControlPanelProps) {
-	const isSuccessRunning = isRunning && currentPipelineType === 'success-pipeline';
-	const isErrorRunning = isRunning && currentPipelineType === 'error-pipeline';
+	const isSuccessRunning = isRunning && currentPipelineType === 'demo-success';
+	const isErrorRunning = isRunning && currentPipelineType === 'demo-error';
 
 	return (
 		<Paper

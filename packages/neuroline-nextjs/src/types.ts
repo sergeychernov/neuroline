@@ -1,21 +1,9 @@
-import type { PipelineManager, PipelineConfig, JobStatus } from 'neuroline';
-
-/**
- * Конфигурация для Next.js хендлеров
- */
-export interface NextjsPipelineOptions {
-	/** PipelineManager инстанс */
-	manager: PipelineManager;
-	/** Зарегистрированные pipeline конфигурации */
-	pipelines: PipelineConfig[];
-}
+import type { JobStatus } from 'neuroline';
 
 /**
  * Тело запроса для запуска pipeline
  */
 export interface StartPipelineBody {
-	/** Тип pipeline (имя из конфигурации) */
-	pipelineType: string;
 	/** Входные данные */
 	input: unknown;
 	/** Опции для jobs */

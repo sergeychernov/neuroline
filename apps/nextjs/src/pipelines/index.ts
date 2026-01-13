@@ -1,8 +1,8 @@
 /**
- * Neuroline Test Pipelines
+ * Neuroline Demo Pipelines
  * 
- * Тестовые pipelines для демонстрации работы библиотеки.
- * Каждый pipeline использует setTimeout для симуляции асинхронной работы,
+ * Демо pipeline для демонстрации работы библиотеки.
+ * Использует setTimeout для симуляции асинхронной работы,
  * не зависит от сети и файловой системы.
  */
 
@@ -21,15 +21,4 @@ export { failingJob, type FailingJobInput, type FailingJobArtifact, type Failing
 // Pipelines
 // ============================================================================
 
-export { successPipeline, type SuccessPipelineInput } from './success-pipeline';
-export { errorPipeline, type ErrorPipelineInput } from './error-pipeline';
-
-// ============================================================================
-// All Pipelines (для регистрации в manager)
-// ============================================================================
-
-import { successPipeline } from './success-pipeline';
-import { errorPipeline } from './error-pipeline';
-
-/** Все тестовые pipelines для регистрации */
-export const testPipelines = [successPipeline, errorPipeline];
+export { demoPipeline, type DemoPipelineInput, successPipeline, type SuccessPipelineInput } from './success-pipeline';

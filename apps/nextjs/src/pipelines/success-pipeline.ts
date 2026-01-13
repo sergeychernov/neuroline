@@ -3,21 +3,27 @@ import { initJob, type InitJobInput, type InitJobArtifact } from './jobs/init-jo
 import { validateJob, type ValidateJobArtifact } from './jobs/validate-job';
 import { computeJob, type ComputeJobArtifact } from './jobs/compute-job';
 import { transformJob, type TransformJobArtifact } from './jobs/transform-job';
+import { failingJob } from './jobs/failing-job';
 import { finalizeJob } from './jobs/finalize-job';
 
 // ============================================================================
 // Pipeline Input Types
 // ============================================================================
 
-/** Входные данные для success pipeline */
-export interface SuccessPipelineInput {
+/** Входные данные для demo pipeline */
+export interface DemoPipelineInput {
 	/** Начальное значение для вычислений */
 	seed: number;
 	/** Имя процесса */
 	name: string;
 	/** Количество итераций для compute job */
 	iterations?: number;
+	/** Если true — pipeline упадёт на failing-task */
+	fail?: boolean;
 }
+
+/** @deprecated Используй DemoPipelineInput */
+export type SuccessPipelineInput = DemoPipelineInput;
 
 // ============================================================================
 // Synapses (трансформация данных между jobs)
@@ -28,7 +34,7 @@ export interface SuccessPipelineInput {
  * Передаёт seed и name из входных данных pipeline
  */
 const inputToInit: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as SuccessPipelineInput;
+	const input = ctx.pipelineInput as DemoPipelineInput;
 	return {
 		seed: input.seed,
 		name: input.name,
@@ -52,7 +58,7 @@ const initToValidate: JobInPipeline['synapses'] = (ctx) => {
  * Передаёт seed и iterations из pipelineInput
  */
 const inputToCompute: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as SuccessPipelineInput;
+	const input = ctx.pipelineInput as DemoPipelineInput;
 	return {
 		seed: input.seed,
 		iterations: input.iterations ?? 10,
@@ -73,7 +79,20 @@ const computeToTransform: JobInPipeline['synapses'] = (ctx) => {
 };
 
 /**
- * Synapse: Transform -> Finalize
+ * Synapse: Transform -> Failing
+ * Передаёт processId и флаг shouldFail из pipelineInput
+ */
+const toFailing: JobInPipeline['synapses'] = (ctx) => {
+	const input = ctx.pipelineInput as DemoPipelineInput;
+	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
+	return {
+		processId: initArtifact?.processId ?? 'unknown',
+		shouldFail: input.fail ?? false,
+	};
+};
+
+/**
+ * Synapse: Failing -> Finalize
  * Собирает данные из всех предыдущих jobs
  */
 const toFinalize: JobInPipeline['synapses'] = (ctx) => {
@@ -92,18 +111,20 @@ const toFinalize: JobInPipeline['synapses'] = (ctx) => {
 // ============================================================================
 
 /**
- * Success Pipeline — успешно выполняется за ~5 секунд
+ * Demo Pipeline — демонстрация работы neuroline
  * 
  * Структура stages:
  * 1. [init] - инициализация (1 сек)
  * 2. [validate, compute] - параллельно валидация и вычисления (1 сек)
  * 3. [transform] - трансформация данных (1.2 сек)
- * 4. [finalize] - финализация и сборка результата (1 сек)
+ * 4. [failing-task] - условно падающая задача (если fail=true)
+ * 5. [finalize] - финализация и сборка результата (1 сек)
  * 
- * Общее время: ~4-5 секунд
+ * Если input.fail === true, pipeline упадёт на stage 4
+ * Общее время: ~5-6 секунд (при успехе)
  */
-export const successPipeline: PipelineConfig<SuccessPipelineInput> = {
-	name: 'success-pipeline',
+export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
+	name: 'demo-pipeline',
 	stages: [
 		// Stage 1: Инициализация
 		{ job: initJob, synapses: inputToInit },
@@ -117,8 +138,14 @@ export const successPipeline: PipelineConfig<SuccessPipelineInput> = {
 		// Stage 3: Трансформация данных
 		{ job: transformJob, synapses: computeToTransform },
 
-		// Stage 4: Финализация
+		// Stage 4: Условно падающая задача (падает если fail=true)
+		{ job: failingJob, synapses: toFailing },
+
+		// Stage 5: Финализация
 		{ job: finalizeJob, synapses: toFinalize },
 	] as PipelineStage[],
-	computeInputHash: (input) => `success_${input.seed}_${input.name}`,
+	computeInputHash: (input) => `demo_${input.seed}_${input.name}_${input.fail ? 'fail' : 'ok'}`,
 };
+
+/** @deprecated Используй demoPipeline */
+export const successPipeline = demoPipeline;

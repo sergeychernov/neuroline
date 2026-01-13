@@ -12,7 +12,7 @@ import type { SerializableValue } from 'neuroline-ui';
 import { PipelineClient } from 'neuroline/client';
 import type { PipelineStatusResponse, PipelineResultResponse, JobStatus } from 'neuroline';
 import { PipelineControlPanel } from './components/PipelineControlPanel';
-import type { SuccessPipelineInput, ErrorPipelineInput } from '../pipelines';
+import type { DemoPipelineInput } from '../pipelines';
 
 // ============================================================================
 // Helpers
@@ -88,8 +88,8 @@ export default function HomePage() {
   const stopRef = useRef<(() => void) | null>(null);
   const currentPipelineIdRef = useRef<string | null>(null);
 
-  // Создаём клиент один раз
-  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  // Один клиент для demo pipeline
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/demo' }), []);
 
   // Инициализация на клиенте
   useEffect(() => {
@@ -142,20 +142,20 @@ export default function HomePage() {
     stopRef.current?.();
 
     setIsRunning(true);
-    setCurrentPipelineType('success-pipeline');
+    setCurrentPipelineType('demo-success');
     setSelectedJob(null);
     setPipeline(null);
 
-    const input: SuccessPipelineInput = {
+    const input: DemoPipelineInput = {
       seed: Math.floor(Math.random() * 1000),
       name: `test-${Date.now()}`,
       iterations: 10,
+      fail: false,
     };
 
     try {
       const polling = await client.startAndPoll(
         {
-          pipelineType: 'success-pipeline',
           input,
           jobOptions: {
             compute: {
@@ -171,7 +171,7 @@ export default function HomePage() {
       currentPipelineIdRef.current = polling.pipelineId;
       stopRef.current = polling.stop;
     } catch (e) {
-      console.error('Failed to start success pipeline', e);
+      console.error('Failed to start demo pipeline (success)', e);
       setIsRunning(false);
     }
   }, [client, handleUpdate, handleError]);
@@ -181,21 +181,27 @@ export default function HomePage() {
     stopRef.current?.();
 
     setIsRunning(true);
-    setCurrentPipelineType('error-pipeline');
+    setCurrentPipelineType('demo-error');
     setSelectedJob(null);
     setPipeline(null);
 
-    const input: ErrorPipelineInput = {
+    const input: DemoPipelineInput = {
       seed: Math.floor(Math.random() * 1000),
       name: `test-${Date.now()}`,
       iterations: 10,
+      fail: true,
     };
 
     try {
       const polling = await client.startAndPoll(
         {
-          pipelineType: 'error-pipeline',
           input,
+          jobOptions: {
+            compute: {
+              multiplier: 2.0,
+              iterationDelayMs: 80,
+            },
+          },
         },
         handleUpdate,
         handleError,
@@ -204,7 +210,7 @@ export default function HomePage() {
       currentPipelineIdRef.current = polling.pipelineId;
       stopRef.current = polling.stop;
     } catch (e) {
-      console.error('Failed to start error pipeline', e);
+      console.error('Failed to start demo pipeline (error)', e);
       setIsRunning(false);
     }
   }, [client, handleUpdate, handleError]);
