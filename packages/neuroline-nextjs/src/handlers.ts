@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 import type { PipelineManager, PipelineStorage } from 'neuroline';
 import type { StartPipelineBody, ApiResponse, JobDetailsResponse } from './types';
 
@@ -19,7 +18,7 @@ function jsonResponse<T>(data: T, init?: ResponseInit): Response {
  * Хендлер для POST /pipeline - запуск pipeline
  */
 export async function handleStartPipeline(
-	request: NextRequest,
+	request: Request,
 	manager: PipelineManager,
 ): Promise<Response> {
 	try {
@@ -61,7 +60,7 @@ export async function handleStartPipeline(
  * Хендлер для GET /pipeline/status - получение статуса
  */
 export async function handleGetStatus(
-	request: NextRequest,
+	request: Request,
 	manager: PipelineManager,
 ): Promise<Response> {
 	try {
@@ -95,7 +94,7 @@ export async function handleGetStatus(
  * Хендлер для GET /pipeline/result - получение результатов
  */
 export async function handleGetResult(
-	request: NextRequest,
+	request: Request,
 	manager: PipelineManager,
 ): Promise<Response> {
 	try {
@@ -129,7 +128,7 @@ export async function handleGetResult(
  * Хендлер для GET /pipeline/list - список pipeline с пагинацией
  */
 export async function handleGetList(
-	request: NextRequest,
+	request: Request,
 	storage: PipelineStorage,
 ): Promise<Response> {
 	try {
@@ -161,7 +160,7 @@ export async function handleGetList(
  * Хендлер для GET /pipeline?action=job - получение данных конкретной job
  */
 export async function handleGetJob(
-	request: NextRequest,
+	request: Request,
 	storage: PipelineStorage,
 ): Promise<Response> {
 	try {
@@ -229,7 +228,7 @@ export async function handleGetJob(
  * Хендлер для GET /pipeline?action=pipeline - получение полных данных pipeline
  */
 export async function handleGetPipeline(
-	request: NextRequest,
+	request: Request,
 	storage: PipelineStorage,
 ): Promise<Response> {
 	try {

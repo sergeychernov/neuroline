@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server';
 import type { PipelineManager, PipelineStorage, PipelineConfig } from 'neuroline';
 import {
 	handleStartPipeline,
@@ -20,9 +19,9 @@ export interface PipelineRouteHandlerOptions {
 
 export interface PipelineRouteHandlers {
 	/** POST handler - запуск pipeline */
-	POST: (request: NextRequest) => Promise<Response>;
+	POST: (request: Request) => Promise<Response>;
 	/** GET handler - получение данных (status, result, list) */
-	GET: (request: NextRequest) => Promise<Response>;
+	GET: (request: Request) => Promise<Response>;
 }
 
 /**
@@ -61,11 +60,11 @@ export function createPipelineRouteHandler(
 	}
 
 	return {
-		POST: async (request: NextRequest) => {
+		POST: async (request: Request) => {
 			return handleStartPipeline(request, manager);
 		},
 
-		GET: async (request: NextRequest) => {
+		GET: async (request: Request) => {
 			const { searchParams } = new URL(request.url);
 			const action = searchParams.get('action') ?? 'status';
 
