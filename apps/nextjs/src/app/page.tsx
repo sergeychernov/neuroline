@@ -61,6 +61,9 @@ async function fetchPipelineDisplay(
 
     if (!status || !state) return null;
 
+    // Создаём Map для быстрого поиска job state по имени
+    const jobStateByName = new Map(state.jobs.map((j) => [j.name, j]));
+
     const displayData: PipelineDisplayData = {
       pipelineId: status.pipelineId,
       pipelineType: status.pipelineType,
@@ -68,14 +71,19 @@ async function fetchPipelineDisplay(
       input: state.input as SerializableValue,
       stages: status.stages.map((stage, index) => ({
         index,
-        jobs: stage.jobs.map((job) => ({
-          name: job.name,
-          status: job.status,
-          startedAt: job.startedAt,
-          finishedAt: job.finishedAt,
-          error: job.error,
-          artifact: result.artifacts[job.name] as SerializableValue | undefined,
-        })),
+        jobs: stage.jobs.map((job) => {
+          const jobState = jobStateByName.get(job.name);
+          return {
+            name: job.name,
+            status: job.status,
+            startedAt: job.startedAt,
+            finishedAt: job.finishedAt,
+            error: job.error,
+            artifact: result.artifacts[job.name] as SerializableValue | undefined,
+            input: jobState?.input as SerializableValue | undefined,
+            options: jobState?.options as SerializableValue | undefined,
+          };
+        }),
       })),
       error: status.error,
     };
@@ -166,7 +174,16 @@ export default function HomePage() {
     };
 
     try {
-      const { pipelineId } = await manager.startPipeline('success-pipeline', { data: input });
+      const { pipelineId } = await manager.startPipeline('success-pipeline', {
+        data: input,
+        // Options для конкретных jobs (ключ = имя job)
+        jobOptions: {
+          compute: {
+            multiplier: 2.0,
+            iterationDelayMs: 80,
+          },
+        },
+      });
       startPolling(pipelineId);
     } catch (e) {
       console.error('Failed to start success pipeline', e);

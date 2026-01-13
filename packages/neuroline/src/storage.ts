@@ -83,6 +83,20 @@ export interface PipelineStorage {
      * Обновить текущий индекс job
      */
     updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void>;
+
+    /**
+     * Обновить входные данные и опции job (при старте выполнения)
+     * @param pipelineId - ID пайплайна
+     * @param jobIndex - индекс job
+     * @param input - входные данные job (результат synapses)
+     * @param options - опции job
+     */
+    updateJobInput(
+        pipelineId: string,
+        jobIndex: number,
+        input: unknown,
+        options?: unknown,
+    ): Promise<void>;
 }
 
 /**
@@ -201,6 +215,22 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         const pipeline = this.pipelines.get(pipelineId);
         if (pipeline) {
             pipeline.currentJobIndex = jobIndex;
+            pipeline.updatedAt = new Date();
+        }
+    }
+
+    async updateJobInput(
+        pipelineId: string,
+        jobIndex: number,
+        input: unknown,
+        options?: unknown,
+    ): Promise<void> {
+        const pipeline = this.pipelines.get(pipelineId);
+        if (pipeline && pipeline.jobs[jobIndex]) {
+            pipeline.jobs[jobIndex].input = input;
+            if (options !== undefined) {
+                pipeline.jobs[jobIndex].options = options;
+            }
             pipeline.updatedAt = new Date();
         }
     }

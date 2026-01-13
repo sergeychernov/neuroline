@@ -9,6 +9,10 @@ import type { PipelineState, JobStatus, PipelineStatus } from './types';
 export interface MongoPipelineJobState {
     name: string;
     status: JobStatus;
+    /** Входные данные job (результат synapses) */
+    input?: unknown;
+    /** Опции job */
+    options?: unknown;
     artifact?: unknown;
     error?: { message: string; stack?: string };
     startedAt?: Date;
@@ -97,6 +101,8 @@ export class MongoPipelineStorage implements PipelineStorage {
             jobs: doc.jobs.map((j) => ({
                 name: j.name,
                 status: j.status,
+                input: j.input,
+                options: j.options,
                 artifact: j.artifact,
                 error: j.error,
                 startedAt: j.startedAt,
@@ -139,6 +145,8 @@ export class MongoPipelineStorage implements PipelineStorage {
             jobs: doc.jobs.map((j) => ({
                 name: j.name,
                 status: j.status,
+                input: j.input,
+                options: j.options,
                 artifact: j.artifact,
                 error: j.error,
                 startedAt: j.startedAt,
@@ -247,6 +255,23 @@ export class MongoPipelineStorage implements PipelineStorage {
 
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> {
         await this.pipelineModel.updateOne({ pipelineId }, { currentJobIndex: jobIndex }).exec();
+    }
+
+    async updateJobInput(
+        pipelineId: string,
+        jobIndex: number,
+        input: unknown,
+        options?: unknown,
+    ): Promise<void> {
+        const update: Record<string, unknown> = {
+            [`jobs.${jobIndex}.input`]: sanitizeForMongo(input),
+        };
+
+        if (options !== undefined) {
+            update[`jobs.${jobIndex}.options`] = sanitizeForMongo(options);
+        }
+
+        await this.pipelineModel.updateOne({ pipelineId }, update).exec();
     }
 }
 

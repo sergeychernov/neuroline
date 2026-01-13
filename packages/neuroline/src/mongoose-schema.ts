@@ -13,6 +13,10 @@ export const PipelineJobStateSchema = new MongooseSchema<MongoPipelineJobState>(
             required: true,
             enum: ['pending', 'processing', 'done', 'error'],
         },
+        /** Входные данные job (результат synapses) */
+        input: { type: MongooseSchema.Types.Mixed },
+        /** Опции job */
+        options: { type: MongooseSchema.Types.Mixed },
         artifact: { type: MongooseSchema.Types.Mixed },
         error: {
             type: new MongooseSchema(

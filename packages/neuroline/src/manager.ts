@@ -271,6 +271,10 @@ export class PipelineManager {
 
                 // Подготавливаем input через synapses или используем дефолтный
                 const jobInput = synapses ? synapses(mapperContext) : defaultInput;
+                const options = jobOptions[jobDef.name];
+
+                // Сохраняем input и options в storage для отображения в UI
+                await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options);
 
                 const context: JobContext = {
                     pipelineId,
@@ -286,7 +290,6 @@ export class PipelineManager {
                 };
 
                 try {
-                    const options = jobOptions[jobDef.name];
                     const artifact = await jobDef.execute(jobInput, options, context);
 
                     // Сохраняем артефакт

@@ -133,14 +133,23 @@ export interface PipelineInput<TData = unknown, TJobOptions = Record<string, unk
 // Job State Types (для хранилища)
 // ============================================================================
 
-/** Состояние отдельной job в документе пайплайна */
-export interface JobState {
+/**
+ * Состояние отдельной job в документе пайплайна
+ * @template TInput - тип входных данных job (результат synapses)
+ * @template TOutput - тип артефакта (результат выполнения)
+ * @template TOptions - тип опций job
+ */
+export interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
     /** Имя job */
     name: string;
     /** Статус выполнения */
     status: JobStatus;
+    /** Входные данные job (результат synapses или дефолтный input) */
+    input?: TInput;
+    /** Опции job */
+    options?: TOptions;
     /** Артефакт (результат выполнения) */
-    artifact?: unknown;
+    artifact?: TOutput;
     /** Информация об ошибке */
     error?: { message: string; stack?: string };
     /** Время начала выполнения */
