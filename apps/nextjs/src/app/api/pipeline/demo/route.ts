@@ -13,10 +13,17 @@
  * - GET /api/pipeline/demo?action=list&page=1&limit=10 - список
  */
 
+import { waitUntil } from '@vercel/functions';
 import { createPipelineRouteHandler } from 'neuroline-nextjs';
 import { ensurePipelineStorageReady, getPipelineManager } from '@/lib/pipeline-server';
 import { demoPipeline } from 'demo-pipelines';
 import type { PipelineConfig } from 'neuroline';
+
+/**
+ * Максимальное время выполнения функции (в секундах)
+ * Для Vercel Pro: до 300 сек, для Hobby: до 60 сек
+ */
+export const maxDuration = 60;
 
 const { manager, storage } = getPipelineManager();
 
@@ -24,6 +31,9 @@ const handlers = createPipelineRouteHandler({
 	manager,
 	storage,
 	pipeline: demoPipeline as PipelineConfig,
+	// waitUntil позволяет продолжить выполнение pipeline после отправки ответа
+	// Это решает проблему "зависания" pipeline на Vercel
+	waitUntil,
 });
 
 export const POST = async (request: Request) => {

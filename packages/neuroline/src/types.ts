@@ -129,6 +129,25 @@ export interface PipelineInput<TData = unknown, TJobOptions = Record<string, unk
     jobOptions?: TJobOptions;
 }
 
+/** Опции для запуска пайплайна */
+export interface StartPipelineOptions {
+    /**
+     * Callback вызываемый при старте выполнения pipeline
+     * Используется для интеграции с waitUntil() в serverless окружениях
+     *
+     * @example
+     * ```typescript
+     * // Next.js App Router с waitUntil
+     * import { waitUntil } from 'next/server';
+     *
+     * manager.startPipeline(type, input, {
+     *   onExecutionStart: (promise) => waitUntil(promise)
+     * });
+     * ```
+     */
+    onExecutionStart?: (executionPromise: Promise<void>) => void;
+}
+
 // ============================================================================
 // Job State Types (для хранилища)
 // ============================================================================

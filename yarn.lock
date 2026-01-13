@@ -1530,6 +1530,7 @@ __metadata:
     "@types/node": "npm:^20.11.5"
     "@types/react": "npm:^18.2.48"
     "@types/react-dom": "npm:^18.2.18"
+    "@vercel/functions": "npm:^1.0.0"
     demo-pipelines: "workspace:*"
     eslint: "npm:^8.56.0"
     eslint-config-next: "npm:14.1.0"
@@ -3058,6 +3059,18 @@ __metadata:
   version: 1.11.1
   resolution: "@unrs/resolver-binding-win32-x64-msvc@npm:1.11.1"
   conditions: os=win32 & cpu=x64
+  languageName: node
+  linkType: hard
+
+"@vercel/functions@npm:^1.0.0":
+  version: 1.6.0
+  resolution: "@vercel/functions@npm:1.6.0"
+  peerDependencies:
+    "@aws-sdk/credential-provider-web-identity": "*"
+  peerDependenciesMeta:
+    "@aws-sdk/credential-provider-web-identity":
+      optional: true
+  checksum: 10c0/7bd41416366e4ed40863419ac40e2af9b83e0e4c8cf943eb6ce479e6e0851fb6779ef02c7fa421dd599a9ebe852b15780fdbcd85d6f5f6bad6b4a42ab31e7891
   languageName: node
   linkType: hard
 

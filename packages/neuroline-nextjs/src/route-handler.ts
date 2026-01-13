@@ -15,6 +15,21 @@ export interface PipelineRouteHandlerOptions {
 	storage: PipelineStorage;
 	/** Конфигурация pipeline для этого route */
 	pipeline: PipelineConfig;
+	/**
+	 * Callback для регистрации фонового выполнения в serverless окружении
+	 * Для Vercel/Next.js передайте waitUntil из next/server
+	 *
+	 * @example
+	 * ```typescript
+	 * import { waitUntil } from 'next/server';
+	 *
+	 * const handlers = createPipelineRouteHandler({
+	 *   manager, storage, pipeline,
+	 *   waitUntil, // передаём функцию waitUntil
+	 * });
+	 * ```
+	 */
+	waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 export interface PipelineRouteHandlers {
@@ -54,7 +69,7 @@ export interface PipelineRouteHandlers {
 export function createPipelineRouteHandler(
 	options: PipelineRouteHandlerOptions,
 ): PipelineRouteHandlers {
-	const { manager, storage, pipeline } = options;
+	const { manager, storage, pipeline, waitUntil } = options;
 
 	// Регистрируем pipeline при создании
 	manager.registerPipeline(pipeline);
@@ -63,7 +78,7 @@ export function createPipelineRouteHandler(
 
 	return {
 		POST: async (request: Request) => {
-			return handleStartPipeline(request, manager, pipelineType);
+			return handleStartPipeline(request, manager, pipelineType, { waitUntil });
 		},
 
 		GET: async (request: Request) => {

@@ -14,17 +14,28 @@ function jsonResponse<T>(data: T, init?: ResponseInit): Response {
 	});
 }
 
+/** Опции для запуска pipeline */
+export interface HandleStartPipelineOptions {
+	/**
+	 * Callback для регистрации фонового выполнения в serverless окружении
+	 * Для Vercel/Next.js передайте waitUntil из next/server
+	 */
+	waitUntil?: (promise: Promise<unknown>) => void;
+}
+
 /**
  * Хендлер для POST /pipeline - запуск pipeline
  *
  * @param request - HTTP запрос
  * @param manager - PipelineManager инстанс
  * @param pipelineType - тип pipeline (определяется route)
+ * @param options - опции запуска (waitUntil для serverless)
  */
 export async function handleStartPipeline(
 	request: Request,
 	manager: PipelineManager,
 	pipelineType: string,
+	options?: HandleStartPipelineOptions,
 ): Promise<Response> {
 	try {
 		const body: StartPipelineBody = await request.json();
@@ -36,10 +47,17 @@ export async function handleStartPipeline(
 			);
 		}
 
-		const result = await manager.startPipeline(pipelineType, {
-			data: body.input,
-			jobOptions: body.jobOptions,
-		});
+		const result = await manager.startPipeline(
+			pipelineType,
+			{
+				data: body.input,
+				jobOptions: body.jobOptions,
+			},
+			{
+				// Передаём waitUntil для serverless окружений
+				onExecutionStart: options?.waitUntil,
+			},
+		);
 
 		return jsonResponse<ApiResponse>({
 			success: true,

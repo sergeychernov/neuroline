@@ -13,6 +13,7 @@ import type {
     JobLogger,
     SynapseContext,
     StartPipelineResponse,
+    StartPipelineOptions,
     PipelineStatusResponse,
     PipelineResultResponse,
     PipelineState,
@@ -138,10 +139,15 @@ export class PipelineManager {
 
     /**
      * Запускает пайплайн или возвращает существующий
+     *
+     * @param pipelineType - тип пайплайна (должен быть зарегистрирован)
+     * @param input - входные данные и опции для jobs
+     * @param options - опции запуска (onExecutionStart для serverless)
      */
     async startPipeline<TData = unknown>(
         pipelineType: string,
         input: PipelineInput<TData>,
+        options?: StartPipelineOptions,
     ): Promise<StartPipelineResponse> {
         const config = this.getPipelineConfig(pipelineType);
 
@@ -207,10 +213,15 @@ export class PipelineManager {
 
         this.logger.info('Pipeline created', { pipelineId, pipelineType, configHash });
 
-        // Запускаем выполнение в фоне
-        this.executePipeline(pipelineId, pipelineType).catch((error) => {
+        // Создаём promise выполнения
+        const executionPromise = this.executePipeline(pipelineId, pipelineType).catch((error) => {
             this.logger.error('Pipeline execution failed', { pipelineId, error });
         });
+
+        // Вызываем callback если передан (для waitUntil в serverless)
+        if (options?.onExecutionStart) {
+            options.onExecutionStart(executionPromise);
+        }
 
         return { pipelineId, isNew: true };
     }
