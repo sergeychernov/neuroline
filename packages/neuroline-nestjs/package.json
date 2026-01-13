@@ -1,6 +1,12 @@
 {
   "name": "neuroline-nestjs",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "homepage": "https://neuroline.vercel.app/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sergeychernov/neuroline.git",
+    "directory": "packages/neuroline-nestjs"
+  },
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",

@@ -1,5 +1,8 @@
 # Neuroline Monorepo
 
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
+
 Мультипакетный репозиторий для оркестрации и визуализации pipeline.
 
 ## 📦 Пакеты

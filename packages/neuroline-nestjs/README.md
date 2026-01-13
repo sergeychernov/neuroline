@@ -2,6 +2,9 @@
 
 # neuroline-nestjs
 
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
+
 NestJS integration package for Neuroline - provides module, controller, and service for pipeline orchestration.
 
 ## Installation
@@ -241,6 +244,9 @@ UNLICENSED
 ---
 
 # neuroline-nestjs
+
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Пакет интеграции с NestJS для Neuroline - предоставляет модуль, контроллер и сервис для оркестрации пайплайнов.
 

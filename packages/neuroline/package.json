@@ -1,6 +1,12 @@
 {
 	"name": "neuroline",
-	"version": "0.2.0",
+	"version": "0.2.1",
+	"homepage": "https://neuroline.vercel.app/",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/sergeychernov/neuroline.git",
+		"directory": "packages/neuroline"
+	},
 	"main": "./dist/index.js",
 	"module": "./dist/index.mjs",
 	"types": "./dist/index.d.ts",

@@ -2,6 +2,9 @@
 
 # Neuroline
 
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
+
 Framework-agnostic pipeline orchestration library with support for:
 - Sequential and parallel job execution
 - Persistent state storage (MongoDB, in-memory, or custom)
@@ -498,6 +501,9 @@ UNLICENSED
 ---
 
 # Neuroline
+
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Фреймворк-агностик библиотека для оркестрации пайплайнов с поддержкой:
 - Последовательного и параллельного выполнения jobs

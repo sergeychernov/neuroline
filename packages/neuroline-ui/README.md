@@ -2,6 +2,9 @@
 
 # neuroline-ui
 
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
+
 React components for visualizing Neuroline pipelines with Material-UI.
 
 ## Installation
@@ -426,6 +429,9 @@ UNLICENSED
 ---
 
 # neuroline-ui
+
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 React компоненты для визуализации Neuroline пайплайнов с Material-UI.
 

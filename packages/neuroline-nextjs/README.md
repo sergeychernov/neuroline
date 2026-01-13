@@ -2,6 +2,9 @@
 
 # neuroline-nextjs
 
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
+
 Next.js App Router integration for Neuroline - provides route handlers for API routes.
 
 ## Installation
@@ -276,6 +279,9 @@ UNLICENSED
 ---
 
 # neuroline-nextjs
+
+[![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
+[![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Интеграция с Next.js App Router для Neuroline - предоставляет обработчики маршрутов для API.
 
