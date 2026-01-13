@@ -14,8 +14,6 @@ export type { PipelineManagerOptions } from './manager';
 export { InMemoryPipelineStorage } from './storage';
 export type { PipelineStorage, PaginatedResult, PaginationParams } from './storage';
 
-// MongoDB (optional) - также доступно через 'neuroline/mongo'
-export { MongoPipelineStorage } from './mongo-storage';
-export { PipelineSchema } from './mongoose-schema';
-export type { MongoPipelineDocument, MongoPipelineJobState } from './mongo-storage';
+// MongoDB экспорты доступны через 'neuroline/mongo':
+// import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Box, Container, Typography, Paper, CircularProgress } from '@mui/material';
 import {
   PipelineViewer,
@@ -8,91 +8,68 @@ import {
   type PipelineDisplayData,
   type JobDisplayInfo,
 } from 'neuroline-ui';
-import { PipelineManager, InMemoryPipelineStorage, type PipelineConfig } from 'neuroline';
 import type { SerializableValue } from 'neuroline-ui';
+import { PipelineClient } from 'neuroline/client';
+import type { PipelineStatusResponse, PipelineResultResponse, JobStatus } from 'neuroline';
 import { PipelineControlPanel } from './components/PipelineControlPanel';
-import {
-  successPipeline,
-  errorPipeline,
-  type SuccessPipelineInput,
-  type ErrorPipelineInput,
-} from '../pipelines';
-
-// ============================================================================
-// Pipeline Manager Singleton
-// ============================================================================
-
-let managerInstance: PipelineManager | null = null;
-let storageInstance: InMemoryPipelineStorage | null = null;
-
-function getPipelineManager() {
-  if (!managerInstance) {
-    storageInstance = new InMemoryPipelineStorage();
-    managerInstance = new PipelineManager({
-      storage: storageInstance,
-      logger: {
-        info: (msg, data) => console.log(`[INFO] ${msg}`, data),
-        error: (msg, data) => console.error(`[ERROR] ${msg}`, data),
-        warn: (msg, data) => console.warn(`[WARN] ${msg}`, data),
-      },
-    });
-    managerInstance.registerPipeline(successPipeline as PipelineConfig);
-    managerInstance.registerPipeline(errorPipeline as PipelineConfig);
-  }
-  return { manager: managerInstance, storage: storageInstance! };
-}
+import type { SuccessPipelineInput, ErrorPipelineInput } from '../pipelines';
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
+/** Тип stage из PipelineStatusResponse */
+interface StageInfo {
+  jobs: Array<{
+    name: string;
+    status: JobStatus;
+    startedAt?: Date;
+    finishedAt?: Date;
+    error?: { message: string; stack?: string };
+  }>;
+}
+
+/** Тип job из stage */
+interface JobInfo {
+  name: string;
+  status: JobStatus;
+  startedAt?: Date;
+  finishedAt?: Date;
+  error?: { message: string; stack?: string };
+}
+
+/** Событие обновления для fallback типизации */
+interface UpdateEvent {
+  status: PipelineStatusResponse;
+  result: PipelineResultResponse;
+}
+
 /**
- * Преобразует PipelineStatusResponse в PipelineDisplayData
+ * Преобразует PipelineUpdateEvent в PipelineDisplayData
  */
-async function fetchPipelineDisplay(
-  manager: PipelineManager,
-  storage: InMemoryPipelineStorage,
-  pipelineId: string,
-): Promise<PipelineDisplayData | null> {
-  try {
-    const status = await manager.getStatus(pipelineId);
-    const result = await manager.getResult(pipelineId);
-    const state = await storage.findById(pipelineId);
+function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
+  const { status, result } = event;
 
-    if (!status || !state) return null;
-
-    // Создаём Map для быстрого поиска job state по имени
-    const jobStateByName = new Map(state.jobs.map((j) => [j.name, j]));
-
-    const displayData: PipelineDisplayData = {
-      pipelineId: status.pipelineId,
-      pipelineType: status.pipelineType,
-      status: status.status,
-      input: state.input as SerializableValue,
-      stages: status.stages.map((stage, index) => ({
-        index,
-        jobs: stage.jobs.map((job) => {
-          const jobState = jobStateByName.get(job.name);
-          return {
-            name: job.name,
-            status: job.status,
-            startedAt: job.startedAt,
-            finishedAt: job.finishedAt,
-            error: job.error,
-            artifact: result.artifacts[job.name] as SerializableValue | undefined,
-            input: jobState?.input as SerializableValue | undefined,
-            options: jobState?.options as SerializableValue | undefined,
-          };
-        }),
+  return {
+    pipelineId: status.pipelineId,
+    pipelineType: status.pipelineType,
+    status: status.status,
+    input: undefined, // Input не доступен через status API
+    stages: status.stages.map((stage: StageInfo, index: number) => ({
+      index,
+      jobs: stage.jobs.map((job: JobInfo) => ({
+        name: job.name,
+        status: job.status,
+        startedAt: job.startedAt,
+        finishedAt: job.finishedAt,
+        error: job.error,
+        artifact: result.artifacts[job.name] as SerializableValue | undefined,
+        input: undefined, // Для получения input нужен отдельный запрос
+        options: undefined,
       })),
-      error: status.error,
-    };
-
-    return displayData;
-  } catch (e) {
-    console.error('Failed to fetch pipeline display', e);
-    return null;
-  }
+    })),
+    error: status.error,
+  };
 }
 
 // ============================================================================
@@ -108,59 +85,61 @@ export default function HomePage() {
   const [currentPipelineType, setCurrentPipelineType] = useState<string | undefined>();
   const [mounted, setMounted] = useState(false);
 
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const stopRef = useRef<(() => void) | null>(null);
   const currentPipelineIdRef = useRef<string | null>(null);
+
+  // Создаём клиент один раз
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
 
   // Инициализация на клиенте
   useEffect(() => {
     setMounted(true);
     return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
+      stopRef.current?.();
     };
   }, []);
 
-  const handleJobClick = useCallback((job: JobDisplayInfo) => {
-    setSelectedJob(job);
-  }, []);
+  const handleJobClick = useCallback(
+    async (job: JobDisplayInfo) => {
+      // Сразу показываем job с базовой информацией
+      setSelectedJob(job);
 
-  const startPolling = useCallback((pipelineId: string) => {
-    const { manager, storage } = getPipelineManager();
-
-    // Очищаем предыдущий polling
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-    }
-
-    currentPipelineIdRef.current = pipelineId;
-
-    const poll = async () => {
-      if (currentPipelineIdRef.current !== pipelineId) return;
-
-      const displayData = await fetchPipelineDisplay(manager, storage, pipelineId);
-      if (!displayData) return;
-
-      setPipeline(displayData);
-
-      if (displayData.status !== 'processing') {
-        setIsRunning(false);
-        if (pollingRef.current) {
-          clearInterval(pollingRef.current);
-          pollingRef.current = null;
+      // Если есть pipelineId, запрашиваем полные детали job (input, options)
+      const pipelineId = currentPipelineIdRef.current;
+      if (pipelineId) {
+        try {
+          const details = await client.getJobDetails(pipelineId, job.name);
+          // Обновляем selectedJob с полными данными
+          setSelectedJob({
+            ...job,
+            input: details.input as SerializableValue | undefined,
+            options: details.options as SerializableValue | undefined,
+          });
+        } catch (e) {
+          console.error('Failed to fetch job details:', e);
         }
       }
-    };
+    },
+    [client],
+  );
 
-    // Первый запрос сразу
-    poll();
+  const handleUpdate = useCallback((event: UpdateEvent) => {
+    const displayData = convertToDisplayData(event);
+    setPipeline(displayData);
 
-    // Потом каждые 500ms
-    pollingRef.current = setInterval(poll, 500);
+    if (event.status.status !== 'processing') {
+      setIsRunning(false);
+    }
+  }, []);
+
+  const handleError = useCallback((error: Error) => {
+    console.error('Pipeline error:', error);
+    setIsRunning(false);
   }, []);
 
   const handleStartSuccess = useCallback(async () => {
-    const { manager } = getPipelineManager();
+    // Остановить предыдущий polling
+    stopRef.current?.();
 
     setIsRunning(true);
     setCurrentPipelineType('success-pipeline');
@@ -174,25 +153,32 @@ export default function HomePage() {
     };
 
     try {
-      const { pipelineId } = await manager.startPipeline('success-pipeline', {
-        data: input,
-        // Options для конкретных jobs (ключ = имя job)
-        jobOptions: {
-          compute: {
-            multiplier: 2.0,
-            iterationDelayMs: 80,
+      const polling = await client.startAndPoll(
+        {
+          pipelineType: 'success-pipeline',
+          input,
+          jobOptions: {
+            compute: {
+              multiplier: 2.0,
+              iterationDelayMs: 80,
+            },
           },
         },
-      });
-      startPolling(pipelineId);
+        handleUpdate,
+        handleError,
+      );
+
+      currentPipelineIdRef.current = polling.pipelineId;
+      stopRef.current = polling.stop;
     } catch (e) {
       console.error('Failed to start success pipeline', e);
       setIsRunning(false);
     }
-  }, [startPolling]);
+  }, [client, handleUpdate, handleError]);
 
   const handleStartError = useCallback(async () => {
-    const { manager } = getPipelineManager();
+    // Остановить предыдущий polling
+    stopRef.current?.();
 
     setIsRunning(true);
     setCurrentPipelineType('error-pipeline');
@@ -206,13 +192,22 @@ export default function HomePage() {
     };
 
     try {
-      const { pipelineId } = await manager.startPipeline('error-pipeline', { data: input });
-      startPolling(pipelineId);
+      const polling = await client.startAndPoll(
+        {
+          pipelineType: 'error-pipeline',
+          input,
+        },
+        handleUpdate,
+        handleError,
+      );
+
+      currentPipelineIdRef.current = polling.pipelineId;
+      stopRef.current = polling.stop;
     } catch (e) {
       console.error('Failed to start error pipeline', e);
       setIsRunning(false);
     }
-  }, [startPolling]);
+  }, [client, handleUpdate, handleError]);
 
   // Loading state
   if (!mounted) {
@@ -331,7 +326,19 @@ export default function HomePage() {
         )}
 
         {/* Детали выбранной Job */}
-        {selectedJob && <JobDetailsPanel job={selectedJob} />}
+        {selectedJob && (
+          <JobDetailsPanel
+            job={selectedJob}
+            onInputEditClick={(job) => {
+              console.log('Edit input for job:', job.name, job.input);
+              // TODO: открыть модальное окно для редактирования input
+            }}
+            onOptionsEditClick={(job) => {
+              console.log('Edit options for job:', job.name, job.options);
+              // TODO: открыть модальное окно для редактирования options
+            }}
+          />
+        )}
 
         {/* Инструкция */}
         <Paper
@@ -347,15 +354,72 @@ export default function HomePage() {
             📖 Как это работает
           </Typography>
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
-            <strong>neuroline</strong> — это библиотека для оркестрации pipeline на сервере.
-            Каждый pipeline состоит из <strong>stages</strong>, которые выполняются последовательно.
-            Внутри каждого stage может быть одна или несколько <strong>jobs</strong>, которые выполняются параллельно.
+            Neuroline состоит из нескольких пакетов. Ядро задаёт модель pipeline (<strong>stages</strong> выполняются
+            последовательно, внутри stage <strong>jobs</strong> выполняются параллельно), а интеграции и UI добавляют
+            удобные способы запуска и визуализации.
           </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            <strong>neuroline-ui</strong> визуализирует pipeline как сеть «нейронов» — каждая job
-            имеет входные данные (от предыдущих jobs или input pipeline), выполняет обработку
-            и выдаёт результат (артефакт) для следующих jobs.
-          </Typography>
+          <Box
+            component="ul"
+            sx={{
+              m: 0,
+              pl: 2.5,
+              color: 'text.secondary',
+              '& li': { mb: 1.25 },
+              '& a': { textDecoration: 'none', '&:hover': { textDecoration: 'underline' } },
+            }}
+          >
+            <Box component="li">
+              <Box
+                component="a"
+                href="https://www.npmjs.com/package/neuroline"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: '#7c4dff' }}
+              >
+                <strong>neuroline</strong>
+              </Box>{' '}
+              — core: PipelineManager, типы, storage (in-memory / Mongo через <strong>neuroline/mongo</strong>) и клиент
+              для опроса API (<strong>neuroline/client</strong>).
+            </Box>
+            <Box component="li">
+              <Box
+                component="a"
+                href="https://www.npmjs.com/package/neuroline-ui"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: '#00e5ff' }}
+              >
+                <strong>neuroline-ui</strong>
+              </Box>{' '}
+              — React + MUI компоненты для визуализации pipeline как «нейросети»: граф jobs, статусы, артефакты и детали
+              выполнения.
+            </Box>
+            <Box component="li">
+              <Box
+                component="a"
+                href="https://www.npmjs.com/package/neuroline-nextjs"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: '#00e676' }}
+              >
+                <strong>neuroline-nextjs</strong>
+              </Box>{' '}
+              — интеграция для Next.js App Router: готовые route handlers (GET/POST) для запуска pipeline и получения
+              статуса/результатов.
+            </Box>
+            <Box component="li">
+              <Box
+                component="a"
+                href="https://www.npmjs.com/package/neuroline-nestjs"
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: '#ffd54f' }}
+              >
+                <strong>neuroline-nestjs</strong>
+              </Box>{' '}
+              — интеграция для NestJS: модуль/контроллер/сервис и REST API для управления pipelines.
+            </Box>
+          </Box>
         </Paper>
 
         {/* Футер */}

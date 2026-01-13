@@ -16,9 +16,10 @@ yarn add neuroline neuroline-nextjs
 ## Features
 
 - **App Router Support** - native Next.js 14+ App Router integration
-- **Type-Safe Handlers** - full TypeScript support with NextRequest/NextResponse
-- **Automatic Routing** - catch-all route handler for all pipeline operations
-- **Stateless Design** - no server-side state, works with serverless deployments
+- **Type-Safe Handlers** - full TypeScript support with NextRequest/Response
+- **Single Endpoint Design** - all operations via query parameters
+- **Job Details API** - get input, options, and artifacts for individual jobs
+- **Stateless Design** - works with serverless deployments
 
 ## Quick Start
 
@@ -38,14 +39,17 @@ manager.registerPipeline(myPipelineConfig);
 
 ### 2. Create API Route Handler
 
-Create a catch-all route at `app/api/pipeline/[...path]/route.ts`:
+Create a route at `app/api/pipeline/route.ts`:
 
 ```typescript
-import { createPipelineHandlers } from 'neuroline-nextjs';
-import { manager } from '@/lib/neuroline';
+import { createPipelineRouteHandler } from 'neuroline-nextjs';
+import { manager, storage } from '@/lib/neuroline';
 
-const handlers = createPipelineHandlers({
+const handlers = createPipelineRouteHandler({
     manager,
+    storage,
+    // Optional: register pipelines here
+    pipelines: [myPipelineConfig, anotherPipelineConfig],
 });
 
 export const GET = handlers.GET;
@@ -56,19 +60,29 @@ That's it! Your pipeline API is ready.
 
 ## API Endpoints
 
-The handler provides the following endpoints:
+The handler provides a single endpoint with query parameters:
 
-### POST `/api/pipeline/:type/start`
+### POST `/api/pipeline`
 
 Start a new pipeline or return existing one.
 
+**Request body:**
+```typescript
+{
+  pipelineType: string;  // Pipeline type name
+  input: unknown;        // Input data
+  jobOptions?: Record<string, unknown>;  // Optional job options
+}
+```
+
 **Example:**
 ```typescript
-const response = await fetch('/api/pipeline/my-pipeline/start', {
+const response = await fetch('/api/pipeline', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    data: {
+    pipelineType: 'my-pipeline',
+    input: {
       url: 'https://api.example.com/data',
       userId: 'user-123',
     },
@@ -79,40 +93,67 @@ const response = await fetch('/api/pipeline/my-pipeline/start', {
 });
 
 const result = await response.json();
-// { pipelineId: "abc123", isNew: true }
+// { success: true, data: { pipelineId: "abc123", isNew: true } }
 ```
 
-### GET `/api/pipeline/:id/status`
+### GET `/api/pipeline?action=status&id=:id`
 
 Get current pipeline status.
 
 **Example:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123/status');
-const status = await response.json();
-// { status: "processing", currentJobIndex: 1, totalJobs: 4, ... }
+const response = await fetch('/api/pipeline?action=status&id=abc123');
+const { data } = await response.json();
+// { status: "processing", currentJobIndex: 1, totalJobs: 4, stages: [...] }
 ```
 
-### GET `/api/pipeline/:id/result`
+### GET `/api/pipeline?action=result&id=:id`
 
 Get pipeline results (artifacts).
 
 **Example:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123/result');
-const result = await response.json();
-// { status: "done", artifacts: [...], jobNames: [...] }
+const response = await fetch('/api/pipeline?action=result&id=abc123');
+const { data } = await response.json();
+// { status: "done", artifacts: { "job-name": {...} }, jobNames: [...] }
 ```
 
-### GET `/api/pipeline/:id`
+### GET `/api/pipeline?action=job&id=:id&jobName=:name`
+
+Get detailed job data including input and options.
+
+**Example:**
+```typescript
+const response = await fetch('/api/pipeline?action=job&id=abc123&jobName=fetch-data');
+const { data } = await response.json();
+// { name: "fetch-data", status: "done", input: {...}, options: {...}, artifact: {...} }
+```
+
+### GET `/api/pipeline?action=pipeline&id=:id`
 
 Get full pipeline state.
 
 **Example:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123');
-const pipeline = await response.json();
+const response = await fetch('/api/pipeline?action=pipeline&id=abc123');
+const { data } = await response.json();
 // Full PipelineState object
+```
+
+### GET `/api/pipeline?action=list`
+
+Get paginated list of pipelines.
+
+**Query parameters:**
+- `page` - Page number (default: 1)
+- `limit` - Items per page (default: 10, max: 100)
+- `pipelineType` - Filter by pipeline type (optional)
+
+**Example:**
+```typescript
+const response = await fetch('/api/pipeline?action=list&page=1&limit=10');
+const { data } = await response.json();
+// { items: [...], total: 50, page: 1, limit: 10, totalPages: 5 }
 ```
 
 ## With MongoDB Storage
@@ -140,70 +181,38 @@ manager.registerPipeline(myPipelineConfig);
 
 ## Client-Side Usage
 
-### React Hook Example
+Use `neuroline/client` for client-side integration:
 
 ```typescript
 'use client';
 
-import { useState, useEffect } from 'react';
-
-export function usePipeline(pipelineId: string | null) {
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!pipelineId) return;
-
-    const pollStatus = async () => {
-      const response = await fetch(`/api/pipeline/${pipelineId}/status`);
-      const data = await response.json();
-      setStatus(data);
-
-      if (data.status === 'processing') {
-        setTimeout(pollStatus, 1000);
-      }
-    };
-
-    pollStatus();
-  }, [pipelineId]);
-
-  const startPipeline = async (type: string, input: any) => {
-    setLoading(true);
-    const response = await fetch(`/api/pipeline/${type}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: input }),
-    });
-    const data = await response.json();
-    setLoading(false);
-    return data.pipelineId;
-  };
-
-  return { status, loading, startPipeline };
-}
-```
-
-### Component Example
-
-```typescript
-'use client';
-
-import { usePipeline } from './usePipeline';
+import { useMemo, useState, useCallback } from 'react';
+import { PipelineClient } from 'neuroline/client';
 
 export function PipelineDemo() {
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
-  const { status, loading, startPipeline } = usePipeline(pipelineId);
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  const [status, setStatus] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
 
-  const handleStart = async () => {
-    const id = await startPipeline('my-pipeline', {
-      url: 'https://api.example.com/data',
-    });
-    setPipelineId(id);
-  };
+  const handleStart = useCallback(async () => {
+    setIsRunning(true);
+    
+    const { pipelineId, stop, completed } = await client.startAndPoll(
+      {
+        pipelineType: 'my-pipeline',
+        input: { url: 'https://api.example.com/data' },
+      },
+      (event) => setStatus(event.status),
+      (error) => console.error(error),
+    );
+
+    await completed;
+    setIsRunning(false);
+  }, [client]);
 
   return (
     <div>
-      <button onClick={handleStart} disabled={loading}>
+      <button onClick={handleStart} disabled={isRunning}>
         Start Pipeline
       </button>
       {status && (
@@ -220,9 +229,10 @@ export function PipelineDemo() {
 ## Configuration Options
 
 ```typescript
-createPipelineHandlers({
-  manager: PipelineManager,        // Required
-  storage?: PipelineStorage,       // Optional - for list operations
+createPipelineRouteHandler({
+  manager: PipelineManager,        // Required - pipeline manager instance
+  storage: PipelineStorage,        // Required - storage for job details and list
+  pipelines?: PipelineConfig[],    // Optional - pipelines to register on init
 });
 ```
 
@@ -256,20 +266,36 @@ const manager = new PipelineManager({ storage });
 
 ## API Reference
 
-### `createPipelineHandlers(options)`
+### `createPipelineRouteHandler(options)`
 
 Creates GET and POST handlers for Next.js App Router.
 
 **Parameters:**
 - `manager: PipelineManager` - Required. The pipeline manager instance.
-- `storage?: PipelineStorage` - Optional. Storage for list operations.
+- `storage: PipelineStorage` - Required. Storage for job details and list operations.
+- `pipelines?: PipelineConfig[]` - Optional. Pipelines to register on initialization.
 
 **Returns:**
 ```typescript
 {
-  GET: (request: NextRequest) => Promise<NextResponse>,
-  POST: (request: NextRequest) => Promise<NextResponse>
+  GET: (request: NextRequest) => Promise<Response>,
+  POST: (request: NextRequest) => Promise<Response>
 }
+```
+
+### Individual Handlers
+
+You can also use individual handlers for custom routing:
+
+```typescript
+import {
+  handleStartPipeline,
+  handleGetStatus,
+  handleGetResult,
+  handleGetJob,
+  handleGetPipeline,
+  handleGetList,
+} from 'neuroline-nextjs';
 ```
 
 ## License
@@ -294,9 +320,10 @@ yarn add neuroline neuroline-nextjs
 ## Возможности
 
 - **Поддержка App Router** - нативная интеграция с Next.js 14+ App Router
-- **Типобезопасные обработчики** - полная поддержка TypeScript с NextRequest/NextResponse
-- **Автоматическая маршрутизация** - catch-all обработчик для всех операций с пайплайнами
-- **Stateless дизайн** - без серверного состояния, работает с serverless деплоями
+- **Типобезопасные обработчики** - полная поддержка TypeScript с NextRequest/Response
+- **Единый эндпоинт** - все операции через query-параметры
+- **API деталей job** - получение input, options и артефактов для отдельных jobs
+- **Stateless дизайн** - работает с serverless деплоями
 
 ## Быстрый старт
 
@@ -316,14 +343,17 @@ manager.registerPipeline(myPipelineConfig);
 
 ### 2. Создайте обработчик API маршрута
 
-Создайте catch-all маршрут в `app/api/pipeline/[...path]/route.ts`:
+Создайте маршрут в `app/api/pipeline/route.ts`:
 
 ```typescript
-import { createPipelineHandlers } from 'neuroline-nextjs';
-import { manager } from '@/lib/neuroline';
+import { createPipelineRouteHandler } from 'neuroline-nextjs';
+import { manager, storage } from '@/lib/neuroline';
 
-const handlers = createPipelineHandlers({
+const handlers = createPipelineRouteHandler({
     manager,
+    storage,
+    // Опционально: регистрация pipelines
+    pipelines: [myPipelineConfig, anotherPipelineConfig],
 });
 
 export const GET = handlers.GET;
@@ -334,19 +364,29 @@ export const POST = handlers.POST;
 
 ## API Эндпоинты
 
-Обработчик предоставляет следующие эндпоинты:
+Обработчик предоставляет единый эндпоинт с query-параметрами:
 
-### POST `/api/pipeline/:type/start`
+### POST `/api/pipeline`
 
 Запустить новый pipeline или вернуть существующий.
 
+**Тело запроса:**
+```typescript
+{
+  pipelineType: string;  // Имя типа pipeline
+  input: unknown;        // Входные данные
+  jobOptions?: Record<string, unknown>;  // Опционально: опции для jobs
+}
+```
+
 **Пример:**
 ```typescript
-const response = await fetch('/api/pipeline/my-pipeline/start', {
+const response = await fetch('/api/pipeline', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    data: {
+    pipelineType: 'my-pipeline',
+    input: {
       url: 'https://api.example.com/data',
       userId: 'user-123',
     },
@@ -357,40 +397,67 @@ const response = await fetch('/api/pipeline/my-pipeline/start', {
 });
 
 const result = await response.json();
-// { pipelineId: "abc123", isNew: true }
+// { success: true, data: { pipelineId: "abc123", isNew: true } }
 ```
 
-### GET `/api/pipeline/:id/status`
+### GET `/api/pipeline?action=status&id=:id`
 
 Получить текущий статус pipeline.
 
 **Пример:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123/status');
-const status = await response.json();
-// { status: "processing", currentJobIndex: 1, totalJobs: 4, ... }
+const response = await fetch('/api/pipeline?action=status&id=abc123');
+const { data } = await response.json();
+// { status: "processing", currentJobIndex: 1, totalJobs: 4, stages: [...] }
 ```
 
-### GET `/api/pipeline/:id/result`
+### GET `/api/pipeline?action=result&id=:id`
 
 Получить результаты pipeline (артефакты).
 
 **Пример:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123/result');
-const result = await response.json();
-// { status: "done", artifacts: [...], jobNames: [...] }
+const response = await fetch('/api/pipeline?action=result&id=abc123');
+const { data } = await response.json();
+// { status: "done", artifacts: { "job-name": {...} }, jobNames: [...] }
 ```
 
-### GET `/api/pipeline/:id`
+### GET `/api/pipeline?action=job&id=:id&jobName=:name`
+
+Получить детальные данные job включая input и options.
+
+**Пример:**
+```typescript
+const response = await fetch('/api/pipeline?action=job&id=abc123&jobName=fetch-data');
+const { data } = await response.json();
+// { name: "fetch-data", status: "done", input: {...}, options: {...}, artifact: {...} }
+```
+
+### GET `/api/pipeline?action=pipeline&id=:id`
 
 Получить полное состояние pipeline.
 
 **Пример:**
 ```typescript
-const response = await fetch('/api/pipeline/abc123');
-const pipeline = await response.json();
+const response = await fetch('/api/pipeline?action=pipeline&id=abc123');
+const { data } = await response.json();
 // Полный объект PipelineState
+```
+
+### GET `/api/pipeline?action=list`
+
+Получить пагинированный список pipelines.
+
+**Query-параметры:**
+- `page` - Номер страницы (по умолчанию: 1)
+- `limit` - Элементов на странице (по умолчанию: 10, макс: 100)
+- `pipelineType` - Фильтр по типу pipeline (опционально)
+
+**Пример:**
+```typescript
+const response = await fetch('/api/pipeline?action=list&page=1&limit=10');
+const { data } = await response.json();
+// { items: [...], total: 50, page: 1, limit: 10, totalPages: 5 }
 ```
 
 ## С MongoDB хранилищем
@@ -418,70 +485,38 @@ manager.registerPipeline(myPipelineConfig);
 
 ## Использование на клиенте
 
-### Пример React хука
+Используйте `neuroline/client` для клиентской интеграции:
 
 ```typescript
 'use client';
 
-import { useState, useEffect } from 'react';
-
-export function usePipeline(pipelineId: string | null) {
-  const [status, setStatus] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!pipelineId) return;
-
-    const pollStatus = async () => {
-      const response = await fetch(`/api/pipeline/${pipelineId}/status`);
-      const data = await response.json();
-      setStatus(data);
-
-      if (data.status === 'processing') {
-        setTimeout(pollStatus, 1000);
-      }
-    };
-
-    pollStatus();
-  }, [pipelineId]);
-
-  const startPipeline = async (type: string, input: any) => {
-    setLoading(true);
-    const response = await fetch(`/api/pipeline/${type}/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: input }),
-    });
-    const data = await response.json();
-    setLoading(false);
-    return data.pipelineId;
-  };
-
-  return { status, loading, startPipeline };
-}
-```
-
-### Пример компонента
-
-```typescript
-'use client';
-
-import { usePipeline } from './usePipeline';
+import { useMemo, useState, useCallback } from 'react';
+import { PipelineClient } from 'neuroline/client';
 
 export function PipelineDemo() {
-  const [pipelineId, setPipelineId] = useState<string | null>(null);
-  const { status, loading, startPipeline } = usePipeline(pipelineId);
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  const [status, setStatus] = useState(null);
+  const [isRunning, setIsRunning] = useState(false);
 
-  const handleStart = async () => {
-    const id = await startPipeline('my-pipeline', {
-      url: 'https://api.example.com/data',
-    });
-    setPipelineId(id);
-  };
+  const handleStart = useCallback(async () => {
+    setIsRunning(true);
+    
+    const { pipelineId, stop, completed } = await client.startAndPoll(
+      {
+        pipelineType: 'my-pipeline',
+        input: { url: 'https://api.example.com/data' },
+      },
+      (event) => setStatus(event.status),
+      (error) => console.error(error),
+    );
+
+    await completed;
+    setIsRunning(false);
+  }, [client]);
 
   return (
     <div>
-      <button onClick={handleStart} disabled={loading}>
+      <button onClick={handleStart} disabled={isRunning}>
         Запустить Pipeline
       </button>
       {status && (
@@ -498,9 +533,10 @@ export function PipelineDemo() {
 ## Опции конфигурации
 
 ```typescript
-createPipelineHandlers({
-  manager: PipelineManager,        // Обязательно
-  storage?: PipelineStorage,       // Опционально - для операций списка
+createPipelineRouteHandler({
+  manager: PipelineManager,        // Обязательно - экземпляр pipeline manager
+  storage: PipelineStorage,        // Обязательно - хранилище для деталей job и списка
+  pipelines?: PipelineConfig[],    // Опционально - pipelines для регистрации при инициализации
 });
 ```
 
@@ -534,20 +570,36 @@ const manager = new PipelineManager({ storage });
 
 ## API Reference
 
-### `createPipelineHandlers(options)`
+### `createPipelineRouteHandler(options)`
 
 Создаёт GET и POST обработчики для Next.js App Router.
 
 **Параметры:**
 - `manager: PipelineManager` - Обязательно. Экземпляр pipeline manager.
-- `storage?: PipelineStorage` - Опционально. Хранилище для операций списка.
+- `storage: PipelineStorage` - Обязательно. Хранилище для деталей job и операций списка.
+- `pipelines?: PipelineConfig[]` - Опционально. Pipelines для регистрации при инициализации.
 
 **Возвращает:**
 ```typescript
 {
-  GET: (request: NextRequest) => Promise<NextResponse>,
-  POST: (request: NextRequest) => Promise<NextResponse>
+  GET: (request: NextRequest) => Promise<Response>,
+  POST: (request: NextRequest) => Promise<Response>
 }
+```
+
+### Отдельные обработчики
+
+Вы также можете использовать отдельные обработчики для кастомной маршрутизации:
+
+```typescript
+import {
+  handleStartPipeline,
+  handleGetStatus,
+  handleGetResult,
+  handleGetJob,
+  handleGetPipeline,
+  handleGetList,
+} from 'neuroline-nextjs';
 ```
 
 ## License

@@ -65,8 +65,13 @@ export const JobNode: React.FC<JobNodeProps> = ({
 
   const formatDuration = () => {
     if (!job.startedAt) return null;
-    const end = job.finishedAt || new Date();
-    const start = new Date(job.startedAt);
+    // Преобразуем даты — могут быть как Date, так и строки из JSON
+    const start = job.startedAt instanceof Date ? job.startedAt : new Date(job.startedAt);
+    const end = job.finishedAt
+      ? job.finishedAt instanceof Date
+        ? job.finishedAt
+        : new Date(job.finishedAt)
+      : new Date();
     const ms = end.getTime() - start.getTime();
     if (ms < 1000) return `${ms}ms`;
     if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;

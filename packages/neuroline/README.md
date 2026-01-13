@@ -156,8 +156,8 @@ console.log(result);
 
 ```typescript
 import mongoose from 'mongoose';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
-// or: import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
+import { PipelineManager } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 // Create model
 const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
@@ -313,7 +313,7 @@ MongoDB storage (requires `mongoose` as peer dependency).
 
 ```typescript
 import mongoose from 'mongoose';
-import { MongoPipelineStorage, PipelineSchema } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
 const storage = new MongoPipelineStorage(PipelineModel);
@@ -328,12 +328,15 @@ import type { PipelineStorage, PipelineState, JobStatus, PipelineStatus } from '
 
 class MyCustomStorage implements PipelineStorage {
     async findById(pipelineId: string): Promise<PipelineState | null> { ... }
+    async findAll(params?: PaginationParams): Promise<PaginatedResult<PipelineState>> { ... }
     async create(state: PipelineState): Promise<PipelineState> { ... }
+    async delete(pipelineId: string): Promise<boolean> { ... }
     async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> { ... }
     async updateJobStatus(pipelineId: string, jobIndex: number, status: JobStatus, startedAt?: Date): Promise<void> { ... }
     async updateJobArtifact(pipelineId: string, jobIndex: number, artifact: unknown, finishedAt: Date): Promise<void> { ... }
     async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
+    async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
 }
 ```
 
@@ -341,8 +344,10 @@ class MyCustomStorage implements PipelineStorage {
 
 ```typescript
 import { Module, OnModuleInit } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
+import { MongooseModule, InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PipelineManager } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 @Module({
     imports: [
@@ -459,7 +464,7 @@ import type {
     JobContext,
     JobLogger,
     JobStatus,
-    JobState,
+    JobState,          // JobState<TInput, TOutput, TOptions> with generics
 
     // Pipeline
     PipelineConfig,
@@ -480,19 +485,132 @@ import type {
 
     // Storage
     PipelineStorage,
+    PaginatedResult,
+    PaginationParams,
+} from 'neuroline';
 
-    // MongoDB
+// MongoDB types (separate import)
+import type {
     MongoPipelineDocument,
     MongoPipelineJobState,
-} from 'neuroline';
+} from 'neuroline/mongo';
+```
+
+### JobState with Generics
+
+`JobState` now supports generic types for input, output (artifact), and options:
+
+```typescript
+interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
+    name: string;
+    status: JobStatus;
+    input?: TInput;      // Input data (computed by synapses)
+    options?: TOptions;  // Job options (from jobOptions)
+    artifact?: TOutput;  // Output data (result of execute)
+    error?: { message: string; stack?: string };
+    startedAt?: Date;
+    finishedAt?: Date;
+}
+```
+
+## Client API (neuroline/client)
+
+Client module for browser-side interaction with Pipeline API.
+
+### PipelineClient
+
+```typescript
+import { PipelineClient } from 'neuroline/client';
+
+const client = new PipelineClient({ baseUrl: '/api/pipeline' });
+
+// Start pipeline
+const { pipelineId, isNew } = await client.start({
+  pipelineType: 'my-pipeline',
+  input: { userId: 123 },
+  jobOptions: { 'fetch-data': { timeout: 5000 } },
+});
+
+// Get status
+const status = await client.getStatus(pipelineId);
+
+// Get results
+const result = await client.getResult(pipelineId);
+
+// Get job details (input, options, artifact)
+const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
+```
+
+### Polling
+
+```typescript
+// Manual polling
+const { stop, completed } = client.poll(pipelineId, (event) => {
+  console.log('Status:', event.status.status);
+  console.log('Artifacts:', event.result.artifacts);
+});
+
+// Wait for completion
+const finalEvent = await completed;
+
+// Or stop polling manually
+stop();
+```
+
+### Start with Polling
+
+```typescript
+// Start pipeline and immediately begin polling
+const { pipelineId, stop, completed } = await client.startAndPoll(
+  {
+    pipelineType: 'my-pipeline',
+    input: { url: 'https://example.com' },
+  },
+  (event) => {
+    // Called on each poll
+    console.log('Progress:', event.status.currentJobIndex, '/', event.status.totalJobs);
+  },
+  (error) => {
+    // Called on error
+    console.error('Pipeline error:', error);
+  }
+);
+```
+
+### React Hook Factory
+
+```typescript
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { createUsePipelineHook, PipelineClient } from 'neuroline/client';
+
+// Create hook with React dependencies
+const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, useRef });
+
+// In component
+function MyComponent() {
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  const { start, status, result, isRunning, error } = usePipeline(client);
+
+  const handleStart = async () => {
+    await start({ pipelineType: 'my-pipeline', input: { userId: 123 } });
+  };
+
+  return (
+    <div>
+      <button onClick={handleStart} disabled={isRunning}>Start</button>
+      {status && <div>Status: {status.status}</div>}
+    </div>
+  );
+}
 ```
 
 ## Exports
 
 | Import path | Contents |
 |-------------|----------|
-| `neuroline` | Everything: types, classes, MongoDB |
-| `neuroline/mongo` | MongoDB only: `MongoPipelineStorage`, `PipelineSchema`, document types |
+| `neuroline` | Core: types, `PipelineManager`, `InMemoryPipelineStorage` |
+| `neuroline/mongo` | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, document types |
+| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, types |
 
 ## License
 
@@ -656,8 +774,8 @@ console.log(result);
 
 ```typescript
 import mongoose from 'mongoose';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
-// или: import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
+import { PipelineManager } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 // Создание модели
 const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
@@ -813,7 +931,7 @@ MongoDB хранилище (требует `mongoose` как peer dependency).
 
 ```typescript
 import mongoose from 'mongoose';
-import { MongoPipelineStorage, PipelineSchema } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 const PipelineModel = mongoose.model('Pipeline', PipelineSchema);
 const storage = new MongoPipelineStorage(PipelineModel);
@@ -824,16 +942,19 @@ const storage = new MongoPipelineStorage(PipelineModel);
 Реализуйте интерфейс `PipelineStorage`:
 
 ```typescript
-import type { PipelineStorage, PipelineState, JobStatus, PipelineStatus } from 'neuroline';
+import type { PipelineStorage, PipelineState, JobStatus, PipelineStatus, PaginatedResult, PaginationParams } from 'neuroline';
 
 class MyCustomStorage implements PipelineStorage {
     async findById(pipelineId: string): Promise<PipelineState | null> { ... }
+    async findAll(params?: PaginationParams): Promise<PaginatedResult<PipelineState>> { ... }
     async create(state: PipelineState): Promise<PipelineState> { ... }
+    async delete(pipelineId: string): Promise<boolean> { ... }
     async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> { ... }
     async updateJobStatus(pipelineId: string, jobIndex: number, status: JobStatus, startedAt?: Date): Promise<void> { ... }
     async updateJobArtifact(pipelineId: string, jobIndex: number, artifact: unknown, finishedAt: Date): Promise<void> { ... }
     async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
+    async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
 }
 ```
 
@@ -841,8 +962,10 @@ class MyCustomStorage implements PipelineStorage {
 
 ```typescript
 import { Module, OnModuleInit } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
+import { MongooseModule, InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PipelineManager } from 'neuroline';
+import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 @Module({
     imports: [
@@ -959,7 +1082,7 @@ import type {
     JobContext,
     JobLogger,
     JobStatus,
-    JobState,
+    JobState,          // JobState<TInput, TOutput, TOptions> с generics
 
     // Pipeline
     PipelineConfig,
@@ -980,19 +1103,132 @@ import type {
 
     // Storage
     PipelineStorage,
+    PaginatedResult,
+    PaginationParams,
+} from 'neuroline';
 
-    // MongoDB
+// MongoDB типы (отдельный импорт)
+import type {
     MongoPipelineDocument,
     MongoPipelineJobState,
-} from 'neuroline';
+} from 'neuroline/mongo';
+```
+
+### JobState с Generics
+
+`JobState` теперь поддерживает generic типы для input, output (artifact) и options:
+
+```typescript
+interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
+    name: string;
+    status: JobStatus;
+    input?: TInput;      // Входные данные (вычисленные synapses)
+    options?: TOptions;  // Опции job (из jobOptions)
+    artifact?: TOutput;  // Выходные данные (результат execute)
+    error?: { message: string; stack?: string };
+    startedAt?: Date;
+    finishedAt?: Date;
+}
+```
+
+## Клиентский API (neuroline/client)
+
+Клиентский модуль для взаимодействия с Pipeline API из браузера.
+
+### PipelineClient
+
+```typescript
+import { PipelineClient } from 'neuroline/client';
+
+const client = new PipelineClient({ baseUrl: '/api/pipeline' });
+
+// Запуск pipeline
+const { pipelineId, isNew } = await client.start({
+  pipelineType: 'my-pipeline',
+  input: { userId: 123 },
+  jobOptions: { 'fetch-data': { timeout: 5000 } },
+});
+
+// Получение статуса
+const status = await client.getStatus(pipelineId);
+
+// Получение результатов
+const result = await client.getResult(pipelineId);
+
+// Получение деталей job (input, options, artifact)
+const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
+```
+
+### Polling
+
+```typescript
+// Ручной polling
+const { stop, completed } = client.poll(pipelineId, (event) => {
+  console.log('Статус:', event.status.status);
+  console.log('Артефакты:', event.result.artifacts);
+});
+
+// Ожидание завершения
+const finalEvent = await completed;
+
+// Или ручная остановка polling
+stop();
+```
+
+### Запуск с Polling
+
+```typescript
+// Запуск pipeline и немедленное начало polling
+const { pipelineId, stop, completed } = await client.startAndPoll(
+  {
+    pipelineType: 'my-pipeline',
+    input: { url: 'https://example.com' },
+  },
+  (event) => {
+    // Вызывается на каждый poll
+    console.log('Прогресс:', event.status.currentJobIndex, '/', event.status.totalJobs);
+  },
+  (error) => {
+    // Вызывается при ошибке
+    console.error('Ошибка pipeline:', error);
+  }
+);
+```
+
+### Фабрика React хука
+
+```typescript
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { createUsePipelineHook, PipelineClient } from 'neuroline/client';
+
+// Создание хука с зависимостями React
+const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, useRef });
+
+// В компоненте
+function MyComponent() {
+  const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline' }), []);
+  const { start, status, result, isRunning, error } = usePipeline(client);
+
+  const handleStart = async () => {
+    await start({ pipelineType: 'my-pipeline', input: { userId: 123 } });
+  };
+
+  return (
+    <div>
+      <button onClick={handleStart} disabled={isRunning}>Запуск</button>
+      {status && <div>Статус: {status.status}</div>}
+    </div>
+  );
+}
 ```
 
 ## Exports
 
 | Import path | Содержимое |
 |-------------|------------|
-| `neuroline` | Всё: типы, классы, MongoDB |
-| `neuroline/mongo` | Только MongoDB: `MongoPipelineStorage`, `PipelineSchema`, типы документов |
+| `neuroline` | Core: типы, `PipelineManager`, `InMemoryPipelineStorage` |
+| `neuroline/mongo` | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, типы документов |
+| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, типы |
 
 ## License
 

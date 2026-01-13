@@ -6,4 +6,5 @@
 export * from './handlers';
 export * from './types';
 export { createPipelineRouteHandler } from './route-handler';
+export type { PipelineRouteHandlerOptions, PipelineRouteHandlers } from './route-handler';
 

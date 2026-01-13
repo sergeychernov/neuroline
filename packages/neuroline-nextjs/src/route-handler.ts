@@ -1,12 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import type { PipelineManager, PipelineStorage, PipelineConfig } from 'neuroline';
 import {
 	handleStartPipeline,
 	handleGetStatus,
 	handleGetResult,
 	handleGetList,
+	handleGetJob,
+	handleGetPipeline,
 } from './handlers';
-import type { ApiResponse } from './types';
 
 export interface PipelineRouteHandlerOptions {
 	/** PipelineManager инстанс */
@@ -19,9 +20,9 @@ export interface PipelineRouteHandlerOptions {
 
 export interface PipelineRouteHandlers {
 	/** POST handler - запуск pipeline */
-	POST: (request: NextRequest) => Promise<NextResponse<ApiResponse>>;
+	POST: (request: NextRequest) => Promise<Response>;
 	/** GET handler - получение данных (status, result, list) */
-	GET: (request: NextRequest) => Promise<NextResponse<ApiResponse>>;
+	GET: (request: NextRequest) => Promise<Response>;
 }
 
 /**
@@ -43,6 +44,8 @@ export interface PipelineRouteHandlers {
  * - POST /api/pipeline - запуск pipeline
  * - GET /api/pipeline?action=status&id=xxx - статус
  * - GET /api/pipeline?action=result&id=xxx - результаты
+ * - GET /api/pipeline?action=job&id=xxx&jobName=yyy - данные job
+ * - GET /api/pipeline?action=pipeline&id=xxx - полные данные pipeline
  * - GET /api/pipeline?action=list&page=1&limit=10 - список
  */
 export function createPipelineRouteHandler(
@@ -71,15 +74,22 @@ export function createPipelineRouteHandler(
 					return handleGetStatus(request, manager);
 				case 'result':
 					return handleGetResult(request, manager);
+				case 'job':
+					return handleGetJob(request, storage);
+				case 'pipeline':
+					return handleGetPipeline(request, storage);
 				case 'list':
 					return handleGetList(request, storage);
 				default:
-					return NextResponse.json(
-						{
+					return new Response(
+						JSON.stringify({
 							success: false,
-							error: `Unknown action: ${action}. Valid actions: status, result, list`,
+							error: `Unknown action: ${action}. Valid actions: status, result, job, pipeline, list`,
+						}),
+						{
+							status: 400,
+							headers: { 'Content-Type': 'application/json' },
 						},
-						{ status: 400 },
 					);
 			}
 		},
