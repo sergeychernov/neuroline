@@ -58,3 +58,4 @@ apps/nestjs/
 2. **Workspace dependencies** (`"neuroline": "workspace:*"`)
 3. **Pipelines в отдельной папке** (`src/pipelines/`)
 4. **Конфигурация** через environment variables
+5. **Debug-эндпоинты включены** (`enableDebugEndpoints: true`) — для демонстрации всей функциональности

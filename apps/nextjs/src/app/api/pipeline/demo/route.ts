@@ -34,6 +34,8 @@ const handlers = createPipelineRouteHandler({
 	// waitUntil позволяет продолжить выполнение pipeline после отправки ответа
 	// Это решает проблему "зависания" pipeline на Vercel
 	waitUntil,
+	// В демо-приложении включаем debug-эндпоинты для демонстрации функциональности
+	enableDebugEndpoints: true,
 });
 
 export const POST = async (request: Request) => {
