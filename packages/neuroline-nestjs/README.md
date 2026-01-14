@@ -41,6 +41,7 @@ const MyPipelineController = createPipelineController({
   manager,
   storage,
   pipeline: myPipeline,
+  // enableDebugEndpoints: true, // Enable action=job and action=pipeline (disabled by default)
 });
 
 @Module({
@@ -102,9 +103,9 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=status&id=demo_123_t
 }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=result&id=xxx`
+### GET `/api/pipeline/my-pipeline?action=result&id=xxx[&jobName=yyy]`
 
-Get pipeline results (artifacts).
+Get a job result (artifact). If `jobName` is not provided, returns the last job result.
 
 **Request:**
 ```bash
@@ -117,16 +118,20 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=result&id=demo_123_t
   "success": true,
   "data": {
     "pipelineId": "demo_123_test_ok",
+    "jobName": "compute",
     "status": "done",
-    "artifacts": {
-      "init": { "initialized": true, "processId": "..." },
-      "compute": { "result": 456.78 }
-    }
+    "artifact": { "result": 456.78 }
   }
 }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
+### Debug Endpoints
+
+The following endpoints return sensitive data (input, options, artifacts) and are **disabled by default**. To enable them, set `enableDebugEndpoints: true`.
+
+⚠️ **WARNING**: Do not enable in production unless you have proper authentication/authorization!
+
+#### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
 
 Get specific job details (input, options, artifact).
 
@@ -147,6 +152,15 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=job&id=demo_123_test
     "artifact": { "result": 456.78 }
   }
 }
+```
+
+#### GET `/api/pipeline/my-pipeline?action=pipeline&id=xxx`
+
+Get full pipeline state (all jobs, inputs, artifacts).
+
+**Request:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=pipeline&id=demo_123_test_ok"
 ```
 
 ### GET `/api/pipeline/my-pipeline?action=list&page=1&limit=10`
@@ -238,7 +252,6 @@ const { pipelineId, completed } = await client.startAndPoll(
   { input: { seed: 123, name: 'test' } },
   (event) => {
     console.log('Status:', event.status.status);
-    console.log('Artifacts:', event.result.artifacts);
   },
 );
 
@@ -332,6 +345,7 @@ const MyPipelineController = createPipelineController({
   manager,
   storage,
   pipeline: myPipeline,
+  // enableDebugEndpoints: true, // Включить action=job и action=pipeline (отключено по умолчанию)
 });
 
 @Module({
@@ -393,9 +407,9 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=status&id=demo_123_t
 }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=result&id=xxx`
+### GET `/api/pipeline/my-pipeline?action=result&id=xxx[&jobName=yyy]`
 
-Получить результаты pipeline (артефакты).
+Получить результат (артефакт) job. Если `jobName` не передан, возвращается результат последней job.
 
 **Запрос:**
 ```bash
@@ -408,16 +422,20 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=result&id=demo_123_t
   "success": true,
   "data": {
     "pipelineId": "demo_123_test_ok",
+    "jobName": "compute",
     "status": "done",
-    "artifacts": {
-      "init": { "initialized": true, "processId": "..." },
-      "compute": { "result": 456.78 }
-    }
+    "artifact": { "result": 456.78 }
   }
 }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
+### Debug-эндпоинты
+
+Следующие эндпоинты возвращают чувствительные данные (input, options, artifacts) и **отключены по умолчанию**. Для включения установите `enableDebugEndpoints: true`.
+
+⚠️ **ВНИМАНИЕ**: Не включайте в production без надлежащей аутентификации/авторизации!
+
+#### GET `/api/pipeline/my-pipeline?action=job&id=xxx&jobName=yyy`
 
 Получить детали конкретной job (input, options, artifact).
 
@@ -438,6 +456,15 @@ curl "http://localhost:3000/api/pipeline/my-pipeline?action=job&id=demo_123_test
     "artifact": { "result": 456.78 }
   }
 }
+```
+
+#### GET `/api/pipeline/my-pipeline?action=pipeline&id=xxx`
+
+Получить полное состояние pipeline (все jobs, inputs, artifacts).
+
+**Запрос:**
+```bash
+curl "http://localhost:3000/api/pipeline/my-pipeline?action=pipeline&id=demo_123_test_ok"
 ```
 
 ### GET `/api/pipeline/my-pipeline?action=list&page=1&limit=10`
@@ -496,7 +523,6 @@ const { pipelineId, completed } = await client.startAndPoll(
   { input: { seed: 123, name: 'test' } },
   (event) => {
     console.log('Статус:', event.status.status);
-    console.log('Артефакты:', event.result.artifacts);
   },
 );
 

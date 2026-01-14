@@ -434,30 +434,36 @@ export class PipelineManager {
     }
 
     /**
-     * Получает результаты пайплайна
+     * Получает результат (артефакт) конкретной job
+     * 
+     * @param pipelineId - ID пайплайна
+     * @param jobName - имя job (опционально, по умолчанию — последняя job)
      */
-    async getResult(pipelineId: string): Promise<PipelineResultResponse> {
+    async getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse> {
         const pipeline = await this.storage.findById(pipelineId);
 
         if (!pipeline) {
             throw new Error(`Pipeline ${pipelineId} not found`);
         }
 
-        const artifacts: Record<string, unknown | null | undefined> = {};
-
-        for (const job of pipeline.jobs) {
-            if (job.status === 'done') {
-                // Job завершена - возвращаем артефакт (может быть null)
-                artifacts[job.name] = job.artifact ?? null;
-            } else {
-                // Job ещё выполняется или в очереди
-                artifacts[job.name] = undefined;
+        // Находим job: по имени или последнюю
+        let job: typeof pipeline.jobs[0] | undefined;
+        
+        if (jobName) {
+            job = pipeline.jobs.find((j) => j.name === jobName);
+            if (!job) {
+                throw new Error(`Job "${jobName}" not found in pipeline ${pipelineId}`);
             }
+        } else {
+            // Последняя job
+            job = pipeline.jobs[pipeline.jobs.length - 1];
         }
 
         return {
-            status: pipeline.status,
-            artifacts,
+            pipelineId,
+            jobName: job.name,
+            status: job.status,
+            artifact: job.status === 'done' ? (job.artifact ?? null) : undefined,
         };
     }
 

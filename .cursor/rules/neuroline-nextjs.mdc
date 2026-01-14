@@ -16,37 +16,61 @@ src/
 ├── index.ts          # Публичные экспорты
 ├── types.ts          # Типы для handlers
 ├── handlers.ts       # Функции-обработчики
-└── route-handler.ts  # createPipelineHandlers factory
+└── route-handler.ts  # createPipelineRouteHandler factory
 ```
 
 ## Использование
 
 ```typescript
-// app/api/pipeline/[...path]/route.ts
-import { createPipelineHandlers } from 'neuroline-nextjs';
+// app/api/pipeline/demo/route.ts
+import { createPipelineRouteHandler } from 'neuroline-nextjs';
+import { manager, storage } from '@/lib/neuroline';
+import { demoPipeline } from '@/pipelines';
 
-const handlers = createPipelineHandlers({
-    manager,
-    storage,
+const handlers = createPipelineRouteHandler({
+	manager,
+	storage,
+	pipeline: demoPipeline, // один route = один pipeline
 });
 
-export const GET = handlers.GET;
 export const POST = handlers.POST;
+export const GET = handlers.GET;
 ```
 
 ## Соглашения Next.js App Router
 
-- Используй `NextRequest` / `NextResponse`
+- Используй Web Fetch API типы `Request` / `Response` (совместимо с App Router)
 - Route handlers экспортируют именованные функции (`GET`, `POST`)
 - Динамические сегменты через `[param]` или `[...path]`
 
 ## API Routes
 
+Один route обслуживает один pipeline, поэтому `pipelineType` берётся из конфигурации route.
+
 | Method | Path | Описание |
 |--------|------|----------|
-| POST | `/api/pipeline/[type]/start` | Запуск |
-| GET | `/api/pipeline/[id]/status` | Статус |
-| GET | `/api/pipeline/[id]/result` | Результаты |
+| POST | `/api/pipeline/<pipeline>` | Запуск pipeline |
+| GET | `/api/pipeline/<pipeline>?action=status&id=<id>` | Статус pipeline |
+| GET | `/api/pipeline/<pipeline>?action=result&id=<id>[&jobName=<job>]` | Результат (артефакт) одной job |
+| GET | `/api/pipeline/<pipeline>?action=list&page=1&limit=10` | Список pipeline этого типа |
+
+### Debug-эндпоинты (требуют `enableDebugEndpoints: true`)
+
+⚠️ **Отключены по умолчанию** — возвращают чувствительные данные (input, options, artifacts).
+
+| Method | Path | Описание |
+|--------|------|----------|
+| GET | `/api/pipeline/<pipeline>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
+| GET | `/api/pipeline/<pipeline>?action=pipeline&id=<id>` | Полное состояние pipeline |
+
+```typescript
+const handlers = createPipelineRouteHandler({
+	manager,
+	storage,
+	pipeline: demoPipeline,
+	enableDebugEndpoints: process.env.NODE_ENV === 'development', // только для dev
+});
+```
 
 ## Правила
 

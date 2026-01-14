@@ -8,7 +8,6 @@
 // ============================================================================
 
 import type {
-	PipelineStatus,
 	JobStatus,
 	StartPipelineResponse,
 	PipelineStatusResponse,
@@ -42,12 +41,10 @@ export interface StartPipelineParams<TData = unknown> {
 	jobOptions?: Record<string, unknown>;
 }
 
-/** Событие обновления pipeline */
+/** Событие обновления pipeline (только статус) */
 export interface PipelineUpdateEvent {
 	/** Статус pipeline */
 	status: PipelineStatusResponse;
-	/** Результаты (артефакты) */
-	result: PipelineResultResponse;
 }
 
 /** Callback для обновлений */
@@ -79,15 +76,18 @@ export interface PollingResult {
  * const client = new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' });
  *
  * // Запуск pipeline с polling
- * const { stop, completed } = client.startAndPoll({
+ * const { stop, completed, pipelineId } = await client.startAndPoll({
  *   input: { userId: 123 },
  * }, (event) => {
  *   console.log('Status:', event.status.status);
- *   console.log('Artifacts:', event.result.artifacts);
  * });
  *
  * // Дождаться завершения
- * const finalEvent = await completed;
+ * await completed;
+ *
+ * // Получить результат последней job
+ * const result = await client.getResult(pipelineId);
+ * console.log('Artifact:', result.artifact);
  * ```
  */
 export class PipelineClient {
@@ -139,12 +139,22 @@ export class PipelineClient {
 	}
 
 	/**
-	 * Получает результаты pipeline (артефакты)
+	 * Получает результат (артефакт) конкретной job
+	 * 
+	 * @param pipelineId - ID пайплайна
+	 * @param jobName - имя job (опционально, по умолчанию — последняя job)
 	 */
-	async getResult(pipelineId: string): Promise<PipelineResultResponse> {
-		const url = `${this.config.baseUrl}?action=result&id=${encodeURIComponent(pipelineId)}`;
+	async getResult<T = unknown>(
+		pipelineId: string,
+		jobName?: string,
+	): Promise<PipelineResultResponse<T>> {
+		let url = `${this.config.baseUrl}?action=result&id=${encodeURIComponent(pipelineId)}`;
+		if (jobName) {
+			url += `&jobName=${encodeURIComponent(jobName)}`;
+		}
+
 		const response = await this.config.fetch(url);
-		const data: ApiResponse<PipelineResultResponse> = await response.json();
+		const data: ApiResponse<PipelineResultResponse<T>> = await response.json();
 
 		if (!data.success || !data.data) {
 			throw new Error(data.error ?? 'Failed to get pipeline result');
@@ -190,22 +200,9 @@ export class PipelineClient {
 	}
 
 	/**
-	 * Получает полные данные pipeline (статус + результаты)
-	 */
-	async getPipelineData(pipelineId: string): Promise<PipelineUpdateEvent> {
-		const [status, result] = await Promise.all([
-			this.getStatus(pipelineId),
-			this.getResult(pipelineId),
-		]);
-
-		return { status, result };
-	}
-
-	/**
 	 * Polling для отслеживания выполнения pipeline
 	 *
-	 * Оптимизация: запрашиваем result только когда статус jobs изменился,
-	 * а не при каждом poll-запросе
+	 * Отслеживает только статус. Для получения результатов используйте getResult()
 	 */
 	poll(
 		pipelineId: string,
@@ -214,48 +211,9 @@ export class PipelineClient {
 	): PollingResult {
 		let stopped = false;
 		let attempts = 0;
-		// Храним предыдущий статус для сравнения
-		let prevJobStatuses: Map<string, JobStatus> | null = null;
-		// Кешируем результаты
-		let cachedResult: PipelineResultResponse | null = null;
 
 		const stop = () => {
 			stopped = true;
-		};
-
-		/**
-		 * Проверяет, изменился ли статус какой-либо job на done/error
-		 * (т.е. появились новые артефакты)
-		 */
-		const hasNewCompletedJobs = (status: PipelineStatusResponse): boolean => {
-			if (!prevJobStatuses) {
-				// Первый запрос — нужно получить результаты
-				return true;
-			}
-
-			for (const stage of status.stages) {
-				for (const job of stage.jobs) {
-					const prevStatus = prevJobStatuses.get(job.name);
-					// Job завершилась с прошлого poll
-					if (prevStatus !== job.status && (job.status === 'done' || job.status === 'error')) {
-						return true;
-					}
-				}
-			}
-
-			return false;
-		};
-
-		/**
-		 * Сохраняет текущие статусы jobs для сравнения
-		 */
-		const saveJobStatuses = (status: PipelineStatusResponse): void => {
-			prevJobStatuses = new Map();
-			for (const stage of status.stages) {
-				for (const job of stage.jobs) {
-					prevJobStatuses.set(job.name, job.status);
-				}
-			}
 		};
 
 		const completed = new Promise<PipelineUpdateEvent>((resolve, reject) => {
@@ -266,21 +224,8 @@ export class PipelineClient {
 				}
 
 				try {
-					// Всегда запрашиваем статус
 					const status = await this.getStatus(pipelineId);
-
-					// Запрашиваем result только если есть новые завершённые jobs
-					if (hasNewCompletedJobs(status)) {
-						cachedResult = await this.getResult(pipelineId);
-					}
-
-					// Сохраняем текущие статусы для следующего сравнения
-					saveJobStatuses(status);
-
-					const event: PipelineUpdateEvent = {
-						status,
-						result: cachedResult ?? { status: status.status, artifacts: {} },
-					};
+					const event: PipelineUpdateEvent = { status };
 
 					onUpdate?.(event);
 
@@ -344,8 +289,6 @@ export interface UsePipelineState<TInput = unknown> {
 	pipelineId: string | null;
 	/** Статус pipeline */
 	status: PipelineStatusResponse | null;
-	/** Результаты pipeline */
-	result: PipelineResultResponse | null;
 	/** Ошибка */
 	error: Error | null;
 	/** Pipeline выполняется */
@@ -354,6 +297,8 @@ export interface UsePipelineState<TInput = unknown> {
 	start: (params: StartPipelineParams<TInput>) => Promise<void>;
 	/** Остановить polling */
 	stop: () => void;
+	/** Получить результат job (клиент для запроса) */
+	client: PipelineClient;
 }
 
 /**
@@ -370,7 +315,12 @@ export interface UsePipelineState<TInput = unknown> {
  *
  * // Использование:
  * const client = new PipelineClient({ baseUrl: '/api/pipeline' });
- * const { start, status, result, isRunning } = usePipeline(client);
+ * const { start, status, isRunning, pipelineId, client } = usePipeline(client);
+ *
+ * // Когда pipeline завершён, получить результат:
+ * if (pipelineId && !isRunning) {
+ *   const result = await client.getResult(pipelineId);
+ * }
  * ```
  */
 export function createUsePipelineHook(react: {
@@ -386,7 +336,6 @@ export function createUsePipelineHook(react: {
 	): UsePipelineState<TInput> {
 		const [pipelineId, setPipelineId] = useState<string | null>(null);
 		const [status, setStatus] = useState<PipelineStatusResponse | null>(null);
-		const [result, setResult] = useState<PipelineResultResponse | null>(null);
 		const [error, setError] = useState<Error | null>(null);
 		const [isRunning, setIsRunning] = useState(false);
 
@@ -405,7 +354,6 @@ export function createUsePipelineHook(react: {
 
 				setError(null);
 				setStatus(null);
-				setResult(null);
 				setIsRunning(true);
 
 				try {
@@ -413,7 +361,6 @@ export function createUsePipelineHook(react: {
 						params,
 						(event) => {
 							setStatus(event.status);
-							setResult(event.result);
 						},
 						(err) => {
 							setError(err);
@@ -445,11 +392,11 @@ export function createUsePipelineHook(react: {
 		return {
 			pipelineId,
 			status,
-			result,
 			error,
 			isRunning,
 			start,
 			stop,
+			client,
 		};
 	};
 }

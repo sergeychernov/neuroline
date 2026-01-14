@@ -7,7 +7,6 @@ export interface StageColumnProps {
   stage: StageDisplayInfo;
   onJobClick?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
-  showArtifacts?: boolean;
 }
 
 /**
@@ -17,10 +16,9 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
   onJobClick,
   selectedJobName,
-  showArtifacts = false,
 }) => {
   const isParallel = stage.jobs.length > 1;
-  
+
   // Определяем статус stage
   const stageStatus = (() => {
     if (stage.jobs.some((j) => j.status === 'error')) return 'error';
@@ -115,7 +113,6 @@ export const StageColumn: React.FC<StageColumnProps> = ({
             job={job}
             isSelected={job.name === selectedJobName}
             onClick={onJobClick}
-            showArtifact={showArtifacts}
           />
         ))}
       </Box>

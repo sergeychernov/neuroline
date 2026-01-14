@@ -10,7 +10,7 @@ import {
 } from 'neuroline-ui';
 import type { SerializableValue } from 'neuroline-ui';
 import { PipelineClient } from 'neuroline/client';
-import type { PipelineStatusResponse, PipelineResultResponse, JobStatus } from 'neuroline';
+import type { PipelineStatusResponse, JobStatus } from 'neuroline';
 import { PipelineControlPanel } from './components/PipelineControlPanel';
 import type { DemoPipelineInput } from 'demo-pipelines';
 
@@ -38,17 +38,17 @@ interface JobInfo {
   error?: { message: string; stack?: string };
 }
 
-/** Событие обновления для fallback типизации */
+/** Событие обновления (только статус) */
 interface UpdateEvent {
   status: PipelineStatusResponse;
-  result: PipelineResultResponse;
 }
 
 /**
  * Преобразует PipelineUpdateEvent в PipelineDisplayData
+ * Артефакты не включаются — их можно получить через getResult() или getJobDetails()
  */
 function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
-  const { status, result } = event;
+  const { status } = event;
 
   return {
     pipelineId: status.pipelineId,
@@ -63,7 +63,7 @@ function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
         startedAt: job.startedAt,
         finishedAt: job.finishedAt,
         error: job.error,
-        artifact: result.artifacts[job.name] as SerializableValue | undefined,
+        artifact: undefined, // Артефакты получаются через отдельный запрос getJobDetails()
         input: undefined, // Для получения input нужен отдельный запрос
         options: undefined,
       })),
@@ -79,8 +79,6 @@ function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
 export default function HomePage() {
   const [pipeline, setPipeline] = useState<PipelineDisplayData | null>(null);
   const [selectedJob, setSelectedJob] = useState<JobDisplayInfo | null>(null);
-  const [showArtifacts, setShowArtifacts] = useState(false);
-  const [showInput, setShowInput] = useState(true);
   const [isRunning, setIsRunning] = useState(false);
   const [currentPipelineType, setCurrentPipelineType] = useState<string | undefined>();
   const [mounted, setMounted] = useState(false);
@@ -109,7 +107,7 @@ export default function HomePage() {
       // Сразу показываем job с базовой информацией
       setSelectedJob(job);
 
-      // Если есть pipelineId и клиент, запрашиваем полные детали job (input, options)
+      // Если есть pipelineId и клиент, запрашиваем полные детали job (input, options, artifact)
       const pipelineId = currentPipelineIdRef.current;
       const client = currentClientRef.current;
       if (pipelineId && client) {
@@ -120,6 +118,7 @@ export default function HomePage() {
             ...job,
             input: details.input as SerializableValue | undefined,
             options: details.options as SerializableValue | undefined,
+            artifact: details.artifact as SerializableValue | undefined,
           });
         } catch (e) {
           console.error('Failed to fetch job details:', e);
@@ -280,10 +279,6 @@ export default function HomePage() {
 
         {/* Панель управления */}
         <PipelineControlPanel
-          showArtifacts={showArtifacts}
-          onShowArtifactsChange={setShowArtifacts}
-          showInput={showInput}
-          onShowInputChange={setShowInput}
           onNextjsSuccess={handleNextjsSuccess}
           onNextjsError={handleNextjsError}
           onNestjsSuccess={handleNestjsSuccess}
@@ -298,8 +293,6 @@ export default function HomePage() {
             pipeline={pipeline}
             onJobClick={handleJobClick}
             selectedJobName={selectedJob?.name}
-            showArtifacts={showArtifacts}
-            showInput={showInput}
           />
         ) : (
           <Paper

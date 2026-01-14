@@ -146,10 +146,15 @@ const status = await manager.getStatus(pipelineId);
 console.log(status);
 // { status: 'processing', currentJobIndex: 1, totalJobs: 4, currentJobName: 'process-data' }
 
-// Get results
+// Get result (artifact) of a specific job (default = last job)
 const result = await manager.getResult(pipelineId);
 console.log(result);
-// { status: 'done', artifacts: [...], jobNames: ['fetch-data', 'process-data', 'notify', 'save-result'] }
+// { pipelineId: '...', jobName: 'save-result', status: 'done', artifact: {...} }
+
+// Get result (artifact) by job name
+const computeResult = await manager.getResult(pipelineId, 'process-data');
+console.log(computeResult);
+// { pipelineId: '...', jobName: 'process-data', status: 'done', artifact: {...} }
 ```
 
 #### With MongoDB Storage
@@ -216,15 +221,16 @@ interface PipelineStatusResponse {
 }
 ```
 
-#### `getResult(pipelineId: string): Promise<PipelineResultResponse>`
+#### `getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse>`
 
-Returns results (artifacts) from all jobs.
+Returns result (artifact) for a single job. If `jobName` is not provided, returns the last job result.
 
 ```typescript
 interface PipelineResultResponse {
-    status: 'processing' | 'done' | 'error';
-    artifacts: (unknown | null | undefined)[];  // undefined = not yet executed
-    jobNames: string[];
+    pipelineId: string;
+    jobName: string;
+    status: 'pending' | 'processing' | 'done' | 'error';
+    artifact: unknown | null | undefined; // undefined = not yet executed, null = executed but no result
 }
 ```
 
@@ -536,7 +542,7 @@ const { pipelineId, isNew } = await client.start({
 // Get status
 const status = await client.getStatus(pipelineId);
 
-// Get results
+// Get result (artifact) of the last job
 const result = await client.getResult(pipelineId);
 
 // Get job details (input, options, artifact)
@@ -549,7 +555,6 @@ const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
 // Manual polling
 const { stop, completed } = client.poll(pipelineId, (event) => {
   console.log('Status:', event.status.status);
-  console.log('Artifacts:', event.result.artifacts);
 });
 
 // Wait for completion
@@ -594,7 +599,7 @@ const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, us
 function MyComponent() {
   // One client per pipeline
   const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' }), []);
-  const { start, status, result, isRunning, error } = usePipeline(client);
+  const { start, status, isRunning, error } = usePipeline(client);
 
   const handleStart = async () => {
     await start({ input: { userId: 123 } });
@@ -769,10 +774,15 @@ const status = await manager.getStatus(pipelineId);
 console.log(status);
 // { status: 'processing', currentJobIndex: 1, totalJobs: 4, currentJobName: 'process-data' }
 
-// Получение результатов
+// Получение результата (артефакта) конкретной job (по умолчанию — последней)
 const result = await manager.getResult(pipelineId);
 console.log(result);
-// { status: 'done', artifacts: [...], jobNames: ['fetch-data', 'process-data', 'notify', 'save-result'] }
+// { pipelineId: '...', jobName: 'save-result', status: 'done', artifact: {...} }
+
+// Получение результата (артефакта) по имени job
+const computeResult = await manager.getResult(pipelineId, 'process-data');
+console.log(computeResult);
+// { pipelineId: '...', jobName: 'process-data', status: 'done', artifact: {...} }
 ```
 
 #### С MongoDB хранилищем
@@ -839,15 +849,16 @@ interface PipelineStatusResponse {
 }
 ```
 
-#### `getResult(pipelineId: string): Promise<PipelineResultResponse>`
+#### `getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse>`
 
-Возвращает результаты (артефакты) всех jobs.
+Возвращает результат (артефакт) одной job. Если `jobName` не передан, возвращает результат последней job.
 
 ```typescript
 interface PipelineResultResponse {
-    status: 'processing' | 'done' | 'error';
-    artifacts: (unknown | null | undefined)[];  // undefined = ещё не выполнена
-    jobNames: string[];
+    pipelineId: string;
+    jobName: string;
+    status: 'pending' | 'processing' | 'done' | 'error';
+    artifact: unknown | null | undefined; // undefined = ещё не выполнена, null = выполнена без результата
 }
 ```
 
@@ -1159,7 +1170,7 @@ const { pipelineId, isNew } = await client.start({
 // Получение статуса
 const status = await client.getStatus(pipelineId);
 
-// Получение результатов
+// Получение результата (артефакта) последней job
 const result = await client.getResult(pipelineId);
 
 // Получение деталей job (input, options, artifact)
@@ -1172,7 +1183,6 @@ const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
 // Ручной polling
 const { stop, completed } = client.poll(pipelineId, (event) => {
   console.log('Статус:', event.status.status);
-  console.log('Артефакты:', event.result.artifacts);
 });
 
 // Ожидание завершения
@@ -1217,7 +1227,7 @@ const usePipeline = createUsePipelineHook({ useState, useCallback, useEffect, us
 function MyComponent() {
   // Один клиент на pipeline
   const client = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/my-pipeline' }), []);
-  const { start, status, result, isRunning, error } = usePipeline(client);
+  const { start, status, isRunning, error } = usePipeline(client);
 
   const handleStart = async () => {
     await start({ input: { userId: 123 } });

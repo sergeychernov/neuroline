@@ -30,6 +30,15 @@ export interface PipelineRouteHandlerOptions {
 	 * ```
 	 */
 	waitUntil?: (promise: Promise<unknown>) => void;
+	/**
+	 * Включить debug-эндпоинты (action=pipeline, action=job)
+	 * 
+	 * ⚠️ ВНИМАНИЕ: Эти эндпоинты возвращают полные данные pipeline/job,
+	 * включая input, options и artifacts. Не включайте в production!
+	 * 
+	 * @default false
+	 */
+	enableDebugEndpoints?: boolean;
 }
 
 export interface PipelineRouteHandlers {
@@ -62,14 +71,16 @@ export interface PipelineRouteHandlers {
  * - POST /api/pipeline/success - запуск pipeline
  * - GET /api/pipeline/success?action=status&id=xxx - статус
  * - GET /api/pipeline/success?action=result&id=xxx - результаты
+ * - GET /api/pipeline/success?action=list&page=1&limit=10 - список (фильтр по типу)
+ * 
+ * Debug endpoints (требуют enableDebugEndpoints: true):
  * - GET /api/pipeline/success?action=job&id=xxx&jobName=yyy - данные job
  * - GET /api/pipeline/success?action=pipeline&id=xxx - полные данные pipeline
- * - GET /api/pipeline/success?action=list&page=1&limit=10 - список (фильтр по типу)
  */
 export function createPipelineRouteHandler(
 	options: PipelineRouteHandlerOptions,
 ): PipelineRouteHandlers {
-	const { manager, storage, pipeline, waitUntil } = options;
+	const { manager, storage, pipeline, waitUntil, enableDebugEndpoints = false } = options;
 
 	// Регистрируем pipeline при создании
 	manager.registerPipeline(pipeline);
@@ -91,8 +102,26 @@ export function createPipelineRouteHandler(
 				case 'result':
 					return handleGetResult(request, manager);
 				case 'job':
+					if (!enableDebugEndpoints) {
+						return new Response(
+							JSON.stringify({
+								success: false,
+								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+							}),
+							{ status: 403, headers: { 'Content-Type': 'application/json' } },
+						);
+					}
 					return handleGetJob(request, storage);
 				case 'pipeline':
+					if (!enableDebugEndpoints) {
+						return new Response(
+							JSON.stringify({
+								success: false,
+								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+							}),
+							{ status: 403, headers: { 'Content-Type': 'application/json' } },
+						);
+					}
 					return handleGetPipeline(request, storage);
 				case 'list':
 					return handleGetList(request, storage, pipelineType);
@@ -100,7 +129,7 @@ export function createPipelineRouteHandler(
 					return new Response(
 						JSON.stringify({
 							success: false,
-							error: `Unknown action: ${action}. Valid actions: status, result, job, pipeline, list`,
+							error: `Unknown action: ${action}. Valid actions: status, result, list`,
 						}),
 						{
 							status: 400,

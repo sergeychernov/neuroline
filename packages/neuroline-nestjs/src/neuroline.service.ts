@@ -70,10 +70,13 @@ export class NeurolineService implements OnModuleInit {
 	}
 
 	/**
-	 * Получить результаты pipeline
+	 * Получить результат (артефакт) конкретной job
+	 * 
+	 * @param pipelineId - ID пайплайна
+	 * @param jobName - имя job (опционально, по умолчанию — последняя job)
 	 */
-	async getResult(pipelineId: string): Promise<PipelineResultResponse> {
-		return this.manager.getResult(pipelineId);
+	async getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse> {
+		return this.manager.getResult(pipelineId, jobName);
 	}
 
 	/**

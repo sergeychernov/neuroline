@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, Button, Paper, Stack, Chip, CircularProgress, Typography, Divider } from '@mui/material';
+import { Box, Button, Paper, Stack, CircularProgress, Typography, Divider } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
@@ -9,14 +9,6 @@ import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 // ============================================================================
 
 export interface PipelineControlPanelProps {
-	/** Показывать артефакты */
-	showArtifacts: boolean;
-	/** Callback изменения showArtifacts */
-	onShowArtifactsChange: (value: boolean) => void;
-	/** Показывать input */
-	showInput: boolean;
-	/** Callback изменения showInput */
-	onShowInputChange: (value: boolean) => void;
 	/** Запуск Next.js success pipeline */
 	onNextjsSuccess: () => void;
 	/** Запуск Next.js error pipeline */
@@ -37,13 +29,9 @@ export interface PipelineControlPanelProps {
 
 /**
  * Панель управления pipelines
- * Кнопки запуска и настройки отображения
+ * Кнопки запуска
  */
 export function PipelineControlPanel({
-	showArtifacts,
-	onShowArtifactsChange,
-	showInput,
-	onShowInputChange,
 	onNextjsSuccess,
 	onNextjsError,
 	onNestjsSuccess,
@@ -237,75 +225,6 @@ export function PipelineControlPanel({
 						</Stack>
 					</Box>
 
-					{/* Разделитель */}
-					<Divider
-						orientation="vertical"
-						flexItem
-						sx={{
-							display: { xs: 'none', md: 'block' },
-							borderColor: 'rgba(160, 160, 160, 0.2)',
-						}}
-					/>
-
-					{/* Настройки отображения */}
-					<Box>
-						<Typography
-							variant="caption"
-							sx={{
-								color: 'text.secondary',
-								fontWeight: 600,
-								mb: 1,
-								display: 'block',
-								letterSpacing: '0.05em',
-							}}
-						>
-							ОТОБРАЖЕНИЕ
-						</Typography>
-						<Stack direction="row" spacing={1}>
-							<Chip
-								size="small"
-								label={showArtifacts ? '📦 ON' : '📦 OFF'}
-								onClick={() => onShowArtifactsChange(!showArtifacts)}
-								sx={{
-									cursor: 'pointer',
-									height: 28,
-									fontSize: '0.75rem',
-									backgroundColor: showArtifacts
-										? 'rgba(124, 77, 255, 0.2)'
-										: 'rgba(160, 160, 160, 0.1)',
-									color: showArtifacts ? '#7c4dff' : 'text.secondary',
-									border: `1px solid ${showArtifacts ? 'rgba(124, 77, 255, 0.3)' : 'rgba(160, 160, 160, 0.2)'
-										}`,
-									'&:hover': {
-										backgroundColor: showArtifacts
-											? 'rgba(124, 77, 255, 0.3)'
-											: 'rgba(160, 160, 160, 0.2)',
-									},
-								}}
-							/>
-							<Chip
-								size="small"
-								label={showInput ? '📥 ON' : '📥 OFF'}
-								onClick={() => onShowInputChange(!showInput)}
-								sx={{
-									cursor: 'pointer',
-									height: 28,
-									fontSize: '0.75rem',
-									backgroundColor: showInput
-										? 'rgba(0, 230, 118, 0.2)'
-										: 'rgba(160, 160, 160, 0.1)',
-									color: showInput ? '#00e676' : 'text.secondary',
-									border: `1px solid ${showInput ? 'rgba(0, 230, 118, 0.3)' : 'rgba(160, 160, 160, 0.2)'
-										}`,
-									'&:hover': {
-										backgroundColor: showInput
-											? 'rgba(0, 230, 118, 0.3)'
-											: 'rgba(160, 160, 160, 0.2)',
-									},
-								}}
-							/>
-						</Stack>
-					</Box>
 				</Stack>
 			</Stack>
 		</Paper>

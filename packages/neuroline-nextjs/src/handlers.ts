@@ -107,7 +107,11 @@ export async function handleGetStatus(
 }
 
 /**
- * Хендлер для GET /pipeline/result - получение результатов
+ * Хендлер для GET /pipeline/result - получение результата (артефакта) job
+ * 
+ * Query параметры:
+ * - id (required): ID пайплайна
+ * - jobName (optional): имя job (по умолчанию — последняя job)
  */
 export async function handleGetResult(
 	request: Request,
@@ -116,6 +120,7 @@ export async function handleGetResult(
 	try {
 		const { searchParams } = new URL(request.url);
 		const id = searchParams.get('id');
+		const jobName = searchParams.get('jobName') ?? undefined;
 
 		if (!id) {
 			return jsonResponse<ApiResponse>(
@@ -124,7 +129,7 @@ export async function handleGetResult(
 			);
 		}
 
-		const result = await manager.getResult(id);
+		const result = await manager.getResult(id, jobName);
 
 		return jsonResponse<ApiResponse>({
 			success: true,

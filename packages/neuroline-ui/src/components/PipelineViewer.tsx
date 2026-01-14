@@ -8,8 +8,6 @@ export interface PipelineViewerProps {
   pipeline: PipelineDisplayData;
   onJobClick?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
-  showArtifacts?: boolean;
-  showInput?: boolean;
 }
 
 /**
@@ -20,8 +18,6 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
   pipeline,
   onJobClick,
   selectedJobName,
-  showArtifacts = false,
-  showInput = false,
 }) => {
   // Подсчёт статистики
   const stats = useMemo(() => {
@@ -125,41 +121,6 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
         </Box>
       </Box>
 
-      {/* Входные данные */}
-      {showInput && pipeline.input && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mb: 3,
-            backgroundColor: 'rgba(0, 230, 118, 0.05)',
-            border: '1px solid rgba(0, 230, 118, 0.2)',
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="caption" sx={{ color: '#00e676', display: 'block', mb: 1 }}>
-            📥 Входные данные:
-          </Typography>
-          <Box
-            component="pre"
-            sx={{
-              color: 'text.secondary',
-              fontFamily: 'monospace',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              maxHeight: 100,
-              overflow: 'auto',
-              m: 0,
-              fontSize: '0.75rem',
-            }}
-          >
-            {typeof pipeline.input === 'object'
-              ? JSON.stringify(pipeline.input, null, 2)
-              : String(pipeline.input ?? '')}
-          </Box>
-        </Paper>
-      )}
-
       {/* Stages */}
       <Box
         sx={{
@@ -177,7 +138,6 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
               stage={stage}
               onJobClick={onJobClick}
               selectedJobName={selectedJobName}
-              showArtifacts={showArtifacts}
             />
 
             {/* Коннектор между stages */}
@@ -205,9 +165,8 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
                       right: -6,
                       top: -4,
                       border: '5px solid transparent',
-                      borderLeft: `8px solid ${
-                        stage.jobs.every((j) => j.status === 'done') ? '#00e5ff' : 'rgba(0, 229, 255, 0.3)'
-                      }`,
+                      borderLeft: `8px solid ${stage.jobs.every((j) => j.status === 'done') ? '#00e5ff' : 'rgba(0, 229, 255, 0.3)'
+                        }`,
                     },
                   }}
                 />

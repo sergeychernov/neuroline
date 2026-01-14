@@ -7,7 +7,6 @@ export interface JobNodeProps {
   job: JobDisplayInfo;
   isSelected?: boolean;
   onClick?: (job: JobDisplayInfo) => void;
-  showArtifact?: boolean;
 }
 
 const pulse = keyframes`
@@ -58,7 +57,6 @@ export const JobNode: React.FC<JobNodeProps> = ({
   job,
   isSelected = false,
   onClick,
-  showArtifact = false,
 }) => {
   const colors = statusColors[job.status];
   const isProcessing = job.status === 'processing';
@@ -102,10 +100,10 @@ export const JobNode: React.FC<JobNodeProps> = ({
         transform: isSelected ? 'scale(1.02)' : 'scale(1)',
         '&:hover': onClick
           ? {
-              transform: 'scale(1.03)',
-              boxShadow: `0 0 25px ${colors.glow}`,
-              borderColor: colors.border.replace('0.3', '0.6').replace('0.5', '0.8'),
-            }
+            transform: 'scale(1.03)',
+            boxShadow: `0 0 25px ${colors.glow}`,
+            borderColor: colors.border.replace('0.3', '0.6').replace('0.5', '0.8'),
+          }
           : {},
         '&::before': {
           content: '""',
@@ -118,10 +116,10 @@ export const JobNode: React.FC<JobNodeProps> = ({
             job.status === 'done'
               ? 'linear-gradient(90deg, #00e676, #00e5ff)'
               : job.status === 'processing'
-              ? 'linear-gradient(90deg, #00e5ff, #7c4dff, #00e5ff)'
-              : job.status === 'error'
-              ? 'linear-gradient(90deg, #ff1744, #ff5722)'
-              : 'transparent',
+                ? 'linear-gradient(90deg, #00e5ff, #7c4dff, #00e5ff)'
+                : job.status === 'error'
+                  ? 'linear-gradient(90deg, #ff1744, #ff5722)'
+                  : 'transparent',
           backgroundSize: isProcessing ? '200% 100%' : '100% 100%',
           animation: isProcessing ? `${glow} 1.5s linear infinite` : undefined,
         },
@@ -172,39 +170,6 @@ export const JobNode: React.FC<JobNodeProps> = ({
             ⚠ {job.error.message}
           </Typography>
         </Tooltip>
-      )}
-
-      {/* Артефакт (если нужно показать) */}
-      {showArtifact && job.artifact !== undefined && (
-        <Box
-          sx={{
-            mt: 1.5,
-            p: 1,
-            backgroundColor: 'rgba(124, 77, 255, 0.1)',
-            borderRadius: 1,
-            border: '1px solid rgba(124, 77, 255, 0.2)',
-          }}
-        >
-          <Typography variant="caption" sx={{ color: '#7c4dff', display: 'block', mb: 0.5 }}>
-            Результат:
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: 'text.secondary',
-              fontFamily: 'monospace',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              maxHeight: 80,
-              overflow: 'auto',
-              display: 'block',
-            }}
-          >
-            {typeof job.artifact === 'object'
-              ? JSON.stringify(job.artifact, null, 2).slice(0, 200)
-              : String(job.artifact).slice(0, 200)}
-          </Typography>
-        </Box>
       )}
 
       {/* Декоративные "коннекторы" как у нейрона */}

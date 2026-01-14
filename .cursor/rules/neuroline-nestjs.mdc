@@ -7,7 +7,7 @@ globs: packages/neuroline-nestjs/**/*
 
 ## Назначение
 
-NestJS интеграция: модуль, контроллер, сервис для работы с Pipeline Manager.
+NestJS интеграция: фабрика контроллера для конкретного pipeline + сервис для доступа к `PipelineManager`/`PipelineStorage`.
 
 ## Структура
 
@@ -16,9 +16,8 @@ src/
 ├── index.ts              # Публичные экспорты
 ├── constants.ts          # Injection tokens
 ├── dto.ts                # DTO классы для валидации
-├── neuroline.module.ts   # DynamicModule
-├── neuroline.controller.ts   # REST endpoints
 └── neuroline.service.ts  # Бизнес-логика
+└── pipeline-controller.factory.ts # createPipelineController factory
 ```
 
 ## Соглашения NestJS
@@ -28,37 +27,59 @@ src/
 - DTO классы для валидации входных данных
 - Swagger декораторы для документации API
 
-## Регистрация модуля
+## Использование
 
 ```typescript
-// Статическая
-NeurolineModule.register({
-    manager: new PipelineManager({ storage }),
-    storage,
-    pipelines: [myPipeline],
+import { Module } from '@nestjs/common';
+import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
+import { createPipelineController } from 'neuroline-nestjs';
+import { demoPipeline } from './pipelines';
+
+const storage = new InMemoryPipelineStorage();
+const manager = new PipelineManager({ storage });
+
+const DemoPipelineController = createPipelineController({
+	path: 'api/pipeline/demo',
+	manager,
+	storage,
+	pipeline: demoPipeline, // один контроллер = один pipeline
 });
 
-// Асинхронная (с MongoDB)
-NeurolineModule.registerAsync({
-    imports: [MongooseModule],
-    useFactory: async (model) => ({
-        manager: new PipelineManager({ storage: new MongoPipelineStorage(model) }),
-        storage,
-        pipelines: [myPipeline],
-    }),
-    inject: [getModelToken('Pipeline')],
-});
+@Module({
+	controllers: [DemoPipelineController],
+})
+export class AppModule {}
 ```
 
 ## REST API Endpoints
 
+API совместим с `neuroline/client` (query-параметр `action`):
+
 | Method | Path | Описание |
 |--------|------|----------|
-| POST | `/pipeline/:type/start` | Запуск pipeline |
-| GET | `/pipeline/:id/status` | Статус pipeline |
-| GET | `/pipeline/:id/result` | Результаты (артефакты) |
-| GET | `/pipeline/:id` | Полное состояние |
-| GET | `/pipelines` | Список всех pipelines |
+| POST | `/<path>` | Запуск pipeline |
+| GET | `/<path>?action=status&id=<id>` | Статус pipeline |
+| GET | `/<path>?action=result&id=<id>[&jobName=<job>]` | Результат (артефакт) одной job |
+| GET | `/<path>?action=list&page=1&limit=10` | Список pipelines (по типу контроллера) |
+
+### Debug-эндпоинты (требуют `enableDebugEndpoints: true`)
+
+⚠️ **Отключены по умолчанию** — возвращают чувствительные данные (input, options, artifacts).
+
+| Method | Path | Описание |
+|--------|------|----------|
+| GET | `/<path>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
+| GET | `/<path>?action=pipeline&id=<id>` | Полное состояние pipeline |
+
+```typescript
+const DemoController = createPipelineController({
+	path: 'api/pipeline/demo',
+	manager,
+	storage,
+	pipeline: demoPipeline,
+	enableDebugEndpoints: process.env.NODE_ENV === 'development', // только для dev
+});
+```
 
 ## Правила
 

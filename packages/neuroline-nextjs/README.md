@@ -102,18 +102,30 @@ const { data } = await response.json();
 // { status: "processing", currentJobIndex: 1, totalJobs: 4, stages: [...] }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=result&id=:id`
+### GET `/api/pipeline/my-pipeline?action=result&id=:id[&jobName=:name]`
 
-Get pipeline results (artifacts).
+Get a job result (artifact). If `jobName` is not provided, returns the last job result.
 
 **Example:**
 ```typescript
+// Last job result
 const response = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123');
 const { data } = await response.json();
-// { status: "done", artifacts: { "job-name": {...} }, jobNames: [...] }
+// { pipelineId: "abc123", jobName: "save-result", status: "done", artifact: {...} }
+
+// Result by job name
+const response2 = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data');
+const { data: jobResult } = await response2.json();
+// { pipelineId: "abc123", jobName: "fetch-data", status: "done", artifact: {...} }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=job&id=:id&jobName=:name`
+### Debug Endpoints
+
+The following endpoints return sensitive data (input, options, artifacts) and are **disabled by default**. To enable them, set `enableDebugEndpoints: true`.
+
+⚠️ **WARNING**: Do not enable in production unless you have proper authentication/authorization!
+
+#### GET `/api/pipeline/my-pipeline?action=job&id=:id&jobName=:name`
 
 Get detailed job data including input and options.
 
@@ -124,7 +136,7 @@ const { data } = await response.json();
 // { name: "fetch-data", status: "done", input: {...}, options: {...}, artifact: {...} }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=pipeline&id=:id`
+#### GET `/api/pipeline/my-pipeline?action=pipeline&id=:id`
 
 Get full pipeline state.
 
@@ -227,6 +239,20 @@ createPipelineRouteHandler({
   manager: PipelineManager,     // Required - pipeline manager instance
   storage: PipelineStorage,     // Required - storage for job details and list
   pipeline: PipelineConfig,     // Required - pipeline config for this route
+  enableDebugEndpoints: false,  // Optional - enable action=job and action=pipeline (default: false)
+});
+```
+
+### Enabling Debug Endpoints
+
+For development or internal tools, you can enable debug endpoints:
+
+```typescript
+const handlers = createPipelineRouteHandler({
+  manager,
+  storage,
+  pipeline: myPipeline,
+  enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 ```
 
@@ -416,18 +442,30 @@ const { data } = await response.json();
 // { status: "processing", currentJobIndex: 1, totalJobs: 4, stages: [...] }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=result&id=:id`
+### GET `/api/pipeline/my-pipeline?action=result&id=:id[&jobName=:name]`
 
-Получить результаты pipeline (артефакты).
+Получить результат (артефакт) job. Если `jobName` не передан, возвращается результат последней job.
 
 **Пример:**
 ```typescript
+// Результат последней job
 const response = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123');
 const { data } = await response.json();
-// { status: "done", artifacts: { "job-name": {...} }, jobNames: [...] }
+// { pipelineId: "abc123", jobName: "save-result", status: "done", artifact: {...} }
+
+// Результат по имени job
+const response2 = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data');
+const { data: jobResult } = await response2.json();
+// { pipelineId: "abc123", jobName: "fetch-data", status: "done", artifact: {...} }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=job&id=:id&jobName=:name`
+### Debug-эндпоинты
+
+Следующие эндпоинты возвращают чувствительные данные (input, options, artifacts) и **отключены по умолчанию**. Для включения установите `enableDebugEndpoints: true`.
+
+⚠️ **ВНИМАНИЕ**: Не включайте в production без надлежащей аутентификации/авторизации!
+
+#### GET `/api/pipeline/my-pipeline?action=job&id=:id&jobName=:name`
 
 Получить детальные данные job включая input и options.
 
@@ -438,7 +476,7 @@ const { data } = await response.json();
 // { name: "fetch-data", status: "done", input: {...}, options: {...}, artifact: {...} }
 ```
 
-### GET `/api/pipeline/my-pipeline?action=pipeline&id=:id`
+#### GET `/api/pipeline/my-pipeline?action=pipeline&id=:id`
 
 Получить полное состояние pipeline.
 
@@ -541,6 +579,20 @@ createPipelineRouteHandler({
   manager: PipelineManager,     // Обязательно - экземпляр pipeline manager
   storage: PipelineStorage,     // Обязательно - хранилище для деталей job и списка
   pipeline: PipelineConfig,     // Обязательно - конфиг pipeline для этого route
+  enableDebugEndpoints: false,  // Опционально - включить action=job и action=pipeline (по умолчанию: false)
+});
+```
+
+### Включение debug-эндпоинтов
+
+Для разработки или внутренних инструментов можно включить debug-эндпоинты:
+
+```typescript
+const handlers = createPipelineRouteHandler({
+  manager,
+  storage,
+  pipeline: myPipeline,
+  enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 ```
 

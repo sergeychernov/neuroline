@@ -244,17 +244,21 @@ export interface PipelineStatusResponse {
     error?: { message: string; jobName?: string };
 }
 
-/** Ответ на запрос результатов пайплайна */
-export interface PipelineResultResponse {
-    /** Статус пайплайна */
-    status: PipelineStatus;
+/** Ответ на запрос результата job */
+export interface PipelineResultResponse<T = unknown> {
+    /** ID пайплайна */
+    pipelineId: string;
+    /** Имя job */
+    jobName: string;
+    /** Статус job */
+    status: JobStatus;
     /**
-     * Артефакты по именам jobs (jobName -> artifact)
+     * Артефакт job
      * - undefined: job ещё выполняется или в очереди
      * - null: job завершена, но не возвращает результат
      * - значение: артефакт job
      */
-    artifacts: Record<string, unknown | null | undefined>;
+    artifact: T | null | undefined;
 }
 
 

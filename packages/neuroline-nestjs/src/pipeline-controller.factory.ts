@@ -24,6 +24,15 @@ export interface CreatePipelineControllerOptions {
 	storage: PipelineStorage;
 	/** Конфигурация pipeline */
 	pipeline: PipelineConfig;
+	/**
+	 * Включить debug-эндпоинты (action=pipeline, action=job)
+	 * 
+	 * ⚠️ ВНИМАНИЕ: Эти эндпоинты возвращают полные данные pipeline/job,
+	 * включая input, options и artifacts. Не включайте в production!
+	 * 
+	 * @default false
+	 */
+	enableDebugEndpoints?: boolean;
 }
 
 /** Body для запуска pipeline */
@@ -90,14 +99,16 @@ interface JobDetailsResponse {
  * - POST /api/pipeline/demo - запуск pipeline
  * - GET /api/pipeline/demo?action=status&id=xxx - статус
  * - GET /api/pipeline/demo?action=result&id=xxx - результаты
+ * - GET /api/pipeline/demo?action=list&page=1&limit=10 - список
+ * 
+ * Debug endpoints (требуют enableDebugEndpoints: true):
  * - GET /api/pipeline/demo?action=job&id=xxx&jobName=yyy - данные job
  * - GET /api/pipeline/demo?action=pipeline&id=xxx - полные данные pipeline
- * - GET /api/pipeline/demo?action=list&page=1&limit=10 - список
  */
 export function createPipelineController(
 	options: CreatePipelineControllerOptions,
 ): Type<unknown> {
-	const { path, manager, storage, pipeline } = options;
+	const { path, manager, storage, pipeline, enableDebugEndpoints = false } = options;
 	const pipelineType = pipeline.name;
 
 	// Регистрируем pipeline при создании контроллера
@@ -145,10 +156,28 @@ export function createPipelineController(
 				case 'status':
 					return this.getStatus(query.id);
 				case 'result':
-					return this.getResult(query.id);
+					return this.getResult(query.id, query.jobName);
 				case 'job':
+					if (!enableDebugEndpoints) {
+						throw new HttpException(
+							{
+								success: false,
+								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+							},
+							HttpStatus.FORBIDDEN,
+						);
+					}
 					return this.getJob(query.id, query.jobName);
 				case 'pipeline':
+					if (!enableDebugEndpoints) {
+						throw new HttpException(
+							{
+								success: false,
+								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+							},
+							HttpStatus.FORBIDDEN,
+						);
+					}
 					return this.getPipeline(query.id);
 				case 'list':
 					return this.getList(query.page, query.limit);
@@ -156,7 +185,7 @@ export function createPipelineController(
 					throw new HttpException(
 						{
 							success: false,
-							error: `Unknown action: ${action}. Valid actions: status, result, job, pipeline, list`,
+							error: `Unknown action: ${action}. Valid actions: status, result, list`,
 						},
 						HttpStatus.BAD_REQUEST,
 					);
@@ -181,7 +210,7 @@ export function createPipelineController(
 			}
 		}
 
-		private async getResult(id?: string): Promise<ApiResponse> {
+		private async getResult(id?: string, jobName?: string): Promise<ApiResponse> {
 			if (!id) {
 				throw new HttpException(
 					{ success: false, error: 'id query parameter is required' },
@@ -190,7 +219,7 @@ export function createPipelineController(
 			}
 
 			try {
-				const result = await manager.getResult(id);
+				const result = await manager.getResult(id, jobName);
 				return { success: true, data: result };
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Unknown error';

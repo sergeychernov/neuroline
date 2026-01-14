@@ -46,11 +46,15 @@ src/
 
 ```tsx
 <PipelineViewer
-    status={pipelineStatus}
-    showTiming
-    onJobClick={(payload) => console.log(payload)}
+    pipeline={pipeline}
+    selectedJobName={selectedJob?.name}
+    onJobClick={(job) => console.log(job)}
 />
 ```
+
+Примечание:
+- `PipelineViewer` **не управляет внешним состоянием** и отображает только то, что пришло в `pipeline`.
+- Артефакты и подробности job рекомендуется показывать в `JobDetailsPanel` (по клику на job, после отдельного запроса в API).
 
 ### Storybook
 

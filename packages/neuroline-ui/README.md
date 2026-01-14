@@ -59,7 +59,6 @@ export function PipelineDemo() {
           pipeline={pipeline}
           onJobClick={handleJobClick}
           selectedJobName={selectedJob?.name}
-          showArtifacts
         />
       )}
       {selectedJob && (
@@ -115,8 +114,6 @@ import { PipelineViewer } from 'neuroline-ui';
       },
     ],
   }}
-  showArtifacts={true}
-  showInput={true}
   onJobClick={(job) => console.log('Job clicked:', job)}
   selectedJobName="fetch-data"
 />
@@ -127,8 +124,6 @@ import { PipelineViewer } from 'neuroline-ui';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `pipeline` | `PipelineDisplayData` | Required | Pipeline data with stages |
-| `showArtifacts` | `boolean` | `false` | Show artifacts in job nodes |
-| `showInput` | `boolean` | `false` | Show pipeline input |
 | `onJobClick` | `(job: JobDisplayInfo) => void` | - | Click handler for job nodes |
 | `selectedJobName` | `string` | - | Name of currently selected job |
 
@@ -178,7 +173,6 @@ import { JobNode } from 'neuroline-ui';
     artifact: { size: 2048 },
   }}
   isSelected={true}
-  showArtifact={true}
   onClick={(job) => console.log('Clicked:', job)}
 />
 ```
@@ -189,7 +183,6 @@ import { JobNode } from 'neuroline-ui';
 |------|------|---------|-------------|
 | `job` | `JobDisplayInfo` | Required | Job data |
 | `isSelected` | `boolean` | `false` | Highlight as selected |
-| `showArtifact` | `boolean` | `false` | Show artifact preview |
 | `onClick` | `(job: JobDisplayInfo) => void` | - | Click handler |
 
 ### StageColumn
@@ -207,7 +200,6 @@ import { StageColumn } from 'neuroline-ui';
       { name: 'job2', status: 'done' },
     ],
   }}
-  showArtifacts={true}
   selectedJobName="job1"
   onJobClick={(job) => console.log(job)}
 />
@@ -399,7 +391,6 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           pipeline={pipeline}
           onJobClick={handleJobClick}
           selectedJobName={selectedJob?.name}
-          showArtifacts
         />
       )}
       {selectedJob && <JobDetailsPanel job={selectedJob} />}
@@ -487,7 +478,6 @@ export function PipelineDemo() {
           pipeline={pipeline}
           onJobClick={handleJobClick}
           selectedJobName={selectedJob?.name}
-          showArtifacts
         />
       )}
       {selectedJob && (
@@ -543,8 +533,6 @@ import { PipelineViewer } from 'neuroline-ui';
       },
     ],
   }}
-  showArtifacts={true}
-  showInput={true}
   onJobClick={(job) => console.log('Job clicked:', job)}
   selectedJobName="fetch-data"
 />
@@ -555,8 +543,6 @@ import { PipelineViewer } from 'neuroline-ui';
 | Проп | Тип | По умолчанию | Описание |
 |------|-----|--------------|----------|
 | `pipeline` | `PipelineDisplayData` | Обязательно | Данные pipeline со stages |
-| `showArtifacts` | `boolean` | `false` | Показывать артефакты в job nodes |
-| `showInput` | `boolean` | `false` | Показывать входные данные pipeline |
 | `onJobClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика по job |
 | `selectedJobName` | `string` | - | Имя выбранной job |
 
@@ -606,7 +592,6 @@ import { JobNode } from 'neuroline-ui';
     artifact: { size: 2048 },
   }}
   isSelected={true}
-  showArtifact={true}
   onClick={(job) => console.log('Clicked:', job)}
 />
 ```
@@ -617,7 +602,6 @@ import { JobNode } from 'neuroline-ui';
 |------|-----|--------------|----------|
 | `job` | `JobDisplayInfo` | Обязательно | Данные job |
 | `isSelected` | `boolean` | `false` | Подсветить как выбранную |
-| `showArtifact` | `boolean` | `false` | Показывать превью артефакта |
 | `onClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика |
 
 ### StageColumn
@@ -635,7 +619,6 @@ import { StageColumn } from 'neuroline-ui';
       { name: 'job2', status: 'done' },
     ],
   }}
-  showArtifacts={true}
   selectedJobName="job1"
   onJobClick={(job) => console.log(job)}
 />
@@ -827,7 +810,6 @@ export default function PipelinePage({ params }: { params: { id: string } }) {
           pipeline={pipeline}
           onJobClick={handleJobClick}
           selectedJobName={selectedJob?.name}
-          showArtifacts
         />
       )}
       {selectedJob && <JobDetailsPanel job={selectedJob} />}
