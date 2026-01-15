@@ -298,5 +298,45 @@ export class MongoPipelineStorage implements PipelineStorage {
             )
             .exec();
     }
+
+    async findAndTimeoutStaleJobs(timeoutMs = 20 * 60 * 1000): Promise<number> {
+        const cutoffTime = new Date(Date.now() - timeoutMs);
+        const errorMessage = `Job timed out after ${Math.round(timeoutMs / 60000)} minutes`;
+        const now = new Date();
+
+        // Находим все processing пайплайны с зависшими джобами
+        // и обновляем их за один запрос используя arrayFilters
+        const result = await this.pipelineModel
+            .updateMany(
+                {
+                    status: 'processing',
+                    jobs: {
+                        $elemMatch: {
+                            status: 'processing',
+                            startedAt: { $lt: cutoffTime },
+                        },
+                    },
+                },
+                {
+                    $set: {
+                        status: 'error',
+                        'jobs.$[staleJob].status': 'error',
+                        'jobs.$[staleJob].error': { message: errorMessage },
+                        'jobs.$[staleJob].finishedAt': now,
+                    },
+                },
+                {
+                    arrayFilters: [
+                        {
+                            'staleJob.status': 'processing',
+                            'staleJob.startedAt': { $lt: cutoffTime },
+                        },
+                    ],
+                },
+            )
+            .exec();
+
+        return result.modifiedCount;
+    }
 }
 

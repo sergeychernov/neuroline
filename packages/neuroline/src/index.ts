@@ -8,7 +8,7 @@ export * from './types';
 
 // Core
 export { PipelineManager } from './manager';
-export type { PipelineManagerOptions } from './manager';
+export type { PipelineManagerOptions, StaleJobsWatchdogOptions } from './manager';
 
 // Storage
 export { InMemoryPipelineStorage } from './storage';

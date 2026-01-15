@@ -81,6 +81,14 @@ export function getPipelineManager() {
 				warn: (msg, data) => console.warn(`[WARN] ${msg}`, data),
 			},
 		});
+
+		// Запускаем фоновый watchdog для отслеживания "зависших" джоб
+		// Если джоба в processing дольше 20 минут — помечается как error
+		// Полезно когда процесс падает во время выполнения джобы
+		managerInstance.startStaleJobsWatchdog({
+			checkIntervalMs: 60_000,     // проверка раз в минуту
+			jobTimeoutMs: 20 * 60_000,   // таймаут 20 минут
+		});
 	}
 	return { manager: managerInstance, storage: storageInstance! };
 }

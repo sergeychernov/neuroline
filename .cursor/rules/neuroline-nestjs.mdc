@@ -49,6 +49,11 @@ import { AuthGuard } from './guards';
           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
         },
       ],
+      // Фоновый watchdog для "зависших" джоб
+      staleJobsWatchdog: {
+        checkIntervalMs: 60_000,   // проверка раз в минуту
+        jobTimeoutMs: 1200_000,    // таймаут 20 минут
+      },
     }),
   ],
 })
@@ -96,6 +101,28 @@ API совместим с `neuroline/client` (query-параметр `action`):
 |--------|------|----------|
 | GET | `/<path>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
 | GET | `/<path>?action=pipeline&id=<id>` | Полное состояние pipeline |
+
+## Опции NeurolineModuleAsyncOptions
+
+| Опция | Описание |
+|-------|----------|
+| `useFactory` | Factory для создания PipelineStorage |
+| `inject` | Провайдеры для инъекции в factory |
+| `controllers` | Массив конфигураций контроллеров |
+| `logger` | Логгер для PipelineManager |
+| `staleJobsWatchdog` | Опции для фонового watchdog зависших джоб |
+
+### staleJobsWatchdog
+
+```typescript
+staleJobsWatchdog: {
+    checkIntervalMs: 60_000,   // интервал проверки (по умолчанию 1 мин)
+    jobTimeoutMs: 1200_000,    // таймаут джобы (по умолчанию 20 мин)
+    onStaleJobsFound: (count) => { ... },  // callback при обнаружении
+}
+```
+
+Watchdog автоматически запускается при старте модуля и останавливается при shutdown.
 
 ## Правила
 

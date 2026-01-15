@@ -15,6 +15,7 @@ import {
 	ExecutionContext,
 	ForbiddenException,
 	CanActivate,
+	OnModuleDestroy,
 } from '@nestjs/common';
 import { ModuleRef, ContextIdFactory } from '@nestjs/core';
 import type {
@@ -22,12 +23,14 @@ import type {
 	PipelineStorage,
 	PipelineConfig,
 	JobStatus,
+	StaleJobsWatchdogOptions,
 } from 'neuroline';
 import { PipelineManager as PipelineManagerClass } from 'neuroline';
 import {
 	NEUROLINE_MANAGER,
 	NEUROLINE_STORAGE,
 	NEUROLINE_CONTROLLER_OPTIONS,
+	NEUROLINE_WATCHDOG_OPTIONS,
 } from './constants';
 import { NeurolineService } from './neuroline.service';
 
@@ -96,6 +99,24 @@ export interface NeurolineModuleAsyncOptions {
 	controllers: PipelineControllerOptions[];
 	/** Логгер для PipelineManager (опционально) */
 	logger?: NeurolineLogger;
+	/**
+	 * Опции для фонового watchdog, который отслеживает "зависшие" джобы.
+	 * 
+	 * Если джоба в статусе processing дольше указанного времени (по умолчанию 20 минут),
+	 * watchdog пометит её как error.
+	 * 
+	 * Это защищает от ситуаций, когда процесс падает во время выполнения джобы,
+	 * и она навсегда остаётся в processing.
+	 * 
+	 * @example
+	 * ```typescript
+	 * staleJobsWatchdog: {
+	 *     checkIntervalMs: 60000,  // проверка раз в минуту
+	 *     jobTimeoutMs: 1200000,   // таймаут 20 минут
+	 * }
+	 * ```
+	 */
+	staleJobsWatchdog?: StaleJobsWatchdogOptions;
 }
 
 /** Body для запуска pipeline */
@@ -157,7 +178,7 @@ function createDynamicController(
 			@Inject(NEUROLINE_STORAGE)
 			private readonly storage: PipelineStorage,
 			private readonly moduleRef: ModuleRef,
-		) {}
+		) { }
 
 		/**
 		 * Проверяет admin guards программно
@@ -180,7 +201,7 @@ function createDynamicController(
 				switchToHttp: () => ({
 					getRequest: <T = any>(): T => request as T,
 					getResponse: <T = any>(): T => ({}) as T,
-					getNext: <T = any>(): T => (() => {}) as T,
+					getNext: <T = any>(): T => (() => { }) as T,
 				}),
 				getClass: <T = any>(): Type<T> => DynamicPipelineController as Type<T>,
 				getHandler: () => this.handleGet,
@@ -207,10 +228,10 @@ function createDynamicController(
 					const guard = await this.moduleRef.resolve<CanActivate>(GuardType, contextId, { strict: false });
 					const result = await guard.canActivate(context);
 					if (!result) {
-					throw new ForbiddenException({
-						success: false,
-						error: 'Access denied to admin endpoints',
-					});
+						throw new ForbiddenException({
+							success: false,
+							error: 'Access denied to admin endpoints',
+						});
 					}
 				} catch (error) {
 					if (error instanceof ForbiddenException) throw error;
@@ -219,16 +240,16 @@ function createDynamicController(
 						const guard = this.moduleRef.get<CanActivate>(GuardType, { strict: false });
 						const result = await guard.canActivate(context);
 						if (!result) {
-					throw new ForbiddenException({
-						success: false,
-						error: 'Access denied to admin endpoints',
-					});
+							throw new ForbiddenException({
+								success: false,
+								error: 'Access denied to admin endpoints',
+							});
 						}
 					} catch {
-					throw new ForbiddenException({
-						success: false,
-						error: 'Access denied to admin endpoints',
-					});
+						throw new ForbiddenException({
+							success: false,
+							error: 'Access denied to admin endpoints',
+						});
 					}
 				}
 			}
@@ -467,10 +488,15 @@ function createDynamicController(
  *         {
  *           path: 'api/v1/demo-pipeline',
  *           pipeline: demoPipelineConfig,
-         *           guards: [AuthGuard],        // guards для всего контроллера
-         *           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
+ *           guards: [AuthGuard],        // guards для всего контроллера
+ *           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
  *         },
  *       ],
+ *       // Фоновый watchdog для отслеживания зависших джоб
+ *       staleJobsWatchdog: {
+ *         checkIntervalMs: 60000,  // проверка раз в минуту
+ *         jobTimeoutMs: 1200000,   // таймаут 20 минут
+ *       },
  *     }),
  *   ],
  * })
@@ -478,7 +504,26 @@ function createDynamicController(
  * ```
  */
 @Module({})
-export class NeurolineModule {
+export class NeurolineModule implements OnModuleDestroy {
+	constructor(
+		@Inject(NEUROLINE_MANAGER)
+		private readonly manager: PipelineManager,
+		@Inject(NEUROLINE_WATCHDOG_OPTIONS)
+		private readonly watchdogOptions: StaleJobsWatchdogOptions | null,
+	) {
+		// Запускаем watchdog если опции переданы
+		if (this.watchdogOptions) {
+			this.manager.startStaleJobsWatchdog(this.watchdogOptions);
+		}
+	}
+
+	/**
+	 * Останавливает watchdog при закрытии модуля
+	 */
+	onModuleDestroy(): void {
+		this.manager.stopStaleJobsWatchdog();
+	}
+
 	/**
 	 * Асинхронная конфигурация модуля с поддержкой DI
 	 * 
@@ -486,6 +531,7 @@ export class NeurolineModule {
 	 * - Создаёт NEUROLINE_MANAGER с автоматической регистрацией всех pipelines
 	 * - Динамически генерирует контроллеры с правильным DI
 	 * - Применяет guards через метаданные
+	 * - Запускает stale jobs watchdog если опции переданы
 	 */
 	static forRootAsync(options: NeurolineModuleAsyncOptions): DynamicModule {
 		// Создаём провайдер для storage
@@ -520,6 +566,12 @@ export class NeurolineModule {
 			useValue: options.controllers,
 		};
 
+		// Создаём провайдер для опций watchdog
+		const watchdogOptionsProvider: Provider = {
+			provide: NEUROLINE_WATCHDOG_OPTIONS,
+			useValue: options.staleJobsWatchdog ?? null,
+		};
+
 		// Динамически генерируем контроллеры
 		const dynamicControllers = options.controllers.map((controllerOptions) =>
 			createDynamicController(controllerOptions, controllerOptions.adminGuards),
@@ -533,6 +585,7 @@ export class NeurolineModule {
 				storageProvider,
 				managerProvider,
 				controllerOptionsProvider,
+				watchdogOptionsProvider,
 				NeurolineService,
 			],
 			exports: [

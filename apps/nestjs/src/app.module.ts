@@ -19,6 +19,12 @@ import { demoPipeline } from 'demo-pipelines';
 					adminGuards: [], // открытый доступ к admin-эндпоинтам
 				},
 			],
+			// Фоновый watchdog для отслеживания "зависших" джоб
+			// Если джоба в processing дольше 20 минут — помечается как error
+			staleJobsWatchdog: {
+				checkIntervalMs: 60_000,     // проверка раз в минуту
+				jobTimeoutMs: 20 * 60_000,   // таймаут 20 минут
+			},
 		}),
 	],
 })

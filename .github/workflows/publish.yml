@@ -29,6 +29,13 @@ jobs:
       - name: Build packages
         run: yarn build:packages
 
+      - name: Initialize publish flags
+        run: |
+          echo "SKIP_PUBLISH=true" >> $GITHUB_ENV
+          echo "SKIP_PUBLISH_UI=true" >> $GITHUB_ENV
+          echo "SKIP_PUBLISH_NEXTJS=true" >> $GITHUB_ENV
+          echo "SKIP_PUBLISH_NESTJS=true" >> $GITHUB_ENV
+
       - name: Auto-bump neuroline version if needed
         working-directory: packages/neuroline
         run: |
@@ -61,7 +68,7 @@ jobs:
           fi
 
       - name: Publish neuroline
-        if: env.SKIP_PUBLISH != 'true'
+        if: env.SKIP_PUBLISH == 'false'
         working-directory: packages/neuroline
         run: npm publish --access public
         env:
@@ -107,7 +114,7 @@ jobs:
           fi
 
       - name: Publish neuroline-ui
-        if: env.SKIP_PUBLISH_UI != 'true'
+        if: env.SKIP_PUBLISH_UI == 'false'
         working-directory: packages/neuroline-ui
         run: npm publish --access public
         env:
@@ -119,11 +126,18 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем публикацию"
-            echo "SKIP_PUBLISH_NEXTJS=true" >> $GITHUB_ENV
-          else
+          # Проверяем изменения в src/ ИЛИ обновление neuroline
+          NEED_PUBLISH=false
+
+          if ! git diff HEAD~1 HEAD --quiet -- src/; then
             echo "Обнаружены изменения в src/"
+            NEED_PUBLISH=true
+          elif [ "$SKIP_PUBLISH" = "false" ]; then
+            echo "neuroline был обновлён, нужно переопубликовать зависимый пакет"
+            NEED_PUBLISH=true
+          fi
+
+          if [ "$NEED_PUBLISH" = "true" ]; then
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
               node -e "
@@ -134,15 +148,16 @@ jobs:
                 fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
                 console.log('Новая версия:', pkg.version);
               "
-              echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
-              echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
             fi
+            echo "SKIP_PUBLISH_NEXTJS=false" >> $GITHUB_ENV
+          else
+            echo "Нет изменений, пропускаем публикацию"
           fi
 
       - name: Publish neuroline-nextjs
-        if: env.SKIP_PUBLISH_NEXTJS != 'true'
+        if: env.SKIP_PUBLISH_NEXTJS == 'false'
         working-directory: packages/neuroline-nextjs
         run: npm publish --access public
         env:
@@ -154,11 +169,18 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем публикацию"
-            echo "SKIP_PUBLISH_NESTJS=true" >> $GITHUB_ENV
-          else
+          # Проверяем изменения в src/ ИЛИ обновление neuroline
+          NEED_PUBLISH=false
+
+          if ! git diff HEAD~1 HEAD --quiet -- src/; then
             echo "Обнаружены изменения в src/"
+            NEED_PUBLISH=true
+          elif [ "$SKIP_PUBLISH" = "false" ]; then
+            echo "neuroline был обновлён, нужно переопубликовать зависимый пакет"
+            NEED_PUBLISH=true
+          fi
+
+          if [ "$NEED_PUBLISH" = "true" ]; then
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
               node -e "
@@ -169,15 +191,16 @@ jobs:
                 fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
                 console.log('Новая версия:', pkg.version);
               "
-              echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
-              echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
             fi
+            echo "SKIP_PUBLISH_NESTJS=false" >> $GITHUB_ENV
+          else
+            echo "Нет изменений, пропускаем публикацию"
           fi
 
       - name: Publish neuroline-nestjs
-        if: env.SKIP_PUBLISH_NESTJS != 'true'
+        if: env.SKIP_PUBLISH_NESTJS == 'false'
         working-directory: packages/neuroline-nestjs
         run: npm publish --access public
         env:

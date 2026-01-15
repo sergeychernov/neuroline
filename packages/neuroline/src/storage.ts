@@ -111,6 +111,19 @@ export interface PipelineStorage {
         retryCount: number,
         maxRetries: number,
     ): Promise<void>;
+
+    /**
+     * Найти и пометить как error все "зависшие" джобы
+     * 
+     * Зависшая джоба — это джоба со статусом 'processing', у которой
+     * startedAt установлен и прошло больше времени, чем указано в timeoutMs.
+     * 
+     * Метод также обновляет статус пайплайна на 'error', если в нём есть зависшие джобы.
+     * 
+     * @param timeoutMs - таймаут в миллисекундах (по умолчанию 20 минут)
+     * @returns количество обновлённых джоб
+     */
+    findAndTimeoutStaleJobs(timeoutMs?: number): Promise<number>;
 }
 
 /**
@@ -261,6 +274,44 @@ export class InMemoryPipelineStorage implements PipelineStorage {
             pipeline.jobs[jobIndex].maxRetries = maxRetries;
             pipeline.updatedAt = new Date();
         }
+    }
+
+    async findAndTimeoutStaleJobs(timeoutMs = 20 * 60 * 1000): Promise<number> {
+        const now = Date.now();
+        const cutoffTime = new Date(now - timeoutMs);
+        let timedOutCount = 0;
+
+        for (const pipeline of this.pipelines.values()) {
+            // Пропускаем уже завершённые пайплайны
+            if (pipeline.status !== 'processing') continue;
+
+            let hasTimedOutJob = false;
+
+            for (const job of pipeline.jobs) {
+                // Ищем джобы со статусом 'processing', у которых startedAt старше cutoffTime
+                if (
+                    job.status === 'processing' &&
+                    job.startedAt &&
+                    new Date(job.startedAt) < cutoffTime
+                ) {
+                    job.status = 'error';
+                    job.error = {
+                        message: `Job timed out after ${Math.round(timeoutMs / 60000)} minutes`,
+                    };
+                    job.finishedAt = new Date();
+                    hasTimedOutJob = true;
+                    timedOutCount++;
+                }
+            }
+
+            // Если нашли зависшие джобы — помечаем пайплайн как error
+            if (hasTimedOutJob) {
+                pipeline.status = 'error';
+                pipeline.updatedAt = new Date();
+            }
+        }
+
+        return timedOutCount;
     }
 
     /** Для тестов: очистить все данные */

@@ -98,6 +98,33 @@ export interface PipelineManagerOptions {
 }
 
 // ============================================================================
+// Stale Jobs Watchdog Options
+// ============================================================================
+
+/**
+ * Опции для watchdog, который отслеживает и таймаутит "зависшие" джобы
+ */
+export interface StaleJobsWatchdogOptions {
+    /**
+     * Интервал проверки в миллисекундах
+     * @default 60000 (1 минута)
+     */
+    checkIntervalMs?: number;
+
+    /**
+     * Таймаут джобы в миллисекундах — если джоба в статусе processing
+     * дольше этого времени, она будет помечена как error
+     * @default 1200000 (20 минут)
+     */
+    jobTimeoutMs?: number;
+
+    /**
+     * Callback, вызываемый при обнаружении и таймауте зависших джоб
+     */
+    onStaleJobsFound?: (count: number) => void;
+}
+
+// ============================================================================
 // Pipeline Manager
 // ============================================================================
 
@@ -109,6 +136,11 @@ export class PipelineManager {
     private readonly pipelineConfigs = new Map<string, PipelineConfig>();
     private readonly storage: PipelineStorage;
     private readonly logger: JobLogger;
+
+    /** Таймер для watchdog */
+    private watchdogTimer: ReturnType<typeof setInterval> | null = null;
+    /** Опции watchdog */
+    private watchdogOptions: StaleJobsWatchdogOptions | null = null;
 
     constructor(options: PipelineManagerOptions) {
         this.storage = options.storage;
@@ -513,6 +545,111 @@ export class PipelineManager {
      */
     async getPipeline(pipelineId: string): Promise<PipelineState | null> {
         return this.storage.findById(pipelineId);
+    }
+
+    // ============================================================================
+    // Stale Jobs Watchdog
+    // ============================================================================
+
+    /**
+     * Запускает фоновый watchdog, который периодически проверяет и таймаутит
+     * "зависшие" джобы — джобы в статусе processing, которые не завершились
+     * за указанное время (например, из-за падения процесса).
+     * 
+     * @param options - опции watchdog
+     * 
+     * @example
+     * ```typescript
+     * // Запуск с настройками по умолчанию (проверка раз в минуту, таймаут 20 минут)
+     * manager.startStaleJobsWatchdog();
+     * 
+     * // Запуск с кастомными настройками
+     * manager.startStaleJobsWatchdog({
+     *     checkIntervalMs: 30000,  // проверка каждые 30 секунд
+     *     jobTimeoutMs: 600000,    // таймаут 10 минут
+     *     onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
+     * });
+     * 
+     * // Остановка при shutdown приложения
+     * manager.stopStaleJobsWatchdog();
+     * ```
+     */
+    startStaleJobsWatchdog(options: StaleJobsWatchdogOptions = {}): void {
+        // Останавливаем предыдущий watchdog если был запущен
+        this.stopStaleJobsWatchdog();
+
+        const checkIntervalMs = options.checkIntervalMs ?? 60_000; // 1 минута
+        const jobTimeoutMs = options.jobTimeoutMs ?? 20 * 60_000;  // 20 минут
+
+        this.watchdogOptions = {
+            checkIntervalMs,
+            jobTimeoutMs,
+            onStaleJobsFound: options.onStaleJobsFound,
+        };
+
+        this.logger.info('Stale jobs watchdog started', {
+            checkIntervalMs,
+            jobTimeoutMs,
+        });
+
+        // Запускаем периодическую проверку
+        this.watchdogTimer = setInterval(() => {
+            this.checkStaleJobs().catch((error) => {
+                this.logger.error('Stale jobs watchdog error', {
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            });
+        }, checkIntervalMs);
+
+        // Делаем unref() чтобы таймер не блокировал завершение процесса
+        if (this.watchdogTimer.unref) {
+            this.watchdogTimer.unref();
+        }
+    }
+
+    /**
+     * Останавливает фоновый watchdog
+     */
+    stopStaleJobsWatchdog(): void {
+        if (this.watchdogTimer) {
+            clearInterval(this.watchdogTimer);
+            this.watchdogTimer = null;
+            this.watchdogOptions = null;
+            this.logger.info('Stale jobs watchdog stopped');
+        }
+    }
+
+    /**
+     * Проверяет возможность стартовать — проверяет есть ли watchdog у storage
+     */
+    isWatchdogRunning(): boolean {
+        return this.watchdogTimer !== null;
+    }
+
+    /**
+     * Выполняет проверку зависших джоб (вызывается по таймеру)
+     */
+    private async checkStaleJobs(): Promise<void> {
+        if (!this.watchdogOptions) return;
+
+        const timedOutCount = await this.storage.findAndTimeoutStaleJobs(
+            this.watchdogOptions.jobTimeoutMs,
+        );
+
+        if (timedOutCount > 0) {
+            this.logger.warn('Stale jobs timed out', { count: timedOutCount });
+            this.watchdogOptions.onStaleJobsFound?.(timedOutCount);
+        }
+    }
+
+    /**
+     * Вручную запустить проверку зависших джоб (полезно для тестов)
+     * 
+     * @param timeoutMs - таймаут в миллисекундах (по умолчанию 20 минут)
+     * @returns количество таймаутнутых джоб
+     */
+    async timeoutStaleJobs(timeoutMs?: number): Promise<number> {
+        return this.storage.findAndTimeoutStaleJobs(timeoutMs);
     }
 }
 

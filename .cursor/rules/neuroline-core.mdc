@@ -95,6 +95,27 @@ Job может быть настроена на автоматический ret
 - `InMemoryPipelineStorage` — для тестов
 - `MongoPipelineStorage` — для продакшена
 
+### Stale Jobs Watchdog
+
+Фоновый мониторинг "зависших" джоб (застрявших в `processing` из-за падения процесса):
+
+```typescript
+// Запуск watchdog
+manager.startStaleJobsWatchdog({
+    checkIntervalMs: 60_000,     // проверка раз в минуту
+    jobTimeoutMs: 20 * 60_000,   // таймаут 20 минут
+});
+
+// Остановка
+manager.stopStaleJobsWatchdog();
+
+// Ручная проверка (для тестов)
+await manager.timeoutStaleJobs();
+```
+
+- Метод `findAndTimeoutStaleJobs()` в `PipelineStorage` — находит и таймаутит зависшие джобы
+- Watchdog использует `setInterval` с `unref()` — не блокирует завершение процесса
+
 ## Правила
 
 1. **Job должна быть чистой функцией** — не обращаться к глобальному состоянию

@@ -345,6 +345,8 @@ class MyCustomStorage implements PipelineStorage {
     async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
     async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
+    async updateJobRetryCount(pipelineId: string, jobIndex: number, retryCount: number, maxRetries: number): Promise<void> { ... }
+    async findAndTimeoutStaleJobs(timeoutMs?: number): Promise<number> { ... }  // For stale jobs watchdog
 }
 ```
 
@@ -426,6 +428,40 @@ const config: PipelineConfig = {
 - `retries`: Number of additional attempts after initial failure (default: 0)
 - `retryDelay`: Delay in milliseconds before each retry (default: 1000)
 - `retryCount` and `maxRetries` are tracked in job state for monitoring
+
+## Stale Jobs Watchdog
+
+When a process crashes during job execution, the job may remain in `processing` status forever ("stale job"). The watchdog monitors and automatically times out such jobs.
+
+```typescript
+const manager = new PipelineManager({ storage, logger });
+
+// Start watchdog (checks every minute, times out jobs after 20 minutes)
+manager.startStaleJobsWatchdog({
+    checkIntervalMs: 60_000,     // Check every 1 minute
+    jobTimeoutMs: 20 * 60_000,   // Timeout after 20 minutes
+    onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
+});
+
+// Stop watchdog on shutdown
+manager.stopStaleJobsWatchdog();
+
+// Check if watchdog is running
+manager.isWatchdogRunning();
+
+// Manual check (useful for testing)
+const timedOutCount = await manager.timeoutStaleJobs();
+```
+
+### StaleJobsWatchdogOptions
+
+```typescript
+interface StaleJobsWatchdogOptions {
+    checkIntervalMs?: number;  // Default: 60000 (1 minute)
+    jobTimeoutMs?: number;     // Default: 1200000 (20 minutes)
+    onStaleJobsFound?: (count: number) => void;
+}
+```
 
 ## Idempotency
 
@@ -520,6 +556,9 @@ import type {
     PipelineStorage,
     PaginatedResult,
     PaginationParams,
+
+    // Watchdog
+    StaleJobsWatchdogOptions,
 } from 'neuroline';
 
 // MongoDB types (separate import)
@@ -1000,6 +1039,8 @@ class MyCustomStorage implements PipelineStorage {
     async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
     async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
+    async updateJobRetryCount(pipelineId: string, jobIndex: number, retryCount: number, maxRetries: number): Promise<void> { ... }
+    async findAndTimeoutStaleJobs(timeoutMs?: number): Promise<number> { ... }  // Для stale jobs watchdog
 }
 ```
 
@@ -1081,6 +1122,40 @@ const config: PipelineConfig = {
 - `retries`: Количество дополнительных попыток после первой ошибки (по умолчанию: 0)
 - `retryDelay`: Задержка в миллисекундах перед каждым ретраем (по умолчанию: 1000)
 - `retryCount` и `maxRetries` отслеживаются в состоянии job для мониторинга
+
+## Stale Jobs Watchdog
+
+Если процесс падает во время выполнения джобы, она может навсегда остаться в статусе `processing` ("зависшая джоба"). Watchdog отслеживает и автоматически таймаутит такие джобы.
+
+```typescript
+const manager = new PipelineManager({ storage, logger });
+
+// Запуск watchdog (проверка раз в минуту, таймаут через 20 минут)
+manager.startStaleJobsWatchdog({
+    checkIntervalMs: 60_000,     // Проверка каждую минуту
+    jobTimeoutMs: 20 * 60_000,   // Таймаут через 20 минут
+    onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
+});
+
+// Остановка watchdog при shutdown
+manager.stopStaleJobsWatchdog();
+
+// Проверка работает ли watchdog
+manager.isWatchdogRunning();
+
+// Ручная проверка (полезно для тестов)
+const timedOutCount = await manager.timeoutStaleJobs();
+```
+
+### StaleJobsWatchdogOptions
+
+```typescript
+interface StaleJobsWatchdogOptions {
+    checkIntervalMs?: number;  // По умолчанию: 60000 (1 минута)
+    jobTimeoutMs?: number;     // По умолчанию: 1200000 (20 минут)
+    onStaleJobsFound?: (count: number) => void;
+}
+```
 
 ## Idempotency (идемпотентность)
 
@@ -1175,6 +1250,9 @@ import type {
     PipelineStorage,
     PaginatedResult,
     PaginationParams,
+
+    // Watchdog
+    StaleJobsWatchdogOptions,
 } from 'neuroline';
 
 // MongoDB типы (отдельный импорт)

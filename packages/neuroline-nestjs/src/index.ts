@@ -11,6 +11,9 @@ export {
 	type NeurolineLogger,
 } from './neuroline.module';
 
+// Реэкспорт типов для watchdog из neuroline
+export type { StaleJobsWatchdogOptions } from 'neuroline';
+
 // Service
 export { NeurolineService } from './neuroline.service';
 
