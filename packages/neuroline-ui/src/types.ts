@@ -30,6 +30,10 @@ export interface JobDisplayInfo {
   input?: SerializableValue;
   /** Опции job */
   options?: SerializableValue;
+  /** Количество выполненных ретраев (0 = первая попытка) */
+  retryCount?: number;
+  /** Максимальное количество ретраев для этой job */
+  maxRetries?: number;
 }
 
 /** Stage для отображения */

@@ -3,6 +3,7 @@
 import { Box, Button, Paper, Stack, CircularProgress, Typography, Divider } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ReplayIcon from '@mui/icons-material/Replay';
 
 // ============================================================================
 // Types
@@ -13,10 +14,14 @@ export interface PipelineControlPanelProps {
 	onNextjsSuccess: () => void;
 	/** Запуск Next.js error pipeline */
 	onNextjsError: () => void;
+	/** Запуск Next.js pipeline с retry (unstableFailCount = 1) */
+	onNextjsRetry: () => void;
 	/** Запуск NestJS success pipeline */
 	onNestjsSuccess: () => void;
 	/** Запуск NestJS error pipeline */
 	onNestjsError: () => void;
+	/** Запуск NestJS pipeline с retry (unstableFailCount = 1) */
+	onNestjsRetry: () => void;
 	/** Pipeline в процессе выполнения */
 	isRunning: boolean;
 	/** Текущий тип pipeline */
@@ -34,15 +39,19 @@ export interface PipelineControlPanelProps {
 export function PipelineControlPanel({
 	onNextjsSuccess,
 	onNextjsError,
+	onNextjsRetry,
 	onNestjsSuccess,
 	onNestjsError,
+	onNestjsRetry,
 	isRunning,
 	currentPipelineType,
 }: PipelineControlPanelProps) {
 	const isNextjsSuccessRunning = isRunning && currentPipelineType === 'nextjs-success';
 	const isNextjsErrorRunning = isRunning && currentPipelineType === 'nextjs-error';
+	const isNextjsRetryRunning = isRunning && currentPipelineType === 'nextjs-retry';
 	const isNestjsSuccessRunning = isRunning && currentPipelineType === 'nestjs-success';
 	const isNestjsErrorRunning = isRunning && currentPipelineType === 'nestjs-error';
+	const isNestjsRetryRunning = isRunning && currentPipelineType === 'nestjs-retry';
 
 	return (
 		<Paper
@@ -134,6 +143,34 @@ export function PipelineControlPanel({
 							>
 								Error
 							</Button>
+							<Button
+								variant="contained"
+								size="small"
+								onClick={onNextjsRetry}
+								disabled={isRunning}
+								startIcon={
+									isNextjsRetryRunning ? (
+										<CircularProgress size={14} color="inherit" />
+									) : (
+										<ReplayIcon sx={{ fontSize: 18 }} />
+									)
+								}
+								sx={{
+									px: 2,
+									py: 0.75,
+									fontSize: '0.8rem',
+									background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+									'&:hover': {
+										background: 'linear-gradient(135deg, #ffb74d 0%, #ff9800 100%)',
+									},
+									'&:disabled': {
+										background: 'rgba(255, 152, 0, 0.3)',
+										color: 'rgba(255,255,255,0.5)',
+									},
+								}}
+							>
+								Retry
+							</Button>
 						</Stack>
 					</Box>
 
@@ -221,6 +258,36 @@ export function PipelineControlPanel({
 								}}
 							>
 								Error
+							</Button>
+							<Button
+								variant="outlined"
+								size="small"
+								onClick={onNestjsRetry}
+								disabled={isRunning}
+								startIcon={
+									isNestjsRetryRunning ? (
+										<CircularProgress size={14} color="inherit" />
+									) : (
+										<ReplayIcon sx={{ fontSize: 18 }} />
+									)
+								}
+								sx={{
+									px: 2,
+									py: 0.75,
+									fontSize: '0.8rem',
+									borderColor: '#ff9800',
+									color: '#ff9800',
+									'&:hover': {
+										borderColor: '#ffb74d',
+										backgroundColor: 'rgba(255, 152, 0, 0.1)',
+									},
+									'&:disabled': {
+										borderColor: 'rgba(255, 152, 0, 0.3)',
+										color: 'rgba(255, 152, 0, 0.5)',
+									},
+								}}
+							>
+								Retry
 							</Button>
 						</Stack>
 					</Box>

@@ -36,6 +36,8 @@ interface JobInfo {
   startedAt?: Date;
   finishedAt?: Date;
   error?: { message: string; stack?: string };
+  retryCount?: number;
+  maxRetries?: number;
 }
 
 /** Событие обновления (только статус) */
@@ -66,6 +68,8 @@ function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
         artifact: undefined, // Артефакты получаются через отдельный запрос getJobDetails()
         input: undefined, // Для получения input нужен отдельный запрос
         options: undefined,
+        retryCount: job.retryCount,
+        maxRetries: job.maxRetries,
       })),
     })),
     error: status.error,
@@ -143,7 +147,11 @@ export default function HomePage() {
   }, []);
 
   const startPipeline = useCallback(
-    async (client: PipelineClient, pipelineTypeLabel: string, fail: boolean) => {
+    async (
+      client: PipelineClient,
+      pipelineTypeLabel: string,
+      options: { fail?: boolean; unstableFailCount?: number } = {},
+    ) => {
       // Остановить предыдущий polling
       stopRef.current?.();
 
@@ -157,7 +165,8 @@ export default function HomePage() {
         seed: Math.floor(Math.random() * 1000),
         name: `test-${Date.now()}`,
         iterations: 10,
-        fail,
+        fail: options.fail ?? false,
+        unstableFailCount: options.unstableFailCount ?? 0,
       };
 
       try {
@@ -187,23 +196,33 @@ export default function HomePage() {
 
   // Next.js handlers
   const handleNextjsSuccess = useCallback(
-    () => startPipeline(nextjsClient, 'nextjs-success', false),
+    () => startPipeline(nextjsClient, 'nextjs-success', { fail: false }),
     [nextjsClient, startPipeline],
   );
 
   const handleNextjsError = useCallback(
-    () => startPipeline(nextjsClient, 'nextjs-error', true),
+    () => startPipeline(nextjsClient, 'nextjs-error', { fail: true }),
+    [nextjsClient, startPipeline],
+  );
+
+  const handleNextjsRetry = useCallback(
+    () => startPipeline(nextjsClient, 'nextjs-retry', { unstableFailCount: 1 }),
     [nextjsClient, startPipeline],
   );
 
   // NestJS handlers
   const handleNestjsSuccess = useCallback(
-    () => startPipeline(nestjsClient, 'nestjs-success', false),
+    () => startPipeline(nestjsClient, 'nestjs-success', { fail: false }),
     [nestjsClient, startPipeline],
   );
 
   const handleNestjsError = useCallback(
-    () => startPipeline(nestjsClient, 'nestjs-error', true),
+    () => startPipeline(nestjsClient, 'nestjs-error', { fail: true }),
+    [nestjsClient, startPipeline],
+  );
+
+  const handleNestjsRetry = useCallback(
+    () => startPipeline(nestjsClient, 'nestjs-retry', { unstableFailCount: 1 }),
     [nestjsClient, startPipeline],
   );
 
@@ -281,8 +300,10 @@ export default function HomePage() {
         <PipelineControlPanel
           onNextjsSuccess={handleNextjsSuccess}
           onNextjsError={handleNextjsError}
+          onNextjsRetry={handleNextjsRetry}
           onNestjsSuccess={handleNestjsSuccess}
           onNestjsError={handleNestjsError}
+          onNestjsRetry={handleNestjsRetry}
           isRunning={isRunning}
           currentPipelineType={currentPipelineType}
         />

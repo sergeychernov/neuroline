@@ -4,6 +4,7 @@ import { validateJob } from './jobs/validate-job';
 import { computeJob, type ComputeJobArtifact } from './jobs/compute-job';
 import { transformJob, type TransformJobArtifact } from './jobs/transform-job';
 import { failingJob } from './jobs/failing-job';
+import { unstableJob } from './jobs/unstable-job';
 import { finalizeJob } from './jobs/finalize-job';
 
 // ============================================================================
@@ -20,6 +21,11 @@ export interface DemoPipelineInput {
 	iterations?: number;
 	/** Если true — pipeline упадёт на failing-task */
 	fail?: boolean;
+	/**
+	 * Сколько раз unstable-task должна упасть перед успехом (по умолчанию 0 — не падать)
+	 * Используется для демонстрации механизма retry
+	 */
+	unstableFailCount?: number;
 }
 
 // ============================================================================
@@ -89,6 +95,19 @@ const toFailing: JobInPipeline['synapses'] = (ctx) => {
 };
 
 /**
+ * Synapse: Transform -> Unstable
+ * Передаёт processId и количество падений для демонстрации retry
+ */
+const toUnstable: JobInPipeline['synapses'] = (ctx) => {
+	const input = ctx.pipelineInput as DemoPipelineInput;
+	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
+	return {
+		processId: initArtifact?.processId ?? 'unknown',
+		failCount: input.unstableFailCount ?? 0,
+	};
+};
+
+/**
  * Synapse: Failing -> Finalize
  * Собирает данные из всех предыдущих jobs
  */
@@ -114,10 +133,11 @@ const toFinalize: JobInPipeline['synapses'] = (ctx) => {
  * 1. [init] - инициализация (1 сек)
  * 2. [validate, compute] - параллельно валидация и вычисления (1 сек)
  * 3. [transform] - трансформация данных (1.2 сек)
- * 4. [failing-task] - условно падающая задача (если fail=true)
+ * 4. [unstable-task, failing-task] - параллельно: нестабильная (с retry) и условно падающая
  * 5. [finalize] - финализация и сборка результата (1 сек)
  *
  * Если input.fail === true, pipeline упадёт на stage 4
+ * unstable-task имеет 2 ретрая — если unstableFailCount <= 2, задача завершится успешно
  * Общее время: ~5-6 секунд (при успехе)
  */
 export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
@@ -135,11 +155,15 @@ export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
 		// Stage 3: Трансформация данных
 		{ job: transformJob, synapses: computeToTransform },
 
-		// Stage 4: Условно падающая задача (падает если fail=true)
-		{ job: failingJob, synapses: toFailing },
+		// Stage 4: Параллельно нестабильная задача (с retry) и условно падающая
+		[
+			{ job: unstableJob, synapses: toUnstable, retries: 2, retryDelay: 1500 },
+			{ job: failingJob, synapses: toFailing },
+		],
 
 		// Stage 5: Финализация
 		{ job: finalizeJob, synapses: toFinalize },
 	] as PipelineStage[],
-	computeInputHash: (input) => `demo_${input.seed}_${input.name}_${input.fail ? 'fail' : 'ok'}`,
+	computeInputHash: (input) => 
+		`demo_${input.seed}_${input.name}_${input.fail ? 'fail' : 'ok'}_unstable${input.unstableFailCount ?? 0}`,
 };

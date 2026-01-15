@@ -68,10 +68,26 @@ const config: PipelineConfig<MyInput> = {
         jobA,                    // Stage 1: одна job
         [jobB, jobC],            // Stage 2: параллельно
         { job: jobD, synapses }, // Stage 3: с трансформацией
+        { job: unstableJob, synapses, retries: 2, retryDelay: 1500 }, // Stage 4: с retry
     ],
     computeInputHash: (input) => `${input.userId}`, // Опционально
 };
 ```
+
+### Retry
+
+Job может быть настроена на автоматический retry при ошибке:
+
+```typescript
+{
+    job: unstableJob,
+    synapses: (ctx) => ({ ... }),
+    retries: 2,        // Максимум 3 попытки (1 + 2 ретрая)
+    retryDelay: 1500,  // Задержка 1.5с между попытками
+}
+```
+
+- `retryCount` и `maxRetries` сохраняются в `JobState` для мониторинга
 
 ### PipelineStorage
 

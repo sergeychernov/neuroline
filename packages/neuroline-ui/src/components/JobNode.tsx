@@ -1,7 +1,14 @@
 import React from 'react';
-import { Box, Typography, Paper, Tooltip, Collapse, IconButton, keyframes } from '@mui/material';
+import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes } from '@mui/material';
 import type { JobDisplayInfo } from '../types';
 import { StatusBadge } from './StatusBadge';
+
+/** Иконка Replay (inline для избежания проблем с tree-shaking) */
+const ReplayIcon: React.FC<{ sx?: object }> = ({ sx }) => (
+  <SvgIcon sx={sx}>
+    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
+  </SvgIcon>
+);
 
 export interface JobNodeProps {
   job: JobDisplayInfo;
@@ -141,12 +148,40 @@ export const JobNode: React.FC<JobNodeProps> = ({
       </Box>
 
       {/* Статус */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
         <StatusBadge status={job.status} size="small" />
         {duration && (
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {duration}
           </Typography>
+        )}
+        {/* Счётчик ретраев — показываем только если были повторные попытки */}
+        {(job.retryCount ?? 0) > 0 && job.maxRetries !== undefined && (
+          <Tooltip
+            title={`Ретрай ${job.retryCount} из ${job.maxRetries}`}
+            arrow
+          >
+            <Chip
+              icon={<ReplayIcon sx={{ fontSize: 14 }} />}
+              label={`${job.retryCount}/${job.maxRetries}`}
+              size="small"
+              sx={{
+                height: 20,
+                fontSize: '0.7rem',
+                backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                color: '#ff9800',
+                border: '1px solid rgba(255, 152, 0, 0.4)',
+                '& .MuiChip-icon': {
+                  color: 'inherit',
+                  marginLeft: '4px',
+                },
+                '& .MuiChip-label': {
+                  paddingLeft: '4px',
+                  paddingRight: '6px',
+                },
+              }}
+            />
+          </Tooltip>
         )}
       </Box>
 

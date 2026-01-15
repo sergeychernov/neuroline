@@ -82,6 +82,14 @@ export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = u
      * Если не указана, job получает pipelineInput (для первого stage) или артефакт предыдущей job
      */
     synapses?: (ctx: SynapseContext) => TInput;
+    /**
+     * Количество повторных попыток при ошибке (по умолчанию 0 — без ретраев)
+     */
+    retries?: number;
+    /**
+     * Задержка между ретраями в миллисекундах (по умолчанию 1000)
+     */
+    retryDelay?: number;
 }
 
 // ============================================================================
@@ -175,6 +183,10 @@ export interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknow
     startedAt?: Date;
     /** Время завершения */
     finishedAt?: Date;
+    /** Количество выполненных ретраев (0 = первая попытка) */
+    retryCount?: number;
+    /** Максимальное количество ретраев для этой job */
+    maxRetries?: number;
 }
 
 /** Состояние пайплайна (для хранилища) */
@@ -238,6 +250,10 @@ export interface PipelineStatusResponse {
             startedAt?: Date;
             finishedAt?: Date;
             error?: { message: string; stack?: string };
+            /** Количество выполненных ретраев */
+            retryCount?: number;
+            /** Максимальное количество ретраев для этой job */
+            maxRetries?: number;
         }>;
     }>;
     /** Информация об ошибке (если status === 'error') */

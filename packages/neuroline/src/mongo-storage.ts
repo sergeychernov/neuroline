@@ -17,6 +17,10 @@ export interface MongoPipelineJobState {
     error?: { message: string; stack?: string };
     startedAt?: Date;
     finishedAt?: Date;
+    /** Количество выполненных ретраев */
+    retryCount?: number;
+    /** Максимальное количество ретраев */
+    maxRetries?: number;
 }
 
 /**
@@ -107,6 +111,8 @@ export class MongoPipelineStorage implements PipelineStorage {
                 error: j.error,
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
+                retryCount: j.retryCount,
+                maxRetries: j.maxRetries,
             })),
             configHash: doc.configHash,
             createdAt: doc.createdAt,
@@ -151,6 +157,8 @@ export class MongoPipelineStorage implements PipelineStorage {
                 error: j.error,
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
+                retryCount: j.retryCount,
+                maxRetries: j.maxRetries,
             })),
             configHash: doc.configHash,
             createdAt: doc.createdAt,
@@ -272,6 +280,23 @@ export class MongoPipelineStorage implements PipelineStorage {
         }
 
         await this.pipelineModel.updateOne({ pipelineId }, update).exec();
+    }
+
+    async updateJobRetryCount(
+        pipelineId: string,
+        jobIndex: number,
+        retryCount: number,
+        maxRetries: number,
+    ): Promise<void> {
+        await this.pipelineModel
+            .updateOne(
+                { pipelineId },
+                {
+                    [`jobs.${jobIndex}.retryCount`]: retryCount,
+                    [`jobs.${jobIndex}.maxRetries`]: maxRetries,
+                },
+            )
+            .exec();
     }
 }
 

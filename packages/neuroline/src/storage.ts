@@ -97,6 +97,20 @@ export interface PipelineStorage {
         input: unknown,
         options?: unknown,
     ): Promise<void>;
+
+    /**
+     * Обновить счётчик ретраев job
+     * @param pipelineId - ID пайплайна
+     * @param jobIndex - индекс job
+     * @param retryCount - текущий номер попытки (0 = первая)
+     * @param maxRetries - максимальное количество ретраев
+     */
+    updateJobRetryCount(
+        pipelineId: string,
+        jobIndex: number,
+        retryCount: number,
+        maxRetries: number,
+    ): Promise<void>;
 }
 
 /**
@@ -231,6 +245,20 @@ export class InMemoryPipelineStorage implements PipelineStorage {
             if (options !== undefined) {
                 pipeline.jobs[jobIndex].options = options;
             }
+            pipeline.updatedAt = new Date();
+        }
+    }
+
+    async updateJobRetryCount(
+        pipelineId: string,
+        jobIndex: number,
+        retryCount: number,
+        maxRetries: number,
+    ): Promise<void> {
+        const pipeline = this.pipelines.get(pipelineId);
+        if (pipeline && pipeline.jobs[jobIndex]) {
+            pipeline.jobs[jobIndex].retryCount = retryCount;
+            pipeline.jobs[jobIndex].maxRetries = maxRetries;
             pipeline.updatedAt = new Date();
         }
     }

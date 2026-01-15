@@ -283,6 +283,8 @@ type StageItem = JobDefinition | JobInPipeline;
 interface JobInPipeline<TInput, TOutput, TOptions> {
     job: JobDefinition<TInput, TOutput, TOptions>;
     synapses?: (ctx: SynapseContext) => TInput;
+    retries?: number;      // Количество ретраев при ошибке (по умолчанию: 0)
+    retryDelay?: number;   // Задержка между ретраями в мс (по умолчанию: 1000)
 }
 ```
 
@@ -398,7 +400,32 @@ Pipeline
 
 - **Stages** execute **sequentially** (Stage 2 starts only after Stage 1 completes)
 - **Jobs within a stage** execute **in parallel**
-- If any job in a stage fails, the entire pipeline is marked as `error`
+- If any job in a stage fails (after all retries), the entire pipeline is marked as `error`
+
+## Retry Mechanism
+
+Jobs can be configured to automatically retry on failure:
+
+```typescript
+const config: PipelineConfig = {
+    name: 'my-pipeline',
+    stages: [
+        // Job with 2 retries and 1.5s delay between attempts
+        {
+            job: unstableJob,
+            synapses: (ctx) => ({ ... }),
+            retries: 2,        // Will try up to 3 times (1 initial + 2 retries)
+            retryDelay: 1500,  // Wait 1.5 seconds between retries
+        },
+        // Job without retries (default behavior)
+        normalJob,
+    ],
+};
+```
+
+- `retries`: Number of additional attempts after initial failure (default: 0)
+- `retryDelay`: Delay in milliseconds before each retry (default: 1000)
+- `retryCount` and `maxRetries` are tracked in job state for monitoring
 
 ## Idempotency
 
@@ -911,6 +938,8 @@ type StageItem = JobDefinition | JobInPipeline;
 interface JobInPipeline<TInput, TOutput, TOptions> {
     job: JobDefinition<TInput, TOutput, TOptions>;
     synapses?: (ctx: SynapseContext) => TInput;
+    retries?: number;      // Количество ретраев при ошибке (по умолчанию: 0)
+    retryDelay?: number;   // Задержка между ретраями в мс (по умолчанию: 1000)
 }
 ```
 
@@ -1026,7 +1055,32 @@ Pipeline
 
 - **Stages** выполняются **последовательно** (Stage 2 начнётся только после завершения Stage 1)
 - **Jobs внутри stage** выполняются **параллельно**
-- Если любая job в stage завершается с ошибкой, весь pipeline помечается как `error`
+- Если любая job в stage завершается с ошибкой (после всех ретраев), весь pipeline помечается как `error`
+
+## Механизм Retry
+
+Jobs можно настроить на автоматический retry при ошибке:
+
+```typescript
+const config: PipelineConfig = {
+    name: 'my-pipeline',
+    stages: [
+        // Job с 2 ретраями и задержкой 1.5с между попытками
+        {
+            job: unstableJob,
+            synapses: (ctx) => ({ ... }),
+            retries: 2,        // Максимум 3 попытки (1 начальная + 2 ретрая)
+            retryDelay: 1500,  // Ожидание 1.5 секунды между ретраями
+        },
+        // Job без ретраев (поведение по умолчанию)
+        normalJob,
+    ],
+};
+```
+
+- `retries`: Количество дополнительных попыток после первой ошибки (по умолчанию: 0)
+- `retryDelay`: Задержка в миллисекундах перед каждым ретраем (по умолчанию: 1000)
+- `retryCount` и `maxRetries` отслеживаются в состоянии job для мониторинга
 
 ## Idempotency (идемпотентность)
 

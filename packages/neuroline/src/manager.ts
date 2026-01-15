@@ -24,6 +24,11 @@ import type {
 // ============================================================================
 
 /**
+ * Задержка на указанное количество миллисекунд
+ */
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * Проверяет, является ли элемент JobInPipeline (имеет поле job)
  */
 const isJobInPipeline = (item: StageItem): item is JobInPipeline => {
@@ -277,7 +282,7 @@ export class PipelineManager {
 
             // Выполняем все jobs stage параллельно
             const jobPromises = stageJobs.map(async (jobInPipeline, indexInStage) => {
-                const { job: jobDef, synapses } = jobInPipeline;
+                const { job: jobDef, synapses, retries = 0, retryDelay = 1000 } = jobInPipeline;
                 const jobIndex = stageJobIndices[indexInStage];
 
                 // Подготавливаем input через synapses или используем дефолтный
@@ -286,6 +291,11 @@ export class PipelineManager {
 
                 // Сохраняем input и options в storage для отображения в UI
                 await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options);
+
+                // Сохраняем информацию о ретраях если они настроены
+                if (retries > 0) {
+                    await this.storage.updateJobRetryCount(pipelineId, jobIndex, 0, retries);
+                }
 
                 const context: JobContext = {
                     pipelineId,
@@ -300,32 +310,59 @@ export class PipelineManager {
                     },
                 };
 
-                try {
-                    const artifact = await jobDef.execute(jobInput, options, context);
+                // Выполняем job с поддержкой retry
+                let lastError: { message: string; stack?: string } | null = null;
 
-                    // Сохраняем артефакт
-                    await this.storage.updateJobArtifact(pipelineId, jobIndex, artifact, new Date());
+                for (let attempt = 0; attempt <= retries; attempt++) {
+                    // Если это не первая попытка — ждём и обновляем счётчик
+                    if (attempt > 0) {
+                        this.logger.warn(`Retrying job (attempt ${attempt + 1}/${retries + 1})`, {
+                            pipelineId,
+                            jobName: jobDef.name,
+                            retryDelay,
+                        });
 
-                    return { success: true as const, jobDef, artifact, jobIndex };
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-                    const errorStack = error instanceof Error ? error.stack : undefined;
+                        await delay(retryDelay);
+                        await this.storage.updateJobRetryCount(pipelineId, jobIndex, attempt, retries);
+                        // Сбрасываем статус обратно на processing для UI (без обновления startedAt)
+                        await this.storage.updateJobStatus(pipelineId, jobIndex, 'processing');
+                    }
 
-                    await this.storage.updateJobError(
-                        pipelineId,
-                        jobIndex,
-                        { message: errorMessage, stack: errorStack },
-                        new Date(),
-                    );
+                    try {
+                        const artifact = await jobDef.execute(jobInput, options, context);
 
-                    this.logger.error('Job execution failed', {
-                        pipelineId,
-                        jobName: jobDef.name,
-                        error: errorMessage,
-                    });
+                        // Сохраняем артефакт
+                        await this.storage.updateJobArtifact(pipelineId, jobIndex, artifact, new Date());
 
-                    return { success: false as const, jobDef, error: errorMessage, jobIndex };
+                        return { success: true as const, jobDef, artifact, jobIndex };
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+                        const errorStack = error instanceof Error ? error.stack : undefined;
+                        lastError = { message: errorMessage, stack: errorStack };
+
+                        this.logger.error(`Job execution failed (attempt ${attempt + 1}/${retries + 1})`, {
+                            pipelineId,
+                            jobName: jobDef.name,
+                            error: errorMessage,
+                            hasRetries: attempt < retries,
+                        });
+
+                        // Если ещё есть ретраи — продолжаем цикл
+                        if (attempt < retries) {
+                            continue;
+                        }
+                    }
                 }
+
+                // Все попытки исчерпаны — сохраняем ошибку
+                await this.storage.updateJobError(
+                    pipelineId,
+                    jobIndex,
+                    lastError ?? { message: 'Unknown error' },
+                    new Date(),
+                );
+
+                return { success: false as const, jobDef, error: lastError?.message ?? 'Unknown error', jobIndex };
             });
 
             const results = await Promise.all(jobPromises);
@@ -389,6 +426,8 @@ export class PipelineManager {
                 startedAt?: Date;
                 finishedAt?: Date;
                 error?: { message: string; stack?: string };
+                retryCount?: number;
+                maxRetries?: number;
             }>
         >();
 
@@ -402,6 +441,8 @@ export class PipelineManager {
                 startedAt: jobState.startedAt,
                 finishedAt: jobState.finishedAt,
                 error: jobState.error,
+                retryCount: jobState.retryCount,
+                maxRetries: jobState.maxRetries,
             });
             stagesMap.set(stageIndex, bucket);
         });
@@ -448,7 +489,7 @@ export class PipelineManager {
 
         // Находим job: по имени или последнюю
         let job: typeof pipeline.jobs[0] | undefined;
-        
+
         if (jobName) {
             job = pipeline.jobs.find((j) => j.name === jobName);
             if (!job) {

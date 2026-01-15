@@ -29,6 +29,10 @@ export const PipelineJobStateSchema = new MongooseSchema<MongoPipelineJobState>(
         },
         startedAt: { type: Date },
         finishedAt: { type: Date },
+        /** Количество выполненных ретраев */
+        retryCount: { type: Number },
+        /** Максимальное количество ретраев */
+        maxRetries: { type: Number },
     },
     { _id: false },
 );
