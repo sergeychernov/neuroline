@@ -51,8 +51,8 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/my-pipeline',
           pipeline: myPipeline,
-          guards: [AuthGuard], // optional
-          enableDebugEndpoints: process.env.NODE_ENV === 'development',
+          guards: [AuthGuard],       // guards для всего контроллера
+          adminGuards: [AdminGuard], // guards для admin-эндпоинтов
         },
       ],
     }),
@@ -141,14 +141,25 @@ Get job result (artifact). If `jobName` is not provided, returns the last job re
 
 List pipelines with pagination.
 
-### Debug Endpoints
+### Admin Endpoints
 
-These endpoints return sensitive data and are **disabled by default**. Enable with `enableDebugEndpoints: true`.
+These endpoints return full pipeline/job data (input, options, artifacts) and are **disabled by default**. Enable with `adminGuards`.
 
 | Endpoint | Description |
 |----------|-------------|
 | `?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact) |
 | `?action=pipeline&id=xxx` | Full pipeline state |
+
+```typescript
+// Admin доступен только авторизованным
+adminGuards: [AdminGuard]
+
+// Admin доступен всем (открытый доступ)
+adminGuards: []
+
+// Admin отключён (по умолчанию)
+// просто не указывайте adminGuards
+```
 
 ## Multiple Pipelines
 
@@ -241,8 +252,8 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/my-pipeline',
           pipeline: myPipeline,
-          guards: [AuthGuard], // опционально
-          enableDebugEndpoints: process.env.NODE_ENV === 'development',
+          guards: [AuthGuard],       // guards для всего контроллера
+          adminGuards: [AdminGuard], // guards для admin-эндпоинтов
         },
       ],
     }),
@@ -331,14 +342,25 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 
 Список pipelines с пагинацией.
 
-### Debug-эндпоинты
+### Admin-эндпоинты
 
-Эти эндпоинты возвращают чувствительные данные и **отключены по умолчанию**. Включите через `enableDebugEndpoints: true`.
+Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts) и **отключены по умолчанию**. Включите через `adminGuards`.
 
 | Эндпоинт | Описание |
 |----------|----------|
 | `?action=job&id=xxx&jobName=yyy` | Детали job (input, options, artifact) |
 | `?action=pipeline&id=xxx` | Полное состояние pipeline |
+
+```typescript
+// Admin доступен только авторизованным
+adminGuards: [AdminGuard]
+
+// Admin доступен всем (открытый доступ)
+adminGuards: []
+
+// Admin отключён (по умолчанию)
+// просто не указывайте adminGuards
+```
 
 ## Несколько Pipelines
 

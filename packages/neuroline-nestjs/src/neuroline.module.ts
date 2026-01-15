@@ -6,12 +6,17 @@ import {
 	Get,
 	Body,
 	Query,
+	Req,
 	HttpException,
 	HttpStatus,
 	Inject,
 	Type,
 	Provider,
+	ExecutionContext,
+	ForbiddenException,
+	CanActivate,
 } from '@nestjs/common';
+import { ModuleRef, ContextIdFactory } from '@nestjs/core';
 import type {
 	PipelineManager,
 	PipelineStorage,
@@ -38,17 +43,27 @@ export interface PipelineControllerOptions {
 	path: string;
 	/** Конфигурация pipeline из neuroline */
 	pipeline: PipelineConfig;
-	/** Guards для контроллера (опционально) */
+	/** Guards для всего контроллера (опционально) */
 	guards?: Type[];
 	/**
-	 * Включить debug-эндпоинты action=job и action=pipeline
+	 * Guards для admin-эндпоинтов (action=job, action=pipeline)
 	 * 
-	 * ⚠️ ВНИМАНИЕ: Эти эндпоинты возвращают полные данные pipeline/job,
-	 * включая input, options и artifacts. Не включайте в production!
+	 * Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts).
 	 * 
-	 * @default false
+	 * - Если указаны — admin-эндпоинты доступны только после прохождения guards
+	 * - Если не указаны — admin-эндпоинты отключены (возвращают 403)
+	 * - Для открытого доступа используйте пустой массив: `adminGuards: []`
+	 * 
+	 * @example
+	 * ```typescript
+	 * // Admin доступен только авторизованным
+	 * adminGuards: [AuthGuard]
+	 * 
+	 * // Admin доступен всем
+	 * adminGuards: []
+	 * ```
 	 */
-	enableDebugEndpoints?: boolean;
+	adminGuards?: Type[];
 }
 
 /**
@@ -123,15 +138,16 @@ interface JobDetailsResponse {
 
 /**
  * Создаёт класс контроллера с правильным DI
- * 
- * В отличие от createPipelineController(), этот контроллер получает
- * manager и storage через DI, а не через closure.
  */
 function createDynamicController(
 	controllerOptions: PipelineControllerOptions,
+	adminGuardTypes: Type[] | undefined,
 ): Type<unknown> {
-	const { path, pipeline, enableDebugEndpoints = false } = controllerOptions;
+	const { path, pipeline } = controllerOptions;
 	const pipelineType = pipeline.name;
+	// undefined = disabled, [] = open, [...guards] = protected
+	const adminEnabled = adminGuardTypes !== undefined;
+	const hasAdminGuards = adminGuardTypes && adminGuardTypes.length > 0;
 
 	@Controller(path)
 	class DynamicPipelineController {
@@ -140,7 +156,83 @@ function createDynamicController(
 			private readonly manager: PipelineManager,
 			@Inject(NEUROLINE_STORAGE)
 			private readonly storage: PipelineStorage,
+			private readonly moduleRef: ModuleRef,
 		) {}
+
+		/**
+		 * Проверяет admin guards программно
+		 */
+		private async checkAdminGuards(request: any): Promise<void> {
+			if (!adminEnabled) {
+				throw new ForbiddenException({
+					success: false,
+					error: 'Admin endpoints are disabled. Set adminGuards: [] to enable.',
+				});
+			}
+
+			if (!hasAdminGuards) {
+				// adminGuards: [] — открытый доступ
+				return;
+			}
+
+			// Создаём минимальный контекст для guards
+			const context = {
+				switchToHttp: () => ({
+					getRequest: <T = any>(): T => request as T,
+					getResponse: <T = any>(): T => ({}) as T,
+					getNext: <T = any>(): T => (() => {}) as T,
+				}),
+				getClass: <T = any>(): Type<T> => DynamicPipelineController as Type<T>,
+				getHandler: () => this.handleGet,
+				getArgs: <T extends unknown[] = unknown[]>(): T => [request] as T,
+				getArgByIndex: <T = any>(index: number): T => (index === 0 ? request : undefined) as T,
+				getType: <TContext extends string = string>(): TContext => 'http' as TContext,
+				switchToRpc: () => ({
+					getData: <T = any>(): T => null as T,
+					getContext: <T = any>(): T => null as T,
+				}),
+				switchToWs: () => ({
+					getData: <T = any>(): T => null as T,
+					getClient: <T = any>(): T => null as T,
+					getPattern: <T = any>(): T => null as T,
+				}),
+			} as ExecutionContext;
+
+			// Получаем request-scoped context
+			const contextId = ContextIdFactory.getByRequest(request);
+
+			// Проверяем каждый guard
+			for (const GuardType of adminGuardTypes!) {
+				try {
+					const guard = await this.moduleRef.resolve<CanActivate>(GuardType, contextId, { strict: false });
+					const result = await guard.canActivate(context);
+					if (!result) {
+					throw new ForbiddenException({
+						success: false,
+						error: 'Access denied to admin endpoints',
+					});
+					}
+				} catch (error) {
+					if (error instanceof ForbiddenException) throw error;
+					// Guard не зарегистрирован — пробуем создать
+					try {
+						const guard = this.moduleRef.get<CanActivate>(GuardType, { strict: false });
+						const result = await guard.canActivate(context);
+						if (!result) {
+					throw new ForbiddenException({
+						success: false,
+						error: 'Access denied to admin endpoints',
+					});
+						}
+					} catch {
+					throw new ForbiddenException({
+						success: false,
+						error: 'Access denied to admin endpoints',
+					});
+					}
+				}
+			}
+		}
 
 		/**
 		 * POST - запуск pipeline
@@ -175,7 +267,10 @@ function createDynamicController(
 		 * GET - получение данных (status, result, job, pipeline, list)
 		 */
 		@Get()
-		async handleGet(@Query() query: GetQueryParams): Promise<ApiResponse> {
+		async handleGet(
+			@Query() query: GetQueryParams,
+			@Req() request: any,
+		): Promise<ApiResponse> {
 			const action = query.action ?? 'status';
 
 			switch (action) {
@@ -184,26 +279,10 @@ function createDynamicController(
 				case 'result':
 					return this.getResult(query.id, query.jobName);
 				case 'job':
-					if (!enableDebugEndpoints) {
-						throw new HttpException(
-							{
-								success: false,
-								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
-							},
-							HttpStatus.FORBIDDEN,
-						);
-					}
+					await this.checkAdminGuards(request);
 					return this.getJob(query.id, query.jobName);
 				case 'pipeline':
-					if (!enableDebugEndpoints) {
-						throw new HttpException(
-							{
-								success: false,
-								error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
-							},
-							HttpStatus.FORBIDDEN,
-						);
-					}
+					await this.checkAdminGuards(request);
 					return this.getPipeline(query.id);
 				case 'list':
 					return this.getList(query.page, query.limit);
@@ -388,8 +467,8 @@ function createDynamicController(
  *         {
  *           path: 'api/v1/demo-pipeline',
  *           pipeline: demoPipelineConfig,
- *           guards: [AuthGuard],
- *           enableDebugEndpoints: true,
+         *           guards: [AuthGuard],        // guards для всего контроллера
+         *           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
  *         },
  *       ],
  *     }),
@@ -443,7 +522,7 @@ export class NeurolineModule {
 
 		// Динамически генерируем контроллеры
 		const dynamicControllers = options.controllers.map((controllerOptions) =>
-			createDynamicController(controllerOptions),
+			createDynamicController(controllerOptions, controllerOptions.adminGuards),
 		);
 
 		return {

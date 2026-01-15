@@ -16,7 +16,7 @@ import { demoPipeline } from 'demo-pipelines';
 				{
 					path: 'api/pipeline/demo',
 					pipeline: demoPipeline,
-					enableDebugEndpoints: true,
+					adminGuards: [], // открытый доступ к admin-эндпоинтам
 				},
 			],
 		}),

@@ -45,8 +45,8 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/demo-pipeline',
           pipeline: demoPipelineConfig,
-          guards: [AuthGuard],           // опционально
-          enableDebugEndpoints: true,    // опционально
+          guards: [AuthGuard],       // guards для всего контроллера
+          adminGuards: [AdminGuard], // guards для admin-эндпоинтов
         },
       ],
     }),
