@@ -108,19 +108,48 @@ export class PipelineClient {
 	async start<TData = unknown>(
 		params: StartPipelineParams<TData>,
 	): Promise<StartPipelineResponse> {
-		const response = await this.config.fetch(this.config.baseUrl, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify(params),
-		});
+		try {
+			const response = await this.config.fetch(this.config.baseUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(params),
+			});
 
-		const data: ApiResponse<StartPipelineResponse> = await response.json();
+			if (!response.ok) {
+				throw new Error(
+					`HTTP error ${response.status}: ${response.statusText} while starting pipeline at ${this.config.baseUrl}`,
+				);
+			}
 
-		if (!data.success || !data.data) {
-			throw new Error(data.error ?? 'Failed to start pipeline');
+			let data: ApiResponse<StartPipelineResponse>;
+			try {
+				data = await response.json();
+			} catch (parseError) {
+				throw new Error(
+					`Invalid JSON response from server when starting pipeline: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+				);
+			}
+
+			if (!data.success || !data.data) {
+				throw new Error(data.error ?? 'Failed to start pipeline');
+			}
+
+			return data.data;
+		} catch (error) {
+			// Re-throw errors with additional context if they're not already our custom errors
+			if (error instanceof Error) {
+				if (error.message.includes('HTTP error') || error.message.includes('Invalid JSON') || error.message.includes('Failed to start')) {
+					throw error;
+				}
+				// Network or fetch errors
+				throw new Error(
+					`Network error while starting pipeline at ${this.config.baseUrl}: ${error.message}`,
+				);
+			}
+			throw new Error(
+				`Unexpected error while starting pipeline: ${String(error)}`,
+			);
 		}
-
-		return data.data;
 	}
 
 	/**
@@ -128,19 +157,48 @@ export class PipelineClient {
 	 */
 	async getStatus(pipelineId: string): Promise<PipelineStatusResponse> {
 		const url = `${this.config.baseUrl}?action=status&id=${encodeURIComponent(pipelineId)}`;
-		const response = await this.config.fetch(url);
-		const data: ApiResponse<PipelineStatusResponse> = await response.json();
 
-		if (!data.success || !data.data) {
-			throw new Error(data.error ?? 'Failed to get pipeline status');
+		try {
+			const response = await this.config.fetch(url);
+
+			if (!response.ok) {
+				throw new Error(
+					`HTTP error ${response.status}: ${response.statusText} while getting status for pipeline "${pipelineId}"`,
+				);
+			}
+
+			let data: ApiResponse<PipelineStatusResponse>;
+			try {
+				data = await response.json();
+			} catch (parseError) {
+				throw new Error(
+					`Invalid JSON response from server when getting pipeline status: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+				);
+			}
+
+			if (!data.success || !data.data) {
+				throw new Error(data.error ?? `Failed to get status for pipeline "${pipelineId}"`);
+			}
+
+			return data.data;
+		} catch (error) {
+			if (error instanceof Error) {
+				if (error.message.includes('HTTP error') || error.message.includes('Invalid JSON') || error.message.includes('Failed to get')) {
+					throw error;
+				}
+				throw new Error(
+					`Network error while getting status for pipeline "${pipelineId}": ${error.message}`,
+				);
+			}
+			throw new Error(
+				`Unexpected error while getting pipeline status: ${String(error)}`,
+			);
 		}
-
-		return data.data;
 	}
 
 	/**
 	 * Получает результат (артефакт) конкретной job
-	 * 
+	 *
 	 * @param pipelineId - ID пайплайна
 	 * @param jobName - имя job (опционально, по умолчанию — последняя job)
 	 */
@@ -153,14 +211,45 @@ export class PipelineClient {
 			url += `&jobName=${encodeURIComponent(jobName)}`;
 		}
 
-		const response = await this.config.fetch(url);
-		const data: ApiResponse<PipelineResultResponse<T>> = await response.json();
+		try {
+			const response = await this.config.fetch(url);
 
-		if (!data.success || !data.data) {
-			throw new Error(data.error ?? 'Failed to get pipeline result');
+			if (!response.ok) {
+				const jobDesc = jobName ? ` for job "${jobName}"` : '';
+				throw new Error(
+					`HTTP error ${response.status}: ${response.statusText} while getting result${jobDesc} for pipeline "${pipelineId}"`,
+				);
+			}
+
+			let data: ApiResponse<PipelineResultResponse<T>>;
+			try {
+				data = await response.json();
+			} catch (parseError) {
+				throw new Error(
+					`Invalid JSON response from server when getting pipeline result: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+				);
+			}
+
+			if (!data.success || !data.data) {
+				const jobDesc = jobName ? ` for job "${jobName}"` : '';
+				throw new Error(data.error ?? `Failed to get result${jobDesc} for pipeline "${pipelineId}"`);
+			}
+
+			return data.data;
+		} catch (error) {
+			if (error instanceof Error) {
+				if (error.message.includes('HTTP error') || error.message.includes('Invalid JSON') || error.message.includes('Failed to get')) {
+					throw error;
+				}
+				const jobDesc = jobName ? ` for job "${jobName}"` : '';
+				throw new Error(
+					`Network error while getting result${jobDesc} for pipeline "${pipelineId}": ${error.message}`,
+				);
+			}
+			throw new Error(
+				`Unexpected error while getting pipeline result: ${String(error)}`,
+			);
 		}
-
-		return data.data;
 	}
 
 	/**
@@ -180,23 +269,52 @@ export class PipelineClient {
 		finishedAt?: string;
 	}> {
 		const url = `${this.config.baseUrl}?action=job&id=${encodeURIComponent(pipelineId)}&jobName=${encodeURIComponent(jobName)}`;
-		const response = await this.config.fetch(url);
-		const data: ApiResponse = await response.json();
 
-		if (!data.success || !data.data) {
-			throw new Error(data.error ?? 'Failed to get job details');
+		try {
+			const response = await this.config.fetch(url);
+
+			if (!response.ok) {
+				throw new Error(
+					`HTTP error ${response.status}: ${response.statusText} while getting details for job "${jobName}" in pipeline "${pipelineId}"`,
+				);
+			}
+
+			let data: ApiResponse;
+			try {
+				data = await response.json();
+			} catch (parseError) {
+				throw new Error(
+					`Invalid JSON response from server when getting job details: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+				);
+			}
+
+			if (!data.success || !data.data) {
+				throw new Error(data.error ?? `Failed to get details for job "${jobName}" in pipeline "${pipelineId}"`);
+			}
+
+			return data.data as {
+				name: string;
+				status: JobStatus;
+				input?: unknown;
+				options?: unknown;
+				artifact?: unknown;
+				error?: { message: string; stack?: string };
+				startedAt?: string;
+				finishedAt?: string;
+			};
+		} catch (error) {
+			if (error instanceof Error) {
+				if (error.message.includes('HTTP error') || error.message.includes('Invalid JSON') || error.message.includes('Failed to get')) {
+					throw error;
+				}
+				throw new Error(
+					`Network error while getting details for job "${jobName}" in pipeline "${pipelineId}": ${error.message}`,
+				);
+			}
+			throw new Error(
+				`Unexpected error while getting job details: ${String(error)}`,
+			);
 		}
-
-		return data.data as {
-			name: string;
-			status: JobStatus;
-			input?: unknown;
-			options?: unknown;
-			artifact?: unknown;
-			error?: { message: string; stack?: string };
-			startedAt?: string;
-			finishedAt?: string;
-		};
 	}
 
 	/**

@@ -38,7 +38,18 @@ export async function handleStartPipeline(
 	options?: HandleStartPipelineOptions,
 ): Promise<Response> {
 	try {
-		const body: StartPipelineBody = await request.json();
+		let body: StartPipelineBody;
+		try {
+			body = await request.json();
+		} catch (parseError) {
+			return jsonResponse<ApiResponse>(
+				{
+					success: false,
+					error: `Invalid JSON in request body: ${parseError instanceof Error ? parseError.message : 'malformed JSON'}`,
+				},
+				{ status: 400 },
+			);
+		}
 
 		if (body.input === undefined) {
 			return jsonResponse<ApiResponse>(
@@ -159,8 +170,26 @@ export async function handleGetList(
 ): Promise<Response> {
 	try {
 		const { searchParams } = new URL(request.url);
-		const page = parseInt(searchParams.get('page') ?? '1', 10);
-		const limit = parseInt(searchParams.get('limit') ?? '10', 10);
+		const pageParam = searchParams.get('page') ?? '1';
+		const limitParam = searchParams.get('limit') ?? '10';
+
+		const page = parseInt(pageParam, 10);
+		const limit = parseInt(limitParam, 10);
+
+		// Validate parseInt results
+		if (isNaN(page)) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: `Invalid page parameter: "${pageParam}" is not a valid number` },
+				{ status: 400 },
+			);
+		}
+
+		if (isNaN(limit)) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: `Invalid limit parameter: "${limitParam}" is not a valid number` },
+				{ status: 400 },
+			);
+		}
 
 		const result = await storage.findAll({
 			page: Math.max(1, page),

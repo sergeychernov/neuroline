@@ -92,119 +92,162 @@ export class MongoPipelineStorage implements PipelineStorage {
     constructor(private readonly pipelineModel: Model<MongoPipelineDocument>) { }
 
     async findById(pipelineId: string): Promise<PipelineState | null> {
-        const doc = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
-        if (!doc) return null;
+        try {
+            const doc = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
+            if (!doc) return null;
 
-        return {
-            pipelineId: doc.pipelineId,
-            pipelineType: doc.pipelineType,
-            status: doc.status,
-            currentJobIndex: doc.currentJobIndex,
-            input: doc.input,
-            jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
-            jobs: doc.jobs.map((j) => ({
-                name: j.name,
-                status: j.status,
-                input: j.input,
-                options: j.options,
-                artifact: j.artifact,
-                error: j.error,
-                startedAt: j.startedAt,
-                finishedAt: j.finishedAt,
-                retryCount: j.retryCount,
-                maxRetries: j.maxRetries,
-            })),
-            configHash: doc.configHash,
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-        };
+            return {
+                pipelineId: doc.pipelineId,
+                pipelineType: doc.pipelineType,
+                status: doc.status,
+                currentJobIndex: doc.currentJobIndex,
+                input: doc.input,
+                jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
+                jobs: doc.jobs.map((j) => ({
+                    name: j.name,
+                    status: j.status,
+                    input: j.input,
+                    options: j.options,
+                    artifact: j.artifact,
+                    error: j.error,
+                    startedAt: j.startedAt,
+                    finishedAt: j.finishedAt,
+                    retryCount: j.retryCount,
+                    maxRetries: j.maxRetries,
+                })),
+                configHash: doc.configHash,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+            };
+        } catch (error) {
+            throw new Error(
+                `Failed to find pipeline by ID "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async findAll(params?: PaginationParams): Promise<PaginatedResult<PipelineState>> {
-        const page = params?.page ?? 1;
-        const limit = params?.limit ?? 10;
-        const skip = (page - 1) * limit;
+        try {
+            const page = params?.page ?? 1;
+            const limit = params?.limit ?? 10;
+            const skip = (page - 1) * limit;
 
-        const filter: Record<string, unknown> = {};
-        if (params?.pipelineType) {
-            filter.pipelineType = params.pipelineType;
+            const filter: Record<string, unknown> = {};
+            if (params?.pipelineType) {
+                filter.pipelineType = params.pipelineType;
+            }
+
+            const [docs, total] = await Promise.all([
+                this.pipelineModel
+                    .find(filter)
+                    .sort({ createdAt: -1 })
+                    .skip(skip)
+                    .limit(limit)
+                    .lean()
+                    .exec(),
+                this.pipelineModel.countDocuments(filter).exec(),
+            ]);
+
+            const items: PipelineState[] = docs.map((doc) => ({
+                pipelineId: doc.pipelineId,
+                pipelineType: doc.pipelineType,
+                status: doc.status,
+                currentJobIndex: doc.currentJobIndex,
+                input: doc.input,
+                jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
+                jobs: doc.jobs.map((j) => ({
+                    name: j.name,
+                    status: j.status,
+                    input: j.input,
+                    options: j.options,
+                    artifact: j.artifact,
+                    error: j.error,
+                    startedAt: j.startedAt,
+                    finishedAt: j.finishedAt,
+                    retryCount: j.retryCount,
+                    maxRetries: j.maxRetries,
+                })),
+                configHash: doc.configHash,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+            }));
+
+            return {
+                items,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            };
+        } catch (error) {
+            const filterDesc = params?.pipelineType ? ` with filter pipelineType="${params.pipelineType}"` : '';
+            throw new Error(
+                `Failed to fetch pipelines${filterDesc} (page ${params?.page ?? 1}, limit ${params?.limit ?? 10}): ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
-
-        const [docs, total] = await Promise.all([
-            this.pipelineModel
-                .find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean()
-                .exec(),
-            this.pipelineModel.countDocuments(filter).exec(),
-        ]);
-
-        const items: PipelineState[] = docs.map((doc) => ({
-            pipelineId: doc.pipelineId,
-            pipelineType: doc.pipelineType,
-            status: doc.status,
-            currentJobIndex: doc.currentJobIndex,
-            input: doc.input,
-            jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
-            jobs: doc.jobs.map((j) => ({
-                name: j.name,
-                status: j.status,
-                input: j.input,
-                options: j.options,
-                artifact: j.artifact,
-                error: j.error,
-                startedAt: j.startedAt,
-                finishedAt: j.finishedAt,
-                retryCount: j.retryCount,
-                maxRetries: j.maxRetries,
-            })),
-            configHash: doc.configHash,
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-        }));
-
-        return {
-            items,
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit),
-        };
     }
 
     async create(state: PipelineState): Promise<PipelineState> {
-        const jobs: MongoPipelineJobState[] = state.jobs.map((j) => ({
-            name: j.name,
-            status: j.status as JobStatus,
-        }));
+        try {
+            const jobs: MongoPipelineJobState[] = state.jobs.map((j) => ({
+                name: j.name,
+                status: j.status as JobStatus,
+            }));
 
-        const doc = await this.pipelineModel.create({
-            pipelineId: state.pipelineId,
-            pipelineType: state.pipelineType,
-            status: state.status,
-            currentJobIndex: state.currentJobIndex,
-            input: sanitizeForMongo(state.input),
-            jobOptions: state.jobOptions ? sanitizeForMongo(state.jobOptions) : undefined,
-            jobs,
-            configHash: state.configHash,
-        });
+            const doc = await this.pipelineModel.create({
+                pipelineId: state.pipelineId,
+                pipelineType: state.pipelineType,
+                status: state.status,
+                currentJobIndex: state.currentJobIndex,
+                input: sanitizeForMongo(state.input),
+                jobOptions: state.jobOptions ? sanitizeForMongo(state.jobOptions) : undefined,
+                jobs,
+                configHash: state.configHash,
+            });
 
-        return {
-            ...state,
-            createdAt: doc.createdAt,
-            updatedAt: doc.updatedAt,
-        };
+            return {
+                ...state,
+                createdAt: doc.createdAt,
+                updatedAt: doc.updatedAt,
+            };
+        } catch (error) {
+            // Check for duplicate key error (code 11000)
+            if (error instanceof Error && 'code' in error && error.code === 11000) {
+                throw new Error(
+                    `Pipeline with ID "${state.pipelineId}" already exists. Use a unique pipeline ID.`,
+                );
+            }
+            throw new Error(
+                `Failed to create pipeline "${state.pipelineId}" of type "${state.pipelineType}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async delete(pipelineId: string): Promise<boolean> {
-        const result = await this.pipelineModel.deleteOne({ pipelineId }).exec();
-        return result.deletedCount > 0;
+        try {
+            const result = await this.pipelineModel.deleteOne({ pipelineId }).exec();
+            return result.deletedCount > 0;
+        } catch (error) {
+            throw new Error(
+                `Failed to delete pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> {
-        await this.pipelineModel.updateOne({ pipelineId }, { status }).exec();
+        try {
+            const result = await this.pipelineModel.updateOne({ pipelineId }, { status }).exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update status for pipeline "${pipelineId}" to "${status}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async updateJobStatus(
@@ -213,16 +256,28 @@ export class MongoPipelineStorage implements PipelineStorage {
         status: JobStatus,
         startedAt?: Date,
     ): Promise<void> {
-        const update: Record<string, unknown> = {
-            [`jobs.${jobIndex}.status`]: status,
-            currentJobIndex: jobIndex,
-        };
+        try {
+            const update: Record<string, unknown> = {
+                [`jobs.${jobIndex}.status`]: status,
+                currentJobIndex: jobIndex,
+            };
 
-        if (startedAt) {
-            update[`jobs.${jobIndex}.startedAt`] = startedAt;
+            if (startedAt) {
+                update[`jobs.${jobIndex}.startedAt`] = startedAt;
+            }
+
+            const result = await this.pipelineModel.updateOne({ pipelineId }, update).exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update job ${jobIndex} status to "${status}" for pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
-
-        await this.pipelineModel.updateOne({ pipelineId }, update).exec();
     }
 
     async updateJobArtifact(
@@ -231,16 +286,28 @@ export class MongoPipelineStorage implements PipelineStorage {
         artifact: unknown,
         finishedAt: Date,
     ): Promise<void> {
-        await this.pipelineModel
-            .updateOne(
-                { pipelineId },
-                {
-                    [`jobs.${jobIndex}.status`]: 'done',
-                    [`jobs.${jobIndex}.artifact`]: sanitizeForMongo(artifact),
-                    [`jobs.${jobIndex}.finishedAt`]: finishedAt,
-                },
-            )
-            .exec();
+        try {
+            const result = await this.pipelineModel
+                .updateOne(
+                    { pipelineId },
+                    {
+                        [`jobs.${jobIndex}.status`]: 'done',
+                        [`jobs.${jobIndex}.artifact`]: sanitizeForMongo(artifact),
+                        [`jobs.${jobIndex}.finishedAt`]: finishedAt,
+                    },
+                )
+                .exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update job ${jobIndex} artifact for pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async updateJobError(
@@ -249,20 +316,44 @@ export class MongoPipelineStorage implements PipelineStorage {
         error: { message: string; stack?: string },
         finishedAt: Date,
     ): Promise<void> {
-        await this.pipelineModel
-            .updateOne(
-                { pipelineId },
-                {
-                    [`jobs.${jobIndex}.status`]: 'error',
-                    [`jobs.${jobIndex}.error`]: error,
-                    [`jobs.${jobIndex}.finishedAt`]: finishedAt,
-                },
-            )
-            .exec();
+        try {
+            const result = await this.pipelineModel
+                .updateOne(
+                    { pipelineId },
+                    {
+                        [`jobs.${jobIndex}.status`]: 'error',
+                        [`jobs.${jobIndex}.error`]: error,
+                        [`jobs.${jobIndex}.finishedAt`]: finishedAt,
+                    },
+                )
+                .exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (dbError) {
+            if (dbError instanceof Error && dbError.message.includes('not found')) {
+                throw dbError;
+            }
+            throw new Error(
+                `Failed to update job ${jobIndex} error for pipeline "${pipelineId}": ${dbError instanceof Error ? dbError.message : String(dbError)}`,
+            );
+        }
     }
 
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> {
-        await this.pipelineModel.updateOne({ pipelineId }, { currentJobIndex: jobIndex }).exec();
+        try {
+            const result = await this.pipelineModel.updateOne({ pipelineId }, { currentJobIndex: jobIndex }).exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update current job index to ${jobIndex} for pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async updateJobInput(
@@ -271,15 +362,27 @@ export class MongoPipelineStorage implements PipelineStorage {
         input: unknown,
         options?: unknown,
     ): Promise<void> {
-        const update: Record<string, unknown> = {
-            [`jobs.${jobIndex}.input`]: sanitizeForMongo(input),
-        };
+        try {
+            const update: Record<string, unknown> = {
+                [`jobs.${jobIndex}.input`]: sanitizeForMongo(input),
+            };
 
-        if (options !== undefined) {
-            update[`jobs.${jobIndex}.options`] = sanitizeForMongo(options);
+            if (options !== undefined) {
+                update[`jobs.${jobIndex}.options`] = sanitizeForMongo(options);
+            }
+
+            const result = await this.pipelineModel.updateOne({ pipelineId }, update).exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update job ${jobIndex} input for pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
-
-        await this.pipelineModel.updateOne({ pipelineId }, update).exec();
     }
 
     async updateJobRetryCount(
@@ -288,55 +391,73 @@ export class MongoPipelineStorage implements PipelineStorage {
         retryCount: number,
         maxRetries: number,
     ): Promise<void> {
-        await this.pipelineModel
-            .updateOne(
-                { pipelineId },
-                {
-                    [`jobs.${jobIndex}.retryCount`]: retryCount,
-                    [`jobs.${jobIndex}.maxRetries`]: maxRetries,
-                },
-            )
-            .exec();
+        try {
+            const result = await this.pipelineModel
+                .updateOne(
+                    { pipelineId },
+                    {
+                        [`jobs.${jobIndex}.retryCount`]: retryCount,
+                        [`jobs.${jobIndex}.maxRetries`]: maxRetries,
+                    },
+                )
+                .exec();
+            if (result.matchedCount === 0) {
+                throw new Error(`Pipeline "${pipelineId}" not found`);
+            }
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('not found')) {
+                throw error;
+            }
+            throw new Error(
+                `Failed to update job ${jobIndex} retry count (${retryCount}/${maxRetries}) for pipeline "${pipelineId}": ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     async findAndTimeoutStaleJobs(timeoutMs = 20 * 60 * 1000): Promise<number> {
-        const cutoffTime = new Date(Date.now() - timeoutMs);
-        const errorMessage = `Job timed out after ${Math.round(timeoutMs / 60000)} minutes`;
-        const now = new Date();
+        try {
+            const cutoffTime = new Date(Date.now() - timeoutMs);
+            const errorMessage = `Job timed out after ${Math.round(timeoutMs / 60000)} minutes`;
+            const now = new Date();
 
-        // Находим все processing пайплайны с зависшими джобами
-        // и обновляем их за один запрос используя arrayFilters
-        const result = await this.pipelineModel
-            .updateMany(
-                {
-                    status: 'processing',
-                    jobs: {
-                        $elemMatch: {
-                            status: 'processing',
-                            startedAt: { $lt: cutoffTime },
+            // Находим все processing пайплайны с зависшими джобами
+            // и обновляем их за один запрос используя arrayFilters
+            const result = await this.pipelineModel
+                .updateMany(
+                    {
+                        status: 'processing',
+                        jobs: {
+                            $elemMatch: {
+                                status: 'processing',
+                                startedAt: { $lt: cutoffTime },
+                            },
                         },
                     },
-                },
-                {
-                    $set: {
-                        status: 'error',
-                        'jobs.$[staleJob].status': 'error',
-                        'jobs.$[staleJob].error': { message: errorMessage },
-                        'jobs.$[staleJob].finishedAt': now,
-                    },
-                },
-                {
-                    arrayFilters: [
-                        {
-                            'staleJob.status': 'processing',
-                            'staleJob.startedAt': { $lt: cutoffTime },
+                    {
+                        $set: {
+                            status: 'error',
+                            'jobs.$[staleJob].status': 'error',
+                            'jobs.$[staleJob].error': { message: errorMessage },
+                            'jobs.$[staleJob].finishedAt': now,
                         },
-                    ],
-                },
-            )
-            .exec();
+                    },
+                    {
+                        arrayFilters: [
+                            {
+                                'staleJob.status': 'processing',
+                                'staleJob.startedAt': { $lt: cutoffTime },
+                            },
+                        ],
+                    },
+                )
+                .exec();
 
-        return result.modifiedCount;
+            return result.modifiedCount;
+        } catch (error) {
+            throw new Error(
+                `Failed to find and timeout stale jobs (timeout: ${Math.round(timeoutMs / 60000)} minutes): ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 }
 

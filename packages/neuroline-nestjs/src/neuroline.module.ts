@@ -438,6 +438,21 @@ function createDynamicController(
 				const pageNum = page ? parseInt(page, 10) : 1;
 				const limitNum = limit ? parseInt(limit, 10) : 10;
 
+				// Validate parseInt results
+				if (page && isNaN(pageNum)) {
+					throw new HttpException(
+						{ success: false, error: `Invalid page parameter: "${page}" is not a valid number` },
+						HttpStatus.BAD_REQUEST,
+					);
+				}
+
+				if (limit && isNaN(limitNum)) {
+					throw new HttpException(
+						{ success: false, error: `Invalid limit parameter: "${limit}" is not a valid number` },
+						HttpStatus.BAD_REQUEST,
+					);
+				}
+
 				const result = await this.storage.findAll({
 					page: Math.max(1, pageNum),
 					limit: Math.min(100, Math.max(1, limitNum)),
@@ -446,6 +461,7 @@ function createDynamicController(
 
 				return { success: true, data: result };
 			} catch (error) {
+				if (error instanceof HttpException) throw error;
 				const message = error instanceof Error ? error.message : 'Unknown error';
 				throw new HttpException({ success: false, error: message }, HttpStatus.INTERNAL_SERVER_ERROR);
 			}

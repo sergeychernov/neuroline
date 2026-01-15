@@ -28,6 +28,13 @@ async function ensureMongoConnected(): Promise<void> {
 	const uri = process.env.MONGODB_URI;
 	if (!uri) return;
 
+	// Validate MongoDB URI format
+	if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+		throw new Error(
+			`Invalid MONGODB_URI format: URI must start with "mongodb://" or "mongodb+srv://", got "${uri.substring(0, 20)}..."`,
+		);
+	}
+
 	// 1 = connected, 2 = connecting
 	if (mongoose.connection.readyState === 1) return;
 	if (mongoose.connection.readyState === 2 && mongoConnectPromise) {
@@ -42,7 +49,8 @@ async function ensureMongoConnected(): Promise<void> {
 	} catch (error) {
 		// Позволяем повторить подключение при следующем запросе
 		mongoConnectPromise = null;
-		throw error;
+		const message = error instanceof Error ? error.message : String(error);
+		throw new Error(`Failed to connect to MongoDB: ${message}. Check your MONGODB_URI environment variable.`);
 	}
 }
 
