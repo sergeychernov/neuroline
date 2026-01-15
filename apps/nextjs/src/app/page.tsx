@@ -45,6 +45,15 @@ interface UpdateEvent {
   status: PipelineStatusResponse;
 }
 
+/** Сводка покрытия из vitest */
+interface CoverageSummary {
+	lines: number;
+	statements: number;
+	functions: number;
+	branches: number;
+	updatedAt?: string;
+}
+
 /**
  * Преобразует PipelineUpdateEvent в PipelineDisplayData
  * Артефакты не включаются — их можно получить через getResult() или getJobDetails()
@@ -86,6 +95,9 @@ export default function HomePage() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentPipelineType, setCurrentPipelineType] = useState<string | undefined>();
   const [mounted, setMounted] = useState(false);
+	const [coverage, setCoverage] = useState<CoverageSummary | null>(null);
+	const [coverageStatus, setCoverageStatus] = useState<'loading' | 'available' | 'unavailable' | 'error'>('loading');
+	const [coverageMessage, setCoverageMessage] = useState<string | null>(null);
 
   const stopRef = useRef<(() => void) | null>(null);
   const currentPipelineIdRef = useRef<string | null>(null);
@@ -105,6 +117,45 @@ export default function HomePage() {
       stopRef.current?.();
     };
   }, []);
+
+	useEffect(() => {
+		let isActive = true;
+
+		const loadCoverage = async () => {
+			try {
+				const response = await fetch('/api/coverage/neuroline', { cache: 'no-store' });
+				const data = await response.json();
+				if (!isActive) return;
+
+				if (data?.available && data?.summary) {
+					setCoverage({
+						lines: data.summary.lines ?? 0,
+						statements: data.summary.statements ?? 0,
+						functions: data.summary.functions ?? 0,
+						branches: data.summary.branches ?? 0,
+						updatedAt: data.updatedAt,
+					});
+					setCoverageStatus('available');
+					setCoverageMessage(null);
+				} else {
+					setCoverage(null);
+					setCoverageStatus('unavailable');
+					setCoverageMessage(data?.message ?? 'Нет данных');
+				}
+			} catch (error) {
+				if (!isActive) return;
+				setCoverage(null);
+				setCoverageStatus('error');
+				setCoverageMessage('Ошибка загрузки');
+			}
+		};
+
+		loadCoverage();
+
+		return () => {
+			isActive = false;
+		};
+	}, []);
 
   const handleJobClick = useCallback(
     async (job: JobDisplayInfo) => {
@@ -225,6 +276,30 @@ export default function HomePage() {
     () => startPipeline(nestjsClient, 'nestjs-retry', { unstableFailCount: 1 }),
     [nestjsClient, startPipeline],
   );
+
+	const coverageText = useMemo(() => {
+		const formatPercent = (value: number) => `${Math.round(value)}%`;
+
+		if (coverageStatus === 'loading') {
+			return 'Покрытие тестами: загрузка...';
+		}
+		if (coverageStatus === 'error') {
+			return `Покрытие тестами: ${coverageMessage ?? 'Ошибка загрузки'}`;
+		}
+		if (coverageStatus === 'unavailable' || !coverage) {
+			return `Покрытие тестами: ${coverageMessage ?? 'Нет данных'}`;
+		}
+
+		const updatedAt = coverage.updatedAt
+			? ` (обновлено ${new Date(coverage.updatedAt).toLocaleString('ru-RU')})`
+			: '';
+
+		return `Покрытие тестами: ${formatPercent(coverage.lines)} строк, ${formatPercent(
+			coverage.statements,
+		)} выражений, ${formatPercent(coverage.functions)} функций, ${formatPercent(
+			coverage.branches,
+		)} ветвей${updatedAt}`;
+	}, [coverage, coverageMessage, coverageStatus]);
 
   // Loading state
   if (!mounted) {
@@ -395,6 +470,9 @@ export default function HomePage() {
               </Box>{' '}
               — core: PipelineManager, типы, storage (in-memory / Mongo через <strong>neuroline/mongo</strong>) и клиент
               для опроса API (<strong>neuroline/client</strong>).
+				<Box component="div" sx={{ mt: 0.5, fontSize: '0.85rem', color: 'text.secondary' }}>
+					{coverageText}
+				</Box>
             </Box>
             <Box component="li">
               <Box

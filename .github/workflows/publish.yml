@@ -67,6 +67,10 @@ jobs:
             fi
           fi
 
+      - name: Run neuroline tests with coverage
+        if: env.SKIP_PUBLISH == 'false'
+        run: yarn workspace neuroline test:coverage
+
       - name: Publish neuroline
         if: env.SKIP_PUBLISH == 'false'
         working-directory: packages/neuroline
