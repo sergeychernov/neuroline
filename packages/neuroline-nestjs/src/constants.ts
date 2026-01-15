@@ -3,5 +3,8 @@
  */
 export const NEUROLINE_MANAGER = 'NEUROLINE_MANAGER';
 export const NEUROLINE_STORAGE = 'NEUROLINE_STORAGE';
-export const NEUROLINE_OPTIONS = 'NEUROLINE_OPTIONS';
 
+/**
+ * Токен для опций контроллеров (внутренний)
+ */
+export const NEUROLINE_CONTROLLER_OPTIONS = 'NEUROLINE_CONTROLLER_OPTIONS';

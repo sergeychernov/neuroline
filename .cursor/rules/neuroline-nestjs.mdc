@@ -7,7 +7,7 @@ globs: packages/neuroline-nestjs/**/*
 
 ## Назначение
 
-NestJS интеграция: фабрика контроллера для конкретного pipeline + сервис для доступа к `PipelineManager`/`PipelineStorage`.
+NestJS интеграция: динамический модуль для pipeline контроллеров с поддержкой DI.
 
 ## Структура
 
@@ -16,39 +16,65 @@ src/
 ├── index.ts              # Публичные экспорты
 ├── constants.ts          # Injection tokens
 ├── dto.ts                # DTO классы для валидации
-└── neuroline.service.ts  # Бизнес-логика
-└── pipeline-controller.factory.ts # createPipelineController factory
+├── neuroline.module.ts   # NeurolineModule с forRootAsync()
+└── neuroline.service.ts  # Сервис для доступа к manager/storage
 ```
 
-## Соглашения NestJS
-
-- Следуй NestJS conventions (Module, Controller, Service)
-- Используй декораторы для DI (`@Injectable`, `@Controller`, etc.)
-- DTO классы для валидации входных данных
-- Swagger декораторы для документации API
-
-## Использование
+## Рекомендуемый способ: NeurolineModule.forRootAsync()
 
 ```typescript
 import { Module } from '@nestjs/common';
-import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
-import { createPipelineController } from 'neuroline-nestjs';
-import { demoPipeline } from './pipelines';
-
-const storage = new InMemoryPipelineStorage();
-const manager = new PipelineManager({ storage });
-
-const DemoPipelineController = createPipelineController({
-	path: 'api/pipeline/demo',
-	manager,
-	storage,
-	pipeline: demoPipeline, // один контроллер = один pipeline
-});
+import { MongooseModule, getModelToken } from '@nestjs/mongoose';
+import { 
+  NeurolineModule, 
+  MongoPipelineStorage, 
+  PipelineSchema 
+} from 'neuroline-nestjs';
+import { demoPipelineConfig } from './pipelines';
+import { AuthGuard } from './guards';
 
 @Module({
-	controllers: [DemoPipelineController],
+  imports: [
+    MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }]),
+    
+    NeurolineModule.forRootAsync({
+      imports: [MongooseModule],
+      useFactory: (model) => new MongoPipelineStorage(model),
+      inject: [getModelToken('Pipeline')],
+      controllers: [
+        {
+          path: 'api/v1/demo-pipeline',
+          pipeline: demoPipelineConfig,
+          guards: [AuthGuard],           // опционально
+          enableDebugEndpoints: true,    // опционально
+        },
+      ],
+    }),
+  ],
 })
 export class AppModule {}
+```
+
+## DI токены
+
+- `NEUROLINE_MANAGER` — PipelineManager
+- `NEUROLINE_STORAGE` — PipelineStorage
+- `NeurolineService` — сервис-обёртка
+
+```typescript
+import { Injectable, Inject } from '@nestjs/common';
+import { NEUROLINE_MANAGER, NeurolineService } from 'neuroline-nestjs';
+import type { PipelineManager } from 'neuroline';
+
+@Injectable()
+export class MyService {
+  constructor(
+    // Вариант 1: через сервис
+    private readonly neuroline: NeurolineService,
+    // Вариант 2: напрямую
+    @Inject(NEUROLINE_MANAGER) private readonly manager: PipelineManager,
+  ) {}
+}
 ```
 
 ## REST API Endpoints
@@ -71,19 +97,9 @@ API совместим с `neuroline/client` (query-параметр `action`):
 | GET | `/<path>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
 | GET | `/<path>?action=pipeline&id=<id>` | Полное состояние pipeline |
 
-```typescript
-const DemoController = createPipelineController({
-	path: 'api/pipeline/demo',
-	manager,
-	storage,
-	pipeline: demoPipeline,
-	enableDebugEndpoints: process.env.NODE_ENV === 'development', // только для dev
-});
-```
-
 ## Правила
 
 1. **Injection tokens** в `constants.ts`
 2. **DTO** для всех входных данных контроллера
-3. **Service** инкапсулирует логику работы с PipelineManager
-4. **Controller** только маршрутизация и валидация
+3. **NeurolineModule** предпочтительнее legacy factory
+4. **Guards** передаются через опции контроллера, не декораторы

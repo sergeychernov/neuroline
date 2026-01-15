@@ -3,7 +3,28 @@
  * Интеграция neuroline с NestJS
  */
 
-export { createPipelineController, type CreatePipelineControllerOptions } from './pipeline-controller.factory';
-export { NeurolineService, type NeurolineModuleOptions } from './neuroline.service';
-export { NEUROLINE_OPTIONS } from './constants';
-export type { ApiResponse } from './dto';
+// Module
+export {
+	NeurolineModule,
+	type PipelineControllerOptions,
+	type NeurolineModuleAsyncOptions,
+	type NeurolineLogger,
+} from './neuroline.module';
+
+// Service
+export { NeurolineService } from './neuroline.service';
+
+// DI токены
+export { NEUROLINE_MANAGER, NEUROLINE_STORAGE } from './constants';
+
+// DTO типы
+export type { ApiResponse, StartPipelineBody, GetQueryParams } from './dto';
+
+// Реэкспорт из neuroline/mongo для удобства
+export {
+	MongoPipelineStorage,
+	PipelineSchema,
+	PipelineJobStateSchema,
+	type MongoPipelineDocument,
+	type MongoPipelineJobState,
+} from 'neuroline/mongo';

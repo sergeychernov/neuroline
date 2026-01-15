@@ -1,52 +1,43 @@
-import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import type {
 	PipelineManager,
 	PipelineStorage,
-	PipelineConfig,
 	StartPipelineResponse,
 	PipelineStatusResponse,
 	PipelineResultResponse,
 	PaginatedResult,
 	PipelineState,
 } from 'neuroline';
-import { NEUROLINE_OPTIONS } from './constants';
-
-export interface NeurolineModuleOptions {
-	/** PipelineManager инстанс */
-	manager: PipelineManager;
-	/** Storage инстанс */
-	storage: PipelineStorage;
-	/** Конфигурации pipeline для регистрации */
-	pipelines?: PipelineConfig[];
-}
+import { NEUROLINE_MANAGER, NEUROLINE_STORAGE } from './constants';
 
 /**
  * Сервис для работы с Neuroline
  *
- * Используется для инъекции manager и storage в NestJS сервисы.
- * Контроллеры создаются через createPipelineController.
+ * Предоставляет доступ к PipelineManager и PipelineStorage в других сервисах.
+ * Автоматически доступен при использовании NeurolineModule.forRootAsync().
+ * 
+ * @example
+ * ```typescript
+ * @Injectable()
+ * export class MyService {
+ *   constructor(private readonly neuroline: NeurolineService) {}
+ * 
+ *   async doSomething() {
+ *     const status = await this.neuroline.getStatus(pipelineId);
+ *     // или напрямую через manager
+ *     const manager = this.neuroline.getManager();
+ *   }
+ * }
+ * ```
  */
 @Injectable()
-export class NeurolineService implements OnModuleInit {
-	private readonly manager: PipelineManager;
-	private readonly storage: PipelineStorage;
-
+export class NeurolineService {
 	constructor(
-		@Inject(NEUROLINE_OPTIONS)
-		private readonly options: NeurolineModuleOptions,
-	) {
-		this.manager = options.manager;
-		this.storage = options.storage;
-	}
-
-	onModuleInit() {
-		// Регистрируем pipeline при инициализации модуля
-		if (this.options.pipelines) {
-			for (const config of this.options.pipelines) {
-				this.manager.registerPipeline(config);
-			}
-		}
-	}
+		@Inject(NEUROLINE_MANAGER)
+		private readonly manager: PipelineManager,
+		@Inject(NEUROLINE_STORAGE)
+		private readonly storage: PipelineStorage,
+	) {}
 
 	/**
 	 * Запустить pipeline

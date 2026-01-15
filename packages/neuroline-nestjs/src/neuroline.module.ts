@@ -1,4 +1,6 @@
 import {
+	Module,
+	DynamicModule,
 	Controller,
 	Post,
 	Get,
@@ -6,26 +8,40 @@ import {
 	Query,
 	HttpException,
 	HttpStatus,
+	Inject,
 	Type,
+	Provider,
 } from '@nestjs/common';
-import type { PipelineManager, PipelineStorage, PipelineConfig, JobStatus } from 'neuroline';
+import type {
+	PipelineManager,
+	PipelineStorage,
+	PipelineConfig,
+	JobStatus,
+} from 'neuroline';
+import { PipelineManager as PipelineManagerClass } from 'neuroline';
+import {
+	NEUROLINE_MANAGER,
+	NEUROLINE_STORAGE,
+	NEUROLINE_CONTROLLER_OPTIONS,
+} from './constants';
+import { NeurolineService } from './neuroline.service';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Опции для создания контроллера */
-export interface CreatePipelineControllerOptions {
-	/** Путь для контроллера (например, 'api/pipeline/demo') */
+/**
+ * Опции для создания pipeline контроллера
+ */
+export interface PipelineControllerOptions {
+	/** Путь контроллера (например, 'api/v1/my-pipeline') */
 	path: string;
-	/** PipelineManager инстанс */
-	manager: PipelineManager;
-	/** Storage инстанс */
-	storage: PipelineStorage;
-	/** Конфигурация pipeline */
+	/** Конфигурация pipeline из neuroline */
 	pipeline: PipelineConfig;
+	/** Guards для контроллера (опционально) */
+	guards?: Type[];
 	/**
-	 * Включить debug-эндпоинты (action=pipeline, action=job)
+	 * Включить debug-эндпоинты action=job и action=pipeline
 	 * 
 	 * ⚠️ ВНИМАНИЕ: Эти эндпоинты возвращают полные данные pipeline/job,
 	 * включая input, options и artifacts. Не включайте в production!
@@ -33,6 +49,38 @@ export interface CreatePipelineControllerOptions {
 	 * @default false
 	 */
 	enableDebugEndpoints?: boolean;
+}
+
+/**
+ * Логгер для pipeline manager
+ */
+export interface NeurolineLogger {
+	info: (msg: string, data?: Record<string, unknown>) => void;
+	error: (msg: string, data?: Record<string, unknown>) => void;
+	warn: (msg: string, data?: Record<string, unknown>) => void;
+}
+
+/**
+ * Асинхронные опции для NeurolineModule
+ */
+export interface NeurolineModuleAsyncOptions {
+	/** Модули для импорта (например, MongooseModule) */
+	imports?: any[];
+	/**
+	 * Factory для создания PipelineStorage
+	 * @example
+	 * ```typescript
+	 * useFactory: (model) => new MongoPipelineStorage(model),
+	 * inject: [getModelToken('Pipeline')],
+	 * ```
+	 */
+	useFactory: (...args: any[]) => Promise<PipelineStorage> | PipelineStorage;
+	/** Провайдеры для инъекции в factory */
+	inject?: any[];
+	/** Конфигурации контроллеров для автоматической генерации */
+	controllers: PipelineControllerOptions[];
+	/** Логгер для PipelineManager (опционально) */
+	logger?: NeurolineLogger;
 }
 
 /** Body для запуска pipeline */
@@ -70,52 +118,30 @@ interface JobDetailsResponse {
 }
 
 // ============================================================================
-// Factory
+// Controller Factory (для DI)
 // ============================================================================
 
 /**
- * Создаёт NestJS контроллер для конкретного pipeline
- *
- * Один контроллер = один pipeline. API совместим с PipelineClient.
- *
- * @example
- * ```typescript
- * // Создаём контроллер
- * const DemoPipelineController = createPipelineController({
- *   path: 'api/pipeline/demo',
- *   manager,
- *   storage,
- *   pipeline: demoPipeline,
- * });
- *
- * // Регистрируем в модуле
- * @Module({
- *   controllers: [DemoPipelineController],
- * })
- * export class AppModule {}
- * ```
- *
- * Endpoints:
- * - POST /api/pipeline/demo - запуск pipeline
- * - GET /api/pipeline/demo?action=status&id=xxx - статус
- * - GET /api/pipeline/demo?action=result&id=xxx - результаты
- * - GET /api/pipeline/demo?action=list&page=1&limit=10 - список
+ * Создаёт класс контроллера с правильным DI
  * 
- * Debug endpoints (требуют enableDebugEndpoints: true):
- * - GET /api/pipeline/demo?action=job&id=xxx&jobName=yyy - данные job
- * - GET /api/pipeline/demo?action=pipeline&id=xxx - полные данные pipeline
+ * В отличие от createPipelineController(), этот контроллер получает
+ * manager и storage через DI, а не через closure.
  */
-export function createPipelineController(
-	options: CreatePipelineControllerOptions,
+function createDynamicController(
+	controllerOptions: PipelineControllerOptions,
 ): Type<unknown> {
-	const { path, manager, storage, pipeline, enableDebugEndpoints = false } = options;
+	const { path, pipeline, enableDebugEndpoints = false } = controllerOptions;
 	const pipelineType = pipeline.name;
 
-	// Регистрируем pipeline при создании контроллера
-	manager.registerPipeline(pipeline);
-
 	@Controller(path)
-	class PipelineController {
+	class DynamicPipelineController {
+		constructor(
+			@Inject(NEUROLINE_MANAGER)
+			private readonly manager: PipelineManager,
+			@Inject(NEUROLINE_STORAGE)
+			private readonly storage: PipelineStorage,
+		) {}
+
 		/**
 		 * POST - запуск pipeline
 		 */
@@ -129,7 +155,7 @@ export function createPipelineController(
 					);
 				}
 
-				const result = await manager.startPipeline(pipelineType, {
+				const result = await this.manager.startPipeline(pipelineType, {
 					data: body.input,
 					jobOptions: body.jobOptions,
 				});
@@ -201,7 +227,7 @@ export function createPipelineController(
 			}
 
 			try {
-				const status = await manager.getStatus(id);
+				const status = await this.manager.getStatus(id);
 				return { success: true, data: status };
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Unknown error';
@@ -219,7 +245,7 @@ export function createPipelineController(
 			}
 
 			try {
-				const result = await manager.getResult(id, jobName);
+				const result = await this.manager.getResult(id, jobName);
 				return { success: true, data: result };
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Unknown error';
@@ -244,7 +270,7 @@ export function createPipelineController(
 			}
 
 			try {
-				const pipelineData = await storage.findById(id);
+				const pipelineData = await this.storage.findById(id);
 
 				if (!pipelineData) {
 					throw new HttpException(
@@ -290,7 +316,7 @@ export function createPipelineController(
 			}
 
 			try {
-				const pipelineData = await storage.findById(id);
+				const pipelineData = await this.storage.findById(id);
 
 				if (!pipelineData) {
 					throw new HttpException(
@@ -312,7 +338,7 @@ export function createPipelineController(
 				const pageNum = page ? parseInt(page, 10) : 1;
 				const limitNum = limit ? parseInt(limit, 10) : 10;
 
-				const result = await storage.findAll({
+				const result = await this.storage.findAll({
 					page: Math.max(1, pageNum),
 					limit: Math.min(100, Math.max(1, limitNum)),
 					pipelineType,
@@ -326,5 +352,115 @@ export function createPipelineController(
 		}
 	}
 
-	return PipelineController;
+	// Применяем guards через Reflect.defineMetadata
+	if (controllerOptions.guards && controllerOptions.guards.length > 0) {
+		Reflect.defineMetadata('__guards__', controllerOptions.guards, DynamicPipelineController);
+	}
+
+	return DynamicPipelineController;
+}
+
+// ============================================================================
+// Module
+// ============================================================================
+
+/**
+ * Neuroline Module для NestJS
+ * 
+ * Поддерживает динамическое создание контроллеров через forRootAsync().
+ * 
+ * @example
+ * ```typescript
+ * import { Module } from '@nestjs/common';
+ * import { MongooseModule, getModelToken } from '@nestjs/mongoose';
+ * import { NeurolineModule, MongoPipelineStorage, PipelineSchema } from 'neuroline-nestjs';
+ * import { demoPipelineConfig } from './pipelines';
+ * 
+ * @Module({
+ *   imports: [
+ *     MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }]),
+ *     
+ *     NeurolineModule.forRootAsync({
+ *       imports: [MongooseModule],
+ *       useFactory: (model) => new MongoPipelineStorage(model),
+ *       inject: [getModelToken('Pipeline')],
+ *       controllers: [
+ *         {
+ *           path: 'api/v1/demo-pipeline',
+ *           pipeline: demoPipelineConfig,
+ *           guards: [AuthGuard],
+ *           enableDebugEndpoints: true,
+ *         },
+ *       ],
+ *     }),
+ *   ],
+ * })
+ * export class AppModule {}
+ * ```
+ */
+@Module({})
+export class NeurolineModule {
+	/**
+	 * Асинхронная конфигурация модуля с поддержкой DI
+	 * 
+	 * - Автоматически создаёт NEUROLINE_STORAGE через useFactory
+	 * - Создаёт NEUROLINE_MANAGER с автоматической регистрацией всех pipelines
+	 * - Динамически генерирует контроллеры с правильным DI
+	 * - Применяет guards через метаданные
+	 */
+	static forRootAsync(options: NeurolineModuleAsyncOptions): DynamicModule {
+		// Создаём провайдер для storage
+		const storageProvider: Provider = {
+			provide: NEUROLINE_STORAGE,
+			useFactory: options.useFactory,
+			inject: options.inject ?? [],
+		};
+
+		// Создаём провайдер для manager
+		const managerProvider: Provider = {
+			provide: NEUROLINE_MANAGER,
+			useFactory: (storage: PipelineStorage) => {
+				const manager = new PipelineManagerClass({
+					storage,
+					logger: options.logger,
+				});
+
+				// Регистрируем все pipelines
+				for (const controller of options.controllers) {
+					manager.registerPipeline(controller.pipeline);
+				}
+
+				return manager;
+			},
+			inject: [NEUROLINE_STORAGE],
+		};
+
+		// Создаём провайдер для конфигурации контроллеров (для NeurolineService)
+		const controllerOptionsProvider: Provider = {
+			provide: NEUROLINE_CONTROLLER_OPTIONS,
+			useValue: options.controllers,
+		};
+
+		// Динамически генерируем контроллеры
+		const dynamicControllers = options.controllers.map((controllerOptions) =>
+			createDynamicController(controllerOptions),
+		);
+
+		return {
+			module: NeurolineModule,
+			imports: options.imports ?? [],
+			controllers: dynamicControllers,
+			providers: [
+				storageProvider,
+				managerProvider,
+				controllerOptionsProvider,
+				NeurolineService,
+			],
+			exports: [
+				NEUROLINE_STORAGE,
+				NEUROLINE_MANAGER,
+				NeurolineService,
+			],
+		};
+	}
 }
