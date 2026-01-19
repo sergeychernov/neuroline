@@ -50,16 +50,27 @@ jobs:
             echo "Обнаружены изменения в src/ или README/package.json"
             # Проверяем, опубликована ли текущая версия
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              # Вручную повышаем patch версию (npm version не работает с workspace:*)
-              node -e "
-                const fs = require('fs');
-                const pkg = require('./package.json');
-                const [major, minor, patch] = pkg.version.split('.').map(Number);
-                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
-                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-                console.log('Новая версия:', pkg.version);
-              "
+              echo "Версия $PACKAGE_VERSION уже опубликована, подбираем следующий patch"
+              # Подбираем следующий доступный patch, чтобы не упасть на 403
+              node -e '
+                const fs = require("fs");
+                const { execSync } = require("child_process");
+                const pkg = require("./package.json");
+                const [major, minor, patchStart] = pkg.version.split(".").map(Number);
+                let patch = patchStart;
+                while (true) {
+                  const candidate = `${major}.${minor}.${patch}`;
+                  try {
+                    execSync(`npm view ${pkg.name}@${candidate} version`, { stdio: "ignore" });
+                    patch += 1;
+                  } catch (err) {
+                    pkg.version = candidate;
+                    break;
+                  }
+                }
+                fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n");
+                console.log("Новая версия:", pkg.version);
+              '
               echo "SKIP_PUBLISH=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
@@ -101,15 +112,26 @@ jobs:
           else
             echo "Обнаружены изменения в src/ или README/package.json"
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              node -e "
-                const fs = require('fs');
-                const pkg = require('./package.json');
-                const [major, minor, patch] = pkg.version.split('.').map(Number);
-                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
-                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-                console.log('Новая версия:', pkg.version);
-              "
+              echo "Версия $PACKAGE_VERSION уже опубликована, подбираем следующий patch"
+              node -e '
+                const fs = require("fs");
+                const { execSync } = require("child_process");
+                const pkg = require("./package.json");
+                const [major, minor, patchStart] = pkg.version.split(".").map(Number);
+                let patch = patchStart;
+                while (true) {
+                  const candidate = `${major}.${minor}.${patch}`;
+                  try {
+                    execSync(`npm view ${pkg.name}@${candidate} version`, { stdio: "ignore" });
+                    patch += 1;
+                  } catch (err) {
+                    pkg.version = candidate;
+                    break;
+                  }
+                }
+                fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n");
+                console.log("Новая версия:", pkg.version);
+              '
               echo "SKIP_PUBLISH_UI=false" >> $GITHUB_ENV
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
@@ -143,15 +165,26 @@ jobs:
 
           if [ "$NEED_PUBLISH" = "true" ]; then
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              node -e "
-                const fs = require('fs');
-                const pkg = require('./package.json');
-                const [major, minor, patch] = pkg.version.split('.').map(Number);
-                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
-                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-                console.log('Новая версия:', pkg.version);
-              "
+              echo "Версия $PACKAGE_VERSION уже опубликована, подбираем следующий patch"
+              node -e '
+                const fs = require("fs");
+                const { execSync } = require("child_process");
+                const pkg = require("./package.json");
+                const [major, minor, patchStart] = pkg.version.split(".").map(Number);
+                let patch = patchStart;
+                while (true) {
+                  const candidate = `${major}.${minor}.${patch}`;
+                  try {
+                    execSync(`npm view ${pkg.name}@${candidate} version`, { stdio: "ignore" });
+                    patch += 1;
+                  } catch (err) {
+                    pkg.version = candidate;
+                    break;
+                  }
+                }
+                fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n");
+                console.log("Новая версия:", pkg.version);
+              '
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
             fi
@@ -186,15 +219,26 @@ jobs:
 
           if [ "$NEED_PUBLISH" = "true" ]; then
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
-              echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
-              node -e "
-                const fs = require('fs');
-                const pkg = require('./package.json');
-                const [major, minor, patch] = pkg.version.split('.').map(Number);
-                pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
-                fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
-                console.log('Новая версия:', pkg.version);
-              "
+              echo "Версия $PACKAGE_VERSION уже опубликована, подбираем следующий patch"
+              node -e '
+                const fs = require("fs");
+                const { execSync } = require("child_process");
+                const pkg = require("./package.json");
+                const [major, minor, patchStart] = pkg.version.split(".").map(Number);
+                let patch = patchStart;
+                while (true) {
+                  const candidate = `${major}.${minor}.${patch}`;
+                  try {
+                    execSync(`npm view ${pkg.name}@${candidate} version`, { stdio: "ignore" });
+                    patch += 1;
+                  } catch (err) {
+                    pkg.version = candidate;
+                    break;
+                  }
+                }
+                fs.writeFileSync("./package.json", JSON.stringify(pkg, null, 2) + "\n");
+                console.log("Новая версия:", pkg.version);
+              '
             else
               echo "Версия $PACKAGE_VERSION не опубликована, можно публиковать"
             fi

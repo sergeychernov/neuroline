@@ -5,7 +5,7 @@
   "homepage": "https://neuroline.vercel.app/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sergeychernov/neuroline.git",
+    "url": "git+https://github.com/sergeychernov/neuroline.git",
     "directory": "packages/neuroline-ui"
   },
   "main": "./dist/index.js",
