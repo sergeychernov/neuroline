@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "corepack yarn build:packages && corepack yarn workspace @neuroline/nextjs build",
+  "buildCommand": "corepack yarn build:packages && corepack yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/ && corepack yarn workspace @neuroline/nextjs build",
   "installCommand": "corepack yarn install",
   "framework": "nextjs",
   "outputDirectory": "apps/nextjs/.next",

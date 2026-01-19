@@ -13,7 +13,8 @@
 		"lint": "yarn workspaces foreach -Ap run lint",
 		"test": "yarn workspaces foreach -Ap run test",
 		"storybook": "yarn workspace neuroline-ui storybook",
-		"build-storybook": "yarn workspace neuroline-ui build-storybook"
+		"build-storybook": "yarn workspace neuroline-ui build-storybook",
+		"build-storybook:nextjs": "yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/"
 	},
 	"devDependencies": {
 		"typescript": "^5.3.3"

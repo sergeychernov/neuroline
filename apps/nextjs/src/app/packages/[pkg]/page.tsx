@@ -58,7 +58,7 @@ export default function PackageDetailsPage({ params }: { params: { pkg: string }
                 README
               </Button>
               {pkgId === 'neuroline-ui' ? (
-                <Button component={Link} href="/packages/neuroline-ui/storybook" variant="outlined">
+                <Button component="a" href="/packages/neuroline-ui/storybook" variant="outlined">
                   Storybook
                 </Button>
               ) : null}
@@ -75,4 +75,3 @@ export default function PackageDetailsPage({ params }: { params: { pkg: string }
     </Box>
   );
 }
-

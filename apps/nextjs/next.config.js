@@ -1,8 +1,38 @@
 /** @type {import('next').NextConfig} */
+const fs = require('node:fs');
+const path = require('node:path');
+
+const storybookIndexPath = path.join(
+  __dirname,
+  'public',
+  'packages',
+  'neuroline-ui',
+  'storybook',
+  'index.html',
+);
+
+const hasEmbeddedStorybook = fs.existsSync(storybookIndexPath);
+
 const nextConfig = {
   transpilePackages: ['neuroline', 'neuroline-ui', 'neuroline-nextjs', 'demo-pipelines'],
   experimental: {
     optimizePackageImports: ['@mui/material'],
+  },
+  async rewrites() {
+    if (!hasEmbeddedStorybook) return [];
+
+    return {
+      beforeFiles: [
+        {
+          source: '/packages/neuroline-ui/storybook',
+          destination: '/packages/neuroline-ui/storybook/index.html',
+        },
+        {
+          source: '/packages/neuroline-ui/storybook/',
+          destination: '/packages/neuroline-ui/storybook/index.html',
+        },
+      ],
+    };
   },
   webpack: (config, { isServer }) => {
     // Игнорируем опциональные зависимости mongodb для client-side encryption
@@ -23,4 +53,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

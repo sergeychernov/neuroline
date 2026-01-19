@@ -30,9 +30,17 @@ type NavItem = { label: string; href: string; external?: boolean };
 
 const drawerWidth = 320;
 
+function normalizePath(pathname: string) {
+  if (pathname === '/') return pathname;
+  return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
+}
+
 function isActivePath(pathname: string, href: string) {
-  if (href === '/') return pathname === '/';
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const normalizedPathname = normalizePath(pathname);
+  const normalizedHref = normalizePath(href);
+
+  if (normalizedHref === '/') return normalizedPathname === '/';
+  return normalizedPathname === normalizedHref || normalizedPathname.startsWith(`${normalizedHref}/`);
 }
 
 export function SiteHeader() {
@@ -125,7 +133,7 @@ export function SiteHeader() {
             {packageItems.map((item) => (
               <ListItemButton
                 key={item.href}
-                component={Link}
+                component={item.href === '/packages/neuroline-ui/storybook' ? 'a' : Link}
                 href={item.href}
                 onClick={closeMobileDrawer}
                 selected={isActivePath(pathname, item.href)}
@@ -246,7 +254,7 @@ export function SiteHeader() {
                 {packageItems.map((item) => (
                   <MenuItem
                     key={item.href}
-                    component={Link}
+                    component={item.href === '/packages/neuroline-ui/storybook' ? 'a' : Link}
                     href={item.href}
                     onClick={handleClosePackagesMenu}
                     sx={{ pl: item.indent ? 4 : 2 }}

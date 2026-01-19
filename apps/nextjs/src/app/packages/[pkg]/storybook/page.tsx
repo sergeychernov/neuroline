@@ -46,10 +46,14 @@ export default function StorybookPage({ params }: { params: { pkg: string } }) {
                   overflowX: 'auto',
                 }}
               >
-                yarn storybook
+                {`yarn storybook
+
+# or embed into Next.js:
+yarn build-storybook:nextjs
+yarn dev`}
               </Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-                Opens on <strong>http://localhost:6006</strong>
+                Dev: <strong>http://localhost:6006</strong> · Embedded: <strong>/packages/neuroline-ui/storybook</strong>
               </Typography>
             </Box>
 
@@ -75,4 +79,3 @@ export default function StorybookPage({ params }: { params: { pkg: string } }) {
     </Box>
   );
 }
-
