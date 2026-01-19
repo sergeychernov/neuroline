@@ -42,12 +42,12 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          # Проверяем, были ли изменения в src/ с последнего коммита
-          if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем публикацию"
+          # Проверяем, были ли изменения в src/ или метаданных пакета
+          if git diff HEAD~1 HEAD --quiet -- src/ README.md package.json; then
+            echo "Нет изменений в src/ или README/package.json, пропускаем публикацию"
             echo "SKIP_PUBLISH=true" >> $GITHUB_ENV
           else
-            echo "Обнаружены изменения в src/"
+            echo "Обнаружены изменения в src/ или README/package.json"
             # Проверяем, опубликована ли текущая версия
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
@@ -95,11 +95,11 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          if git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Нет изменений в src/, пропускаем публикацию"
+          if git diff HEAD~1 HEAD --quiet -- src/ README.md package.json; then
+            echo "Нет изменений в src/ или README/package.json, пропускаем публикацию"
             echo "SKIP_PUBLISH_UI=true" >> $GITHUB_ENV
           else
-            echo "Обнаружены изменения в src/"
+            echo "Обнаружены изменения в src/ или README/package.json"
             if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version 2>/dev/null; then
               echo "Версия $PACKAGE_VERSION уже опубликована, автоматически повышаем patch"
               node -e "
@@ -130,11 +130,11 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          # Проверяем изменения в src/ ИЛИ обновление neuroline
+          # Проверяем изменения в src/ или метаданных пакета ИЛИ обновление neuroline
           NEED_PUBLISH=false
 
-          if ! git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Обнаружены изменения в src/"
+          if ! git diff HEAD~1 HEAD --quiet -- src/ README.md package.json; then
+            echo "Обнаружены изменения в src/ или README/package.json"
             NEED_PUBLISH=true
           elif [ "$SKIP_PUBLISH" = "false" ]; then
             echo "neuroline был обновлён, нужно переопубликовать зависимый пакет"
@@ -173,11 +173,11 @@ jobs:
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
-          # Проверяем изменения в src/ ИЛИ обновление neuroline
+          # Проверяем изменения в src/ или метаданных пакета ИЛИ обновление neuroline
           NEED_PUBLISH=false
 
-          if ! git diff HEAD~1 HEAD --quiet -- src/; then
-            echo "Обнаружены изменения в src/"
+          if ! git diff HEAD~1 HEAD --quiet -- src/ README.md package.json; then
+            echo "Обнаружены изменения в src/ или README/package.json"
             NEED_PUBLISH=true
           elif [ "$SKIP_PUBLISH" = "false" ]; then
             echo "neuroline был обновлён, нужно переопубликовать зависимый пакет"
