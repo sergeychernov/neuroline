@@ -43,7 +43,6 @@ export function SiteHeader() {
 
   const primaryItems = useMemo<NavItem[]>(
     () => [
-      { label: 'Home', href: '/' },
       { label: 'GitHub', href: 'https://github.com/sergeychernov/neuroline', external: true },
       { label: 'npmjs', href: 'https://www.npmjs.com/search?q=neuroline', external: true },
       { label: 'Examples', href: '/examples' },
@@ -85,13 +84,25 @@ export function SiteHeader() {
   const drawer = (
     <Box sx={{ width: drawerWidth }} role="presentation">
       <Box sx={{ px: 2, py: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, letterSpacing: '0.06em' }}>
+        <Typography
+          variant="h6"
+          component={Link}
+          href="/"
+          onClick={closeMobileDrawer}
+          sx={{
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            textDecoration: 'none',
+            color: 'inherit',
+            display: 'inline-block',
+          }}
+        >
           NEUROLINE
         </Typography>
       </Box>
       <Divider />
       <List>
-        {primaryItems.slice(0, 5).map((item) => (
+        {primaryItems.slice(0, 4).map((item) => (
           <ListItemButton
             key={item.label}
             component={item.external ? 'a' : Link}
@@ -126,7 +137,7 @@ export function SiteHeader() {
           </List>
         </Collapse>
 
-        {primaryItems.slice(5).map((item) => (
+        {primaryItems.slice(4).map((item) => (
           <ListItemButton
             key={item.label}
             component={item.external ? 'a' : Link}
@@ -183,14 +194,6 @@ export function SiteHeader() {
 
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }}>
             <Stack direction="row" spacing={1.5} alignItems="center">
-              <Button
-                component={Link}
-                href="/"
-                color="inherit"
-                sx={desktopButtonSx('/')}
-              >
-                Home
-              </Button>
               <Button
                 component="a"
                 href="https://github.com/sergeychernov/neuroline"
@@ -283,4 +286,3 @@ export function SiteHeader() {
     </AppBar>
   );
 }
-
