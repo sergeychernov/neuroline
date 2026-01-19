@@ -161,6 +161,22 @@ export interface StartPipelineOptions {
 // ============================================================================
 
 /**
+ * Информация об ошибке выполнения job
+ */
+export interface JobError {
+    /** Сообщение об ошибке */
+    message: string;
+    /** Stack trace ошибки */
+    stack?: string;
+    /** Номер попытки (0 = первая) */
+    attempt?: number;
+    /** Логи выполнения до момента ошибки */
+    logs?: string[];
+    /** Дополнительные данные для отладки */
+    data?: unknown;
+}
+
+/**
  * Состояние отдельной job в документе пайплайна
  * @template TInput - тип входных данных job (результат synapses)
  * @template TOutput - тип артефакта (результат выполнения)
@@ -177,8 +193,8 @@ export interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknow
     options?: TOptions;
     /** Артефакт (результат выполнения) */
     artifact?: TOutput;
-    /** Информация об ошибке */
-    error?: { message: string; stack?: string };
+    /** История ошибок (пустой массив, если ошибок нет) */
+    errors: Array<JobError>;
     /** Время начала выполнения */
     startedAt?: Date;
     /** Время завершения */
@@ -249,7 +265,8 @@ export interface PipelineStatusResponse {
             status: JobStatus;
             startedAt?: Date;
             finishedAt?: Date;
-            error?: { message: string; stack?: string };
+            /** История ошибок (пустой массив, если ошибок нет) */
+            errors: Array<JobError>;
             /** Количество выполненных ретраев */
             retryCount?: number;
             /** Максимальное количество ретраев для этой job */
@@ -275,6 +292,28 @@ export interface PipelineResultResponse<T = unknown> {
      * - значение: артефакт job
      */
     artifact: T | null | undefined;
+}
+
+/**
+ * Ответ на запрос деталей job
+ */
+export interface JobDetailsResponse {
+    /** Имя job */
+    name: string;
+    /** Статус job */
+    status: JobStatus;
+    /** Входные данные job */
+    input?: unknown;
+    /** Опции job */
+    options?: unknown;
+    /** Артефакт job */
+    artifact?: unknown;
+    /** История ошибок (пустой массив, если ошибок нет) */
+    errors: JobError[];
+    /** Время начала выполнения */
+    startedAt?: Date;
+    /** Время завершения */
+    finishedAt?: Date;
 }
 
 

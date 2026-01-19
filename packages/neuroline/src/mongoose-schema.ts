@@ -18,14 +18,23 @@ export const PipelineJobStateSchema = new MongooseSchema<MongoPipelineJobState>(
         /** Опции job */
         options: { type: MongooseSchema.Types.Mixed },
         artifact: { type: MongooseSchema.Types.Mixed },
-        error: {
-            type: new MongooseSchema(
-                {
-                    message: { type: String, required: true },
-                    stack: { type: String },
-                },
-                { _id: false },
-            ),
+        /** История ошибок (включая промежуточные при ретраях) */
+        errors: {
+            type: [
+                new MongooseSchema(
+                    {
+                        message: { type: String, required: true },
+                        stack: { type: String },
+                        attempt: { type: Number },
+                        /** Логи выполнения до момента ошибки */
+                        logs: { type: [String] },
+                        /** Дополнительные данные для отладки */
+                        data: { type: MongooseSchema.Types.Mixed },
+                    },
+                    { _id: false },
+                ),
+            ],
+            default: [],
         },
         startedAt: { type: Date },
         finishedAt: { type: Date },

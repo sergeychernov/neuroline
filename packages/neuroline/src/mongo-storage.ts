@@ -1,7 +1,7 @@
 import type { Model, Document } from 'mongoose';
 
 import type { PipelineStorage, PaginationParams, PaginatedResult } from './storage';
-import type { PipelineState, JobStatus, PipelineStatus } from './types';
+import type { PipelineState, JobStatus, PipelineStatus, JobError } from './types';
 
 /**
  * Интерфейс состояния job в MongoDB документе
@@ -14,7 +14,8 @@ export interface MongoPipelineJobState {
     /** Опции job */
     options?: unknown;
     artifact?: unknown;
-    error?: { message: string; stack?: string };
+    /** История ошибок (включая промежуточные при ретраях) */
+    errors?: Array<{ message: string; stack?: string; attempt?: number; logs?: string[]; data?: unknown }>;
     startedAt?: Date;
     finishedAt?: Date;
     /** Количество выполненных ретраев */
@@ -108,7 +109,7 @@ export class MongoPipelineStorage implements PipelineStorage {
                 input: j.input,
                 options: j.options,
                 artifact: j.artifact,
-                error: j.error,
+                errors: j.errors ?? [],
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
                 retryCount: j.retryCount,
@@ -154,7 +155,7 @@ export class MongoPipelineStorage implements PipelineStorage {
                 input: j.input,
                 options: j.options,
                 artifact: j.artifact,
-                error: j.error,
+                errors: j.errors ?? [],
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
                 retryCount: j.retryCount,
@@ -178,6 +179,7 @@ export class MongoPipelineStorage implements PipelineStorage {
         const jobs: MongoPipelineJobState[] = state.jobs.map((j) => ({
             name: j.name,
             status: j.status as JobStatus,
+            errors: j.errors ?? [],
         }));
 
         const doc = await this.pipelineModel.create({
@@ -243,22 +245,43 @@ export class MongoPipelineStorage implements PipelineStorage {
             .exec();
     }
 
-    async updateJobError(
+    async appendJobError(
         pipelineId: string,
         jobIndex: number,
-        error: { message: string; stack?: string },
-        finishedAt: Date,
+        error: JobError,
+        isFinal: boolean,
+        finishedAt?: Date,
     ): Promise<void> {
-        await this.pipelineModel
-            .updateOne(
-                { pipelineId },
-                {
-                    [`jobs.${jobIndex}.status`]: 'error',
-                    [`jobs.${jobIndex}.error`]: error,
-                    [`jobs.${jobIndex}.finishedAt`]: finishedAt,
-                },
-            )
-            .exec();
+        // Санитизируем data если есть
+        const errorEntry = error.data !== undefined
+            ? { ...error, data: sanitizeForMongo(error.data) }
+            : error;
+
+        if (isFinal) {
+            // Финальная ошибка — добавляем в массив и обновляем статус
+            await this.pipelineModel
+                .updateOne(
+                    { pipelineId },
+                    {
+                        $push: { [`jobs.${jobIndex}.errors`]: errorEntry },
+                        $set: {
+                            [`jobs.${jobIndex}.status`]: 'error',
+                            [`jobs.${jobIndex}.finishedAt`]: finishedAt ?? new Date(),
+                        },
+                    },
+                )
+                .exec();
+        } else {
+            // Промежуточная ошибка — только добавляем в массив
+            await this.pipelineModel
+                .updateOne(
+                    { pipelineId },
+                    {
+                        $push: { [`jobs.${jobIndex}.errors`]: errorEntry },
+                    },
+                )
+                .exec();
+        }
     }
 
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> {
@@ -321,8 +344,10 @@ export class MongoPipelineStorage implements PipelineStorage {
                     $set: {
                         status: 'error',
                         'jobs.$[staleJob].status': 'error',
-                        'jobs.$[staleJob].error': { message: errorMessage },
                         'jobs.$[staleJob].finishedAt': now,
+                    },
+                    $push: {
+                        'jobs.$[staleJob].errors': { message: errorMessage, attempt: 0 },
                     },
                 },
                 {

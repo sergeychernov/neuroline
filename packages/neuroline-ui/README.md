@@ -264,12 +264,12 @@ import { OptionsView } from 'neuroline-ui';
 
 ### ErrorView
 
-Display job error details.
+Display job error details (supports error history with retries).
 
 ```typescript
 import { ErrorView } from 'neuroline-ui';
 
-<ErrorView error={{ message: 'Database connection timeout', stack: 'Error: ...' }} />
+<ErrorView errors={[{ message: 'Database connection timeout', stack: 'Error: ...', attempt: 0 }]} />
 ```
 
 ## Types
@@ -279,6 +279,7 @@ import type {
   PipelineDisplayData,
   StageDisplayInfo,
   JobDisplayInfo,
+  JobError,
   JobStatus,
   PipelineStatus,
   SerializableValue,
@@ -293,7 +294,7 @@ interface JobDisplayInfo {
   status: 'pending' | 'processing' | 'done' | 'error';
   startedAt?: Date;
   finishedAt?: Date;
-  error?: { message: string; stack?: string };
+  errors: JobError[];
   artifact?: SerializableValue;
   input?: SerializableValue;
   options?: SerializableValue;
@@ -696,12 +697,12 @@ import { OptionsView } from 'neuroline-ui';
 
 ### ErrorView
 
-Отображение деталей ошибки job.
+Отображение деталей ошибок job (включая историю ретраев).
 
 ```typescript
 import { ErrorView } from 'neuroline-ui';
 
-<ErrorView error={{ message: 'Database connection timeout', stack: 'Error: ...' }} />
+<ErrorView errors={[{ message: 'Database connection timeout', stack: 'Error: ...', attempt: 0 }]} />
 ```
 
 ## Типы
@@ -711,6 +712,7 @@ import type {
   PipelineDisplayData,
   StageDisplayInfo,
   JobDisplayInfo,
+  JobError,
   JobStatus,
   PipelineStatus,
   SerializableValue,
@@ -725,7 +727,7 @@ interface JobDisplayInfo {
   status: 'pending' | 'processing' | 'done' | 'error';
   startedAt?: Date;
   finishedAt?: Date;
-  error?: { message: string; stack?: string };
+  errors: JobError[];
   artifact?: SerializableValue;
   input?: SerializableValue;
   options?: SerializableValue;

@@ -1,4 +1,4 @@
-import type { JobStatus } from 'neuroline';
+import type { JobDetailsResponse } from 'neuroline';
 
 /**
  * Тело запроса для запуска pipeline
@@ -50,16 +50,4 @@ export interface ApiResponse<T = unknown> {
 	error?: string;
 }
 
-/**
- * Данные job для ответа API
- */
-export interface JobDetailsResponse {
-	name: string;
-	status: JobStatus;
-	input?: unknown;
-	options?: unknown;
-	artifact?: unknown;
-	error?: { message: string; stack?: string };
-	startedAt?: Date;
-	finishedAt?: Date;
-}
+export type { JobDetailsResponse };

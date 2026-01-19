@@ -10,7 +10,10 @@ const createState = (overrides: Partial<PipelineState>): PipelineState => ({
 	currentJobIndex: overrides.currentJobIndex ?? 0,
 	input: overrides.input ?? {},
 	jobOptions: overrides.jobOptions,
-	jobs: overrides.jobs ?? [{ name: 'job', status: 'pending' }],
+	jobs: (overrides.jobs ?? [{ name: 'job', status: 'pending', errors: [] }]).map((job) => ({
+		errors: [],
+		...job,
+	})),
 	configHash: overrides.configHash ?? 'hash',
 	createdAt: overrides.createdAt,
 	updatedAt: overrides.updatedAt,
@@ -39,7 +42,7 @@ describe('InMemoryPipelineStorage', () => {
 		expect(timedOut).toBe(1);
 		expect(updated?.status).toBe('error');
 		expect(updated?.jobs[0].status).toBe('error');
-		expect(updated?.jobs[0].error?.message).toContain('timed out');
+		expect(updated?.jobs[0].errors?.at(-1)?.message).toContain('timed out');
 	});
 
 	it('поддерживает пагинацию и фильтрацию по типу', async () => {

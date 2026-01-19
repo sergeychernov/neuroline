@@ -344,7 +344,7 @@ class MyCustomStorage implements PipelineStorage {
     async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> { ... }
     async updateJobStatus(pipelineId: string, jobIndex: number, status: JobStatus, startedAt?: Date): Promise<void> { ... }
     async updateJobArtifact(pipelineId: string, jobIndex: number, artifact: unknown, finishedAt: Date): Promise<void> { ... }
-    async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
+    async appendJobError(pipelineId: string, jobIndex: number, error: JobError, isFinal: boolean, finishedAt?: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
     async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
     async updateJobRetryCount(pipelineId: string, jobIndex: number, retryCount: number, maxRetries: number): Promise<void> { ... }
@@ -543,6 +543,8 @@ import type {
     PipelineInput,
     PipelineStatus,
     PipelineState,
+    JobError,
+    JobError,
 
     // Synapse
     SynapseContext,
@@ -575,13 +577,21 @@ import type {
 `JobState` now supports generic types for input, output (artifact), and options:
 
 ```typescript
+interface JobError {
+    message: string;
+    stack?: string;
+    attempt?: number;
+    logs?: string[];
+    data?: unknown;
+}
+
 interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
     name: string;
     status: JobStatus;
     input?: TInput;      // Input data (computed by synapses)
     options?: TOptions;  // Job options (from jobOptions)
     artifact?: TOutput;  // Output data (result of execute)
-    error?: { message: string; stack?: string };
+    errors: JobError[];  // Error history (empty array when no errors)
     startedAt?: Date;
     finishedAt?: Date;
 }
@@ -1038,7 +1048,7 @@ class MyCustomStorage implements PipelineStorage {
     async updateStatus(pipelineId: string, status: PipelineStatus): Promise<void> { ... }
     async updateJobStatus(pipelineId: string, jobIndex: number, status: JobStatus, startedAt?: Date): Promise<void> { ... }
     async updateJobArtifact(pipelineId: string, jobIndex: number, artifact: unknown, finishedAt: Date): Promise<void> { ... }
-    async updateJobError(pipelineId: string, jobIndex: number, error: { message: string; stack?: string }, finishedAt: Date): Promise<void> { ... }
+    async appendJobError(pipelineId: string, jobIndex: number, error: JobError, isFinal: boolean, finishedAt?: Date): Promise<void> { ... }
     async updateCurrentJobIndex(pipelineId: string, jobIndex: number): Promise<void> { ... }
     async updateJobInput(pipelineId: string, jobIndex: number, input: unknown, options?: unknown): Promise<void> { ... }
     async updateJobRetryCount(pipelineId: string, jobIndex: number, retryCount: number, maxRetries: number): Promise<void> { ... }
@@ -1269,13 +1279,21 @@ import type {
 `JobState` теперь поддерживает generic типы для input, output (artifact) и options:
 
 ```typescript
+interface JobError {
+    message: string;
+    stack?: string;
+    attempt?: number;
+    logs?: string[];
+    data?: unknown;
+}
+
 interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
     name: string;
     status: JobStatus;
     input?: TInput;      // Входные данные (вычисленные synapses)
     options?: TOptions;  // Опции job (из jobOptions)
     artifact?: TOutput;  // Выходные данные (результат execute)
-    error?: { message: string; stack?: string };
+    errors: JobError[];
     startedAt?: Date;
     finishedAt?: Date;
 }

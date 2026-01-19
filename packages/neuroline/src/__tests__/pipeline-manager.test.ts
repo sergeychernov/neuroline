@@ -75,7 +75,7 @@ describe('PipelineManager', () => {
 		expect(result.artifact).toBe(4);
 	});
 
-	it('делает ретраи и сохраняет retryCount', async () => {
+	it('делает ретраи и сохраняет retryCount и errors', async () => {
 		const storage = new InMemoryPipelineStorage();
 		const manager = new PipelineManager({ storage });
 
@@ -110,6 +110,10 @@ describe('PipelineManager', () => {
 		expect(pipeline?.jobs[0].retryCount).toBe(1);
 		expect(pipeline?.jobs[0].maxRetries).toBe(1);
 		expect(attempts).toBe(1);
+		// Ошибка первой попытки сохранена в errors
+		expect(pipeline?.jobs[0].errors).toHaveLength(1);
+		expect(pipeline?.jobs[0].errors?.[0].message).toBe('boom');
+		expect(pipeline?.jobs[0].errors?.[0].attempt).toBe(0);
 	});
 
 	it('инвалидирует pipeline при изменении конфигурации', async () => {

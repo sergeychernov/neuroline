@@ -30,6 +30,7 @@ const baseJob: JobDisplayInfo = {
 	startedAt: new Date(Date.now() - 5000),
 	finishedAt: new Date(),
 	artifact: { data: '{"users": [...]}', size: 2048 },
+	errors: [],
 };
 
 /** Job completed successfully with artefact */
@@ -46,6 +47,7 @@ export const Processing: Story = {
 			name: 'transform-data',
 			status: 'processing',
 			startedAt: new Date(Date.now() - 3000),
+			errors: [],
 		},
 	},
 };
@@ -56,6 +58,7 @@ export const Pending: Story = {
 		job: {
 			name: 'save-to-db',
 			status: 'pending',
+			errors: [],
 		},
 	},
 };
@@ -68,7 +71,7 @@ export const Error: Story = {
 			status: 'error',
 			startedAt: new Date(Date.now() - 2000),
 			finishedAt: new Date(),
-			error: { message: 'Database connection timeout' },
+			errors: [{ message: 'Database connection timeout', attempt: 0 }],
 		},
 	},
 };
@@ -97,6 +100,7 @@ export const LargeArtifact: Story = {
 					saveMs: 890,
 				},
 			},
+			errors: [],
 		},
 	},
 };
@@ -129,6 +133,7 @@ export const AllTabs: Story = {
 				discountApplied: 15,
 				finalAmount: 254.99,
 			},
+			errors: [],
 		},
 		onInputEditClick: fn(),
 		onOptionsEditClick: fn(),
@@ -147,6 +152,7 @@ export const OnlyInput: Story = {
 				items: [{ productId: 'PROD-5', quantity: 10 }],
 				couponCode: 'SAVE20',
 			},
+			errors: [],
 		},
 		onInputEditClick: fn(),
 	},
@@ -167,6 +173,7 @@ export const InputAndOptions: Story = {
 				priority: 'normal',
 				retryOnFail: true,
 			},
+			errors: [],
 		},
 		onInputEditClick: fn(),
 		onOptionsEditClick: fn(),

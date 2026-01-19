@@ -149,11 +149,12 @@ export const JobNode: React.FC<JobNodeProps> = ({
 
       {/* Status */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-        {job.error ? (
+        {job.errors.length > 0 ? (
           <Tooltip
             title={
               <Typography variant="caption" sx={{ whiteSpace: 'pre-line' }}>
-                {`${job.error.message}\n${job.error.stack ?? ''}`}
+                {/* Показываем последнюю ошибку */}
+                {`${job.errors.at(-1)?.message ?? ''}\n${job.errors.at(-1)?.stack ?? ''}`}
               </Typography>
             }
             arrow

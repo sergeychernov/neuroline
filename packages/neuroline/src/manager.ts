@@ -12,6 +12,7 @@ import type {
     JobContext,
     JobLogger,
     SynapseContext,
+    JobError,
     StartPipelineResponse,
     StartPipelineOptions,
     PipelineStatusResponse,
@@ -232,6 +233,7 @@ export class PipelineManager {
         const jobs: JobState[] = flatJobs.map(({ jobInPipeline }) => ({
             name: jobInPipeline.job.name,
             status: 'pending' as JobStatus,
+            errors: [],
         }));
 
         // Создаём состояние пайплайна
@@ -343,8 +345,6 @@ export class PipelineManager {
                 };
 
                 // Выполняем job с поддержкой retry
-                let lastError: { message: string; stack?: string } | null = null;
-
                 for (let attempt = 0; attempt <= retries; attempt++) {
                     // Если это не первая попытка — ждём и обновляем счётчик
                     if (attempt > 0) {
@@ -370,31 +370,36 @@ export class PipelineManager {
                     } catch (error) {
                         const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
                         const errorStack = error instanceof Error ? error.stack : undefined;
-                        lastError = { message: errorMessage, stack: errorStack };
+                        const isFinal = attempt >= retries;
 
                         this.logger.error(`Job execution failed (attempt ${attempt + 1}/${retries + 1})`, {
                             pipelineId,
                             jobName: jobDef.name,
                             error: errorMessage,
-                            hasRetries: attempt < retries,
+                            hasRetries: !isFinal,
                         });
 
+                        // Записываем ошибку в историю (isFinal определяет финальный статус)
+                        await this.storage.appendJobError(
+                            pipelineId,
+                            jobIndex,
+                            { message: errorMessage, stack: errorStack, attempt },
+                            isFinal,
+                            isFinal ? new Date() : undefined,
+                        );
+
                         // Если ещё есть ретраи — продолжаем цикл
-                        if (attempt < retries) {
+                        if (!isFinal) {
                             continue;
                         }
+
+                        // Все попытки исчерпаны
+                        return { success: false as const, jobDef, error: errorMessage, jobIndex };
                     }
                 }
 
-                // Все попытки исчерпаны — сохраняем ошибку
-                await this.storage.updateJobError(
-                    pipelineId,
-                    jobIndex,
-                    lastError ?? { message: 'Unknown error' },
-                    new Date(),
-                );
-
-                return { success: false as const, jobDef, error: lastError?.message ?? 'Unknown error', jobIndex };
+                // Этот код недостижим, но TypeScript требует return
+                return { success: false as const, jobDef, error: 'Unknown error', jobIndex };
             });
 
             const results = await Promise.all(jobPromises);
@@ -457,7 +462,7 @@ export class PipelineManager {
                 status: JobStatus;
                 startedAt?: Date;
                 finishedAt?: Date;
-                error?: { message: string; stack?: string };
+                errors: JobError[];
                 retryCount?: number;
                 maxRetries?: number;
             }>
@@ -472,7 +477,7 @@ export class PipelineManager {
                 status: jobState.status,
                 startedAt: jobState.startedAt,
                 finishedAt: jobState.finishedAt,
-                error: jobState.error,
+                errors: jobState.errors ?? [],
                 retryCount: jobState.retryCount,
                 maxRetries: jobState.maxRetries,
             });
@@ -495,11 +500,14 @@ export class PipelineManager {
 
         if (pipeline.status === 'error') {
             const errorJob = pipeline.jobs.find((j) => j.status === 'error');
-            if (errorJob?.error) {
-                response.error = {
-                    message: errorJob.error.message,
-                    jobName: errorJob.name,
-                };
+            if (errorJob) {
+                const lastError = errorJob.errors?.at(-1);
+                if (lastError) {
+                    response.error = {
+                        message: lastError.message,
+                        jobName: errorJob.name,
+                    };
+                }
             }
         }
 

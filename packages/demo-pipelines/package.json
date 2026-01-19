@@ -1,6 +1,6 @@
 {
 	"name": "demo-pipelines",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"private": true,
 	"description": "Демо pipelines для тестирования neuroline",
 	"type": "module",

@@ -24,6 +24,7 @@ import type {
 	PipelineConfig,
 	JobStatus,
 	StaleJobsWatchdogOptions,
+	JobDetailsResponse,
 } from 'neuroline';
 import { PipelineManager as PipelineManagerClass } from 'neuroline';
 import {
@@ -141,17 +142,7 @@ interface ApiResponse<T = unknown> {
 	error?: string;
 }
 
-/** Ответ с деталями job */
-interface JobDetailsResponse {
-	name: string;
-	status: JobStatus;
-	input?: unknown;
-	options?: unknown;
-	artifact?: unknown;
-	error?: { message: string; stack?: string };
-	startedAt?: Date;
-	finishedAt?: Date;
-}
+// JobDetailsResponse импортируется из neuroline
 
 // ============================================================================
 // Controller Factory (для DI)
@@ -394,7 +385,7 @@ function createDynamicController(
 					input: job.input,
 					options: job.options,
 					artifact: job.artifact,
-					error: job.error,
+					errors: job.errors ?? [],
 					startedAt: job.startedAt,
 					finishedAt: job.finishedAt,
 				};

@@ -12,6 +12,7 @@ import type {
 	StartPipelineResponse,
 	PipelineStatusResponse,
 	PipelineResultResponse,
+	JobDetailsResponse,
 } from './types';
 
 /** Ответ API */
@@ -169,16 +170,7 @@ export class PipelineClient {
 	async getJobDetails(
 		pipelineId: string,
 		jobName: string,
-	): Promise<{
-		name: string;
-		status: JobStatus;
-		input?: unknown;
-		options?: unknown;
-		artifact?: unknown;
-		error?: { message: string; stack?: string };
-		startedAt?: string;
-		finishedAt?: string;
-	}> {
+	): Promise<JobDetailsResponse> {
 		const url = `${this.config.baseUrl}?action=job&id=${encodeURIComponent(pipelineId)}&jobName=${encodeURIComponent(jobName)}`;
 		const response = await this.config.fetch(url);
 		const data: ApiResponse = await response.json();
@@ -187,16 +179,7 @@ export class PipelineClient {
 			throw new Error(data.error ?? 'Failed to get job details');
 		}
 
-		return data.data as {
-			name: string;
-			status: JobStatus;
-			input?: unknown;
-			options?: unknown;
-			artifact?: unknown;
-			error?: { message: string; stack?: string };
-			startedAt?: string;
-			finishedAt?: string;
-		};
+		return data.data as JobDetailsResponse;
 	}
 
 	/**

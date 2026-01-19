@@ -1,4 +1,4 @@
-import type { PipelineState, JobStatus, PipelineStatus } from './types';
+import type { PipelineState, JobStatus, PipelineStatus, JobError } from './types';
 
 /** Результат пагинированного запроса */
 export interface PaginatedResult<T> {
@@ -70,13 +70,18 @@ export interface PipelineStorage {
     ): Promise<void>;
 
     /**
-     * Обновить ошибку job (при неудачном выполнении)
+     * Добавить ошибку job в историю (при каждом падении, включая промежуточные при ретраях)
+     * @param pipelineId - ID пайплайна
+     * @param jobIndex - индекс job
+     * @param error - информация об ошибке (message, stack, logs, data)
+     * @param isFinal - если true, также обновляет статус job на 'error' и finishedAt
      */
-    updateJobError(
+    appendJobError(
         pipelineId: string,
         jobIndex: number,
-        error: { message: string; stack?: string },
-        finishedAt: Date,
+        error: JobError,
+        isFinal: boolean,
+        finishedAt?: Date,
     ): Promise<void>;
 
     /**
@@ -223,17 +228,27 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         }
     }
 
-    async updateJobError(
+    async appendJobError(
         pipelineId: string,
         jobIndex: number,
-        error: { message: string; stack?: string },
-        finishedAt: Date,
+        error: JobError,
+        isFinal: boolean,
+        finishedAt?: Date,
     ): Promise<void> {
         const pipeline = this.pipelines.get(pipelineId);
         if (pipeline && pipeline.jobs[jobIndex]) {
-            pipeline.jobs[jobIndex].status = 'error';
-            pipeline.jobs[jobIndex].error = error;
-            pipeline.jobs[jobIndex].finishedAt = finishedAt;
+            const job = pipeline.jobs[jobIndex];
+            // Инициализируем массив если его нет
+            if (!job.errors) {
+                job.errors = [];
+            }
+            // Добавляем ошибку в историю
+            job.errors.push(error);
+            // Если это финальная ошибка — обновляем статус и время
+            if (isFinal) {
+                job.status = 'error';
+                job.finishedAt = finishedAt ?? new Date();
+            }
             pipeline.updatedAt = new Date();
         }
     }
@@ -295,9 +310,14 @@ export class InMemoryPipelineStorage implements PipelineStorage {
                     new Date(job.startedAt) < cutoffTime
                 ) {
                     job.status = 'error';
-                    job.error = {
+                    // Добавляем ошибку таймаута в массив errors
+                    if (!job.errors) {
+                        job.errors = [];
+                    }
+                    job.errors.push({
                         message: `Job timed out after ${Math.round(timeoutMs / 60000)} minutes`,
-                    };
+                        attempt: job.retryCount ?? 0,
+                    });
                     job.finishedAt = new Date();
                     hasTimedOutJob = true;
                     timedOutCount++;

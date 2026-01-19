@@ -26,6 +26,7 @@ export const Pending: Story = {
     job: {
       name: 'fetch-data',
       status: 'pending',
+      errors: [],
     },
   },
 };
@@ -36,6 +37,7 @@ export const Processing: Story = {
       name: 'process-data',
       status: 'processing',
       startedAt: new Date(Date.now() - 5000),
+      errors: [],
     },
   },
 };
@@ -48,6 +50,7 @@ export const Done: Story = {
       startedAt: new Date(Date.now() - 10000),
       finishedAt: new Date(Date.now() - 2000),
       artifact: { saved: true, recordId: 'abc123' },
+      errors: [],
     },
     showArtifact: true,
   },
@@ -60,10 +63,13 @@ export const Error: Story = {
       status: 'error',
       startedAt: new Date(Date.now() - 3000),
       finishedAt: new Date(Date.now() - 1000),
-      error: {
-        message: 'Validation failed: missing required field "email"',
-        stack: 'Error: Validation failed\n    at validateInput (job.ts:42)',
-      },
+      errors: [
+        {
+          message: 'Validation failed: missing required field "email"',
+          stack: 'Error: Validation failed\n    at validateInput (job.ts:42)',
+          attempt: 0,
+        },
+      ],
     },
   },
 };
@@ -75,6 +81,7 @@ export const Selected: Story = {
       status: 'done',
       startedAt: new Date(Date.now() - 8000),
       finishedAt: new Date(Date.now() - 4000),
+      errors: [],
     },
     isSelected: true,
   },
@@ -86,6 +93,7 @@ export const LongName: Story = {
       name: 'very-long-job-name-that-might-need-wrapping',
       status: 'processing',
       startedAt: new Date(),
+      errors: [],
     },
   },
 };

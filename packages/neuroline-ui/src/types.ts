@@ -1,7 +1,9 @@
 /**
  * Типы для neuroline-ui
- * Повторяем нужные типы из neuroline для независимости
+ * Базовые типы переиспользуем из neuroline
  */
+
+import type { JobError as CoreJobError } from 'neuroline';
 
 /** Статус отдельной job */
 export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
@@ -11,6 +13,11 @@ export type PipelineStatus = 'processing' | 'done' | 'error';
 
 /** Тип для сериализуемых данных */
 export type SerializableValue = Record<string, unknown> | string | number | boolean | null;
+
+/**
+ * Информация об ошибке выполнения job
+ */
+export type JobError = CoreJobError;
 
 /** Информация о job для отображения */
 export interface JobDisplayInfo {
@@ -22,8 +29,8 @@ export interface JobDisplayInfo {
   startedAt?: Date;
   /** Время завершения */
   finishedAt?: Date;
-  /** Ошибка (если есть) */
-  error?: { message: string; stack?: string };
+  /** История ошибок (пустой массив, если ошибок нет) */
+  errors: JobError[];
   /** Артефакт (результат) - любые сериализуемые данные */
   artifact?: SerializableValue;
   /** Входные данные job (результат synapses) */

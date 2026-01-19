@@ -231,7 +231,7 @@ export async function handleGetJob(
 			input: job.input,
 			options: job.options,
 			artifact: job.artifact,
-			error: job.error,
+			errors: job.errors ?? [],
 			startedAt: job.startedAt,
 			finishedAt: job.finishedAt,
 		};

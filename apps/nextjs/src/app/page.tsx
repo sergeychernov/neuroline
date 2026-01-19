@@ -10,7 +10,7 @@ import {
 } from 'neuroline-ui';
 import type { SerializableValue } from 'neuroline-ui';
 import { PipelineClient } from 'neuroline/client';
-import type { PipelineStatusResponse, JobStatus } from 'neuroline';
+import type { PipelineStatusResponse } from 'neuroline';
 import { PipelineControlPanel } from './components/PipelineControlPanel';
 import type { DemoPipelineInput } from 'demo-pipelines';
 
@@ -19,26 +19,10 @@ import type { DemoPipelineInput } from 'demo-pipelines';
 // ============================================================================
 
 /** Тип stage из PipelineStatusResponse */
-interface StageInfo {
-  jobs: Array<{
-    name: string;
-    status: JobStatus;
-    startedAt?: Date;
-    finishedAt?: Date;
-    error?: { message: string; stack?: string };
-  }>;
-}
+type StageInfo = PipelineStatusResponse['stages'][number];
 
 /** Тип job из stage */
-interface JobInfo {
-  name: string;
-  status: JobStatus;
-  startedAt?: Date;
-  finishedAt?: Date;
-  error?: { message: string; stack?: string };
-  retryCount?: number;
-  maxRetries?: number;
-}
+type JobInfo = StageInfo['jobs'][number];
 
 /** Событие обновления (только статус) */
 interface UpdateEvent {
@@ -73,7 +57,7 @@ function convertToDisplayData(event: UpdateEvent): PipelineDisplayData {
         status: job.status,
         startedAt: job.startedAt,
         finishedAt: job.finishedAt,
-        error: job.error,
+        errors: job.errors,
         artifact: undefined, // Артефакты получаются через отдельный запрос getJobDetails()
         input: undefined, // Для получения input нужен отдельный запрос
         options: undefined,
@@ -169,11 +153,16 @@ export default function HomePage() {
         try {
           const details = await client.getJobDetails(pipelineId, job.name);
           // Обновляем selectedJob с полными данными
-          setSelectedJob({
-            ...job,
+          const detailsForDisplay: Partial<JobDisplayInfo> = {
+            ...details,
             input: details.input as SerializableValue | undefined,
             options: details.options as SerializableValue | undefined,
             artifact: details.artifact as SerializableValue | undefined,
+          };
+
+          setSelectedJob({
+            ...job,
+            ...detailsForDisplay,
           });
         } catch (e) {
           console.error('Failed to fetch job details:', e);

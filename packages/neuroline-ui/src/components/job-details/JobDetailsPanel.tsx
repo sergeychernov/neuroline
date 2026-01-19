@@ -51,9 +51,9 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 	const hasArtifact = job.artifact !== undefined;
 	const hasInput = job.input !== undefined;
 	const hasOptions = job.options !== undefined;
-	const hasError = job.error !== undefined;
-	const hasTabs = hasArtifact || hasInput || hasOptions || hasError;
-	const errorTabIndex = (hasArtifact ? 1 : 0) + (hasInput ? 1 : 0) + (hasOptions ? 1 : 0);
+	const hasErrors = job.errors.length > 0;
+	const hasTabs = hasArtifact || hasInput || hasOptions || hasErrors;
+	const errorsTabIndex = (hasArtifact ? 1 : 0) + (hasInput ? 1 : 0) + (hasOptions ? 1 : 0);
 
 	return (
 		<Paper
@@ -112,7 +112,7 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 						{hasArtifact && <Tab label="📦 Artefact" />}
 						{hasInput && <Tab label="📥 Input" />}
 						{hasOptions && <Tab label="⚙️ Options" />}
-						{hasError && <Tab label="⚠️ Error" />}
+						{hasErrors && <Tab label="⚠️ Errors" />}
 					</Tabs>
 
 					{/* Compute actual tab index */}
@@ -140,9 +140,9 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 							/>
 						</TabPanel>
 					)}
-					{hasError && (
-						<TabPanel value={tabIndex} index={errorTabIndex}>
-							<ErrorView error={job.error!} />
+					{hasErrors && (
+						<TabPanel value={tabIndex} index={errorsTabIndex}>
+							<ErrorView errors={job.errors} />
 						</TabPanel>
 					)}
 				</Box>
