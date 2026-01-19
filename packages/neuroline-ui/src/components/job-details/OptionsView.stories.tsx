@@ -20,7 +20,7 @@ const meta: Meta<typeof OptionsView> = {
 export default meta;
 type Story = StoryObj<typeof OptionsView>;
 
-/** Опции HTTP-запроса */
+/** HTTP request options */
 export const HttpOptions: Story = {
 	args: {
 		options: {
@@ -32,7 +32,7 @@ export const HttpOptions: Story = {
 	},
 };
 
-/** Опции базы данных */
+/** Database options */
 export const DatabaseOptions: Story = {
 	args: {
 		options: {
@@ -44,7 +44,7 @@ export const DatabaseOptions: Story = {
 	},
 };
 
-/** Опции уведомлений */
+/** Notification options */
 export const NotificationOptions: Story = {
 	args: {
 		options: {
@@ -57,14 +57,14 @@ export const NotificationOptions: Story = {
 	},
 };
 
-/** Null значение */
+/** Null value */
 export const NullOptions: Story = {
 	args: {
 		options: null,
 	},
 };
 
-/** Без кнопки редактирования */
+/** Without edit button */
 export const WithoutEditButton: Story = {
 	args: {
 		options: {

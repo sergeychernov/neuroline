@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from '@storybook/test';
 import { JobDetailsPanel } from './JobDetailsPanel';
-import type { JobDisplayInfo } from '../types';
+import type { JobDisplayInfo } from '../../types';
 
 const meta: Meta<typeof JobDetailsPanel> = {
 	component: JobDetailsPanel,
@@ -32,14 +32,14 @@ const baseJob: JobDisplayInfo = {
 	artifact: { data: '{"users": [...]}', size: 2048 },
 };
 
-/** Job завершённая успешно с артефактом */
+/** Job completed successfully with artefact */
 export const Done: Story = {
 	args: {
 		job: baseJob,
 	},
 };
 
-/** Job в процессе выполнения */
+/** Job in progress */
 export const Processing: Story = {
 	args: {
 		job: {
@@ -50,7 +50,7 @@ export const Processing: Story = {
 	},
 };
 
-/** Job ожидает выполнения */
+/** Job pending */
 export const Pending: Story = {
 	args: {
 		job: {
@@ -60,7 +60,7 @@ export const Pending: Story = {
 	},
 };
 
-/** Job с ошибкой */
+/** Job with error */
 export const Error: Story = {
 	args: {
 		job: {
@@ -73,7 +73,7 @@ export const Error: Story = {
 	},
 };
 
-/** Job с большим артефактом */
+/** Job with large artefact */
 export const LargeArtifact: Story = {
 	args: {
 		job: {
@@ -101,7 +101,7 @@ export const LargeArtifact: Story = {
 	},
 };
 
-/** Job со всеми табами: artifact, input, options */
+/** Job with all tabs: artefact, input, options */
 export const AllTabs: Story = {
 	args: {
 		job: {
@@ -135,7 +135,7 @@ export const AllTabs: Story = {
 	},
 };
 
-/** Job только с input (без артефакта) */
+/** Job with input only (no artefact) */
 export const OnlyInput: Story = {
 	args: {
 		job: {
@@ -152,7 +152,7 @@ export const OnlyInput: Story = {
 	},
 };
 
-/** Job с input и options, но без артефакта */
+/** Job with input and options, no artefact */
 export const InputAndOptions: Story = {
 	args: {
 		job: {

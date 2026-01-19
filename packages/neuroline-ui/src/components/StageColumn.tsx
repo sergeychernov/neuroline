@@ -10,7 +10,7 @@ export interface StageColumnProps {
 }
 
 /**
- * Колонка stage - содержит одну или несколько Jobs (параллельных)
+ * Stage column - contains one or more jobs (parallel)
  */
 export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
@@ -19,7 +19,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
 }) => {
   const isParallel = stage.jobs.length > 1;
 
-  // Определяем статус stage
+  // Determine stage status
   const stageStatus = (() => {
     if (stage.jobs.some((j) => j.status === 'error')) return 'error';
     if (stage.jobs.some((j) => j.status === 'processing')) return 'processing';
@@ -43,7 +43,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
         gap: 2,
       }}
     >
-      {/* Заголовок stage */}
+      {/* Stage header */}
       <Paper
         elevation={0}
         sx={{
@@ -91,7 +91,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
           position: 'relative',
         }}
       >
-        {/* Линия для параллельных jobs */}
+        {/* Line for parallel jobs */}
         {isParallel && (
           <Box
             sx={{

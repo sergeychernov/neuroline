@@ -22,29 +22,29 @@ const statusConfig: Record<
   { label: string; color: string; bgColor: string }
 > = {
   pending: {
-    label: 'Ожидание',
+    label: 'Pending',
     color: '#a0a0a0',
     bgColor: 'rgba(160, 160, 160, 0.15)',
   },
   processing: {
-    label: 'Выполняется',
+    label: 'Processing',
     color: '#00e5ff',
     bgColor: 'rgba(0, 229, 255, 0.15)',
   },
   done: {
-    label: 'Готово',
+    label: 'Done',
     color: '#00e676',
     bgColor: 'rgba(0, 230, 118, 0.15)',
   },
   error: {
-    label: 'Ошибка',
+    label: 'Error',
     color: '#ff1744',
     bgColor: 'rgba(255, 23, 68, 0.15)',
   },
 };
 
 /**
- * Компонент для отображения статуса Job/Pipeline
+ * Component for displaying job/pipeline status
  */
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'small' }) => {
   const config = statusConfig[status];

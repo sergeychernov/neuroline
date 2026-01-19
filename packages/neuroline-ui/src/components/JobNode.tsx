@@ -3,7 +3,7 @@ import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes } from '@mui/
 import type { JobDisplayInfo } from '../types';
 import { StatusBadge } from './StatusBadge';
 
-/** Иконка Replay (inline для избежания проблем с tree-shaking) */
+/** Replay icon (inline to avoid tree-shaking issues) */
 const ReplayIcon: React.FC<{ sx?: object }> = ({ sx }) => (
   <SvgIcon sx={sx}>
     <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" />
@@ -58,7 +58,7 @@ const statusColors = {
 };
 
 /**
- * Компонент "нейрон" - отображение отдельной Job
+ * "Neuron" component for rendering a single job
  */
 export const JobNode: React.FC<JobNodeProps> = ({
   job,
@@ -70,7 +70,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
 
   const formatDuration = () => {
     if (!job.startedAt) return null;
-    // Преобразуем даты — могут быть как Date, так и строки из JSON
+    // Normalize dates - can be Date or JSON strings
     const start = job.startedAt instanceof Date ? job.startedAt : new Date(job.startedAt);
     const end = job.finishedAt
       ? job.finishedAt instanceof Date
@@ -132,7 +132,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
         },
       }}
     >
-      {/* Заголовок */}
+      {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
         <Typography
           variant="body1"
@@ -147,18 +147,33 @@ export const JobNode: React.FC<JobNodeProps> = ({
         </Typography>
       </Box>
 
-      {/* Статус */}
+      {/* Status */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-        <StatusBadge status={job.status} size="small" />
+        {job.error ? (
+          <Tooltip
+            title={
+              <Typography variant="caption" sx={{ whiteSpace: 'pre-line' }}>
+                {`${job.error.message}\n${job.error.stack ?? ''}`}
+              </Typography>
+            }
+            arrow
+          >
+            <Box component="span">
+              <StatusBadge status={job.status} size="small" />
+            </Box>
+          </Tooltip>
+        ) : (
+          <StatusBadge status={job.status} size="small" />
+        )}
         {duration && (
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
             {duration}
           </Typography>
         )}
-        {/* Счётчик ретраев — показываем только если были повторные попытки */}
+        {/* Retry counter - show only if retries happened */}
         {(job.retryCount ?? 0) > 0 && job.maxRetries !== undefined && (
           <Tooltip
-            title={`Ретрай ${job.retryCount} из ${job.maxRetries}`}
+            title={`Retry ${job.retryCount} of ${job.maxRetries}`}
             arrow
           >
             <Chip
@@ -185,29 +200,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
         )}
       </Box>
 
-      {/* Ошибка */}
-      {job.error && (
-        <Tooltip title={job.error.stack || job.error.message} arrow>
-          <Typography
-            variant="caption"
-            sx={{
-              color: '#ff1744',
-              display: 'block',
-              mt: 1,
-              p: 1,
-              backgroundColor: 'rgba(255, 23, 68, 0.1)',
-              borderRadius: 1,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            ⚠ {job.error.message}
-          </Typography>
-        </Tooltip>
-      )}
-
-      {/* Декоративные "коннекторы" как у нейрона */}
+      {/* Decorative connectors like a neuron */}
       <Box
         sx={{
           position: 'absolute',

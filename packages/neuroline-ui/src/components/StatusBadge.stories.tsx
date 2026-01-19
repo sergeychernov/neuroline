@@ -17,7 +17,7 @@ const meta: Meta<typeof StatusBadge> = {
 export default meta;
 type Story = StoryObj<typeof StatusBadge>;
 
-/** Статус: Ожидание */
+/** Status: Pending */
 export const Pending: Story = {
 	args: {
 		status: 'pending',
@@ -25,7 +25,7 @@ export const Pending: Story = {
 	},
 };
 
-/** Статус: Выполняется (с анимацией) */
+/** Status: Processing (with animation) */
 export const Processing: Story = {
 	args: {
 		status: 'processing',
@@ -33,7 +33,7 @@ export const Processing: Story = {
 	},
 };
 
-/** Статус: Готово */
+/** Status: Done */
 export const Done: Story = {
 	args: {
 		status: 'done',
@@ -41,7 +41,7 @@ export const Done: Story = {
 	},
 };
 
-/** Статус: Ошибка */
+/** Status: Error */
 export const Error: Story = {
 	args: {
 		status: 'error',
@@ -49,7 +49,7 @@ export const Error: Story = {
 	},
 };
 
-/** Размер: Medium */
+/** Size: Medium */
 export const MediumSize: Story = {
 	args: {
 		status: 'done',
@@ -57,7 +57,7 @@ export const MediumSize: Story = {
 	},
 };
 
-/** Все статусы рядом */
+/** All statuses together */
 export const AllStatuses: Story = {
 	render: () => (
 		<Stack spacing={2}>
@@ -77,7 +77,7 @@ export const AllStatuses: Story = {
 	),
 };
 
-/** Сравнение размеров */
+/** Size comparison */
 export const SizeComparison: Story = {
 	render: () => (
 		<Stack direction="row" spacing={2} alignItems="center">

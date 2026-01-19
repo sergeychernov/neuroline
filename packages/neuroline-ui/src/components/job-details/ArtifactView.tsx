@@ -1,20 +1,20 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
-import type { SerializableValue } from '../types';
+import type { SerializableValue } from '../../types';
 
 export interface ArtifactViewProps {
-	/** Артефакт (результат выполнения job) */
+	/** Artefact (job execution result) */
 	artifact: SerializableValue;
 }
 
 /**
- * Компонент отображения артефакта Job
+ * Component for displaying a job artefact
  */
 export const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
 	if (artifact === null || artifact === undefined) {
 		return (
 			<Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
-				Нет данных
+				No data
 			</Typography>
 		);
 	}
@@ -22,7 +22,7 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
 	return (
 		<Box>
 			<Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-				Результат выполнения:
+				Execution result:
 			</Typography>
 			<Paper
 				sx={{

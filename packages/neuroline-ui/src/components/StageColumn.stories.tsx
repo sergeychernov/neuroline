@@ -19,7 +19,7 @@ type Story = StoryObj<typeof StageColumn>;
 
 const now = Date.now();
 
-/** Stage с одной job */
+/** Stage with one job */
 export const SingleJob: Story = {
 	args: {
 		stage: {
@@ -37,7 +37,7 @@ export const SingleJob: Story = {
 	},
 };
 
-/** Stage с параллельными jobs */
+/** Stage with parallel jobs */
 export const ParallelJobs: Story = {
 	args: {
 		stage: {
@@ -62,7 +62,7 @@ export const ParallelJobs: Story = {
 	},
 };
 
-/** Stage в процессе выполнения */
+/** Stage in progress */
 export const Processing: Story = {
 	args: {
 		stage: {
@@ -78,7 +78,7 @@ export const Processing: Story = {
 	},
 };
 
-/** Stage с ошибкой */
+/** Stage with error */
 export const WithError: Story = {
 	args: {
 		stage: {
@@ -100,7 +100,7 @@ export const WithError: Story = {
 	},
 };
 
-/** Stage ожидает выполнения */
+/** Stage pending */
 export const Pending: Story = {
 	args: {
 		stage: {
@@ -115,7 +115,7 @@ export const Pending: Story = {
 	},
 };
 
-/** Stage с выбранной job */
+/** Stage with selected job */
 export const WithSelectedJob: Story = {
 	args: {
 		stage: {
@@ -139,7 +139,7 @@ export const WithSelectedJob: Story = {
 	},
 };
 
-/** Stage с артефактами */
+/** Stage with artefacts */
 export const WithArtifacts: Story = {
 	args: {
 		stage: {

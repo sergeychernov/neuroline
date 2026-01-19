@@ -11,15 +11,15 @@ export interface PipelineViewerProps {
 }
 
 /**
- * Главный компонент визуализации Pipeline
- * Отображает stages как колонки, соединённые линиями
+ * Main pipeline visualization component
+ * Renders stages as columns connected by lines
  */
 export const PipelineViewer: React.FC<PipelineViewerProps> = ({
   pipeline,
   onJobClick,
   selectedJobName,
 }) => {
-  // Подсчёт статистики
+  // Compute stats
   const stats = useMemo(() => {
     const allJobs = pipeline.stages.flatMap((s) => s.jobs);
     return {
@@ -51,7 +51,7 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
         overflow: 'hidden',
       }}
     >
-      {/* Заголовок */}
+      {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <Typography
@@ -70,7 +70,7 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
           <StatusBadge status={pipeline.status} size="medium" />
         </Box>
 
-        {/* Прогресс-бар */}
+        {/* Progress bar */}
         <Box sx={{ mb: 2 }}>
           <Box
             sx={{
@@ -95,7 +95,7 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
           </Box>
         </Box>
 
-        {/* Статистика */}
+        {/* Statistics */}
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
           <Chip
             label={`${stats.done}/${stats.total} jobs`}
@@ -140,7 +140,7 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
               selectedJobName={selectedJobName}
             />
 
-            {/* Коннектор между stages */}
+            {/* Connector between stages */}
             {index < pipeline.stages.length - 1 && (
               <Box
                 sx={{
@@ -176,23 +176,6 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
         ))}
       </Box>
 
-      {/* Ошибка pipeline */}
-      {pipeline.error && (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 2,
-            mt: 3,
-            backgroundColor: 'rgba(255, 23, 68, 0.1)',
-            border: '1px solid rgba(255, 23, 68, 0.3)',
-            borderRadius: 2,
-          }}
-        >
-          <Typography variant="body2" sx={{ color: '#ff1744' }}>
-            ⚠ Ошибка в job "{pipeline.error.jobName}": {pipeline.error.message}
-          </Typography>
-        </Paper>
-      )}
     </Paper>
   );
 };

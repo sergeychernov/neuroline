@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Box, Paper, Typography, Stack, Chip, Alert, Tabs, Tab } from '@mui/material';
-import type { JobDisplayInfo } from '../types';
+import { Box, Paper, Typography, Stack, Chip, Tabs, Tab } from '@mui/material';
+import type { JobDisplayInfo } from '../../types';
 import { ArtifactView } from './ArtifactView';
+import { ErrorView } from './ErrorView';
 import { InputView } from './InputView';
 import { OptionsView } from './OptionsView';
 
 export interface JobDetailsPanelProps {
-	/** Job для отображения деталей */
+	/** Job to display details for */
 	job: JobDisplayInfo;
-	/** Callback при клике на редактирование Input */
+	/** Callback on input edit click */
 	onInputEditClick?: (job: JobDisplayInfo) => void;
-	/** Callback при клике на редактирование Options */
+	/** Callback on options edit click */
 	onOptionsEditClick?: (job: JobDisplayInfo) => void;
 }
 
@@ -33,7 +34,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 };
 
 /**
- * Панель с детальной информацией о выбранной Job
+ * Panel with detailed info about a selected job
  */
 export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 	job,
@@ -46,11 +47,13 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 		setTabIndex(newValue);
 	};
 
-	// Определяем какие табы показывать
+	// Determine which tabs to show
 	const hasArtifact = job.artifact !== undefined;
 	const hasInput = job.input !== undefined;
 	const hasOptions = job.options !== undefined;
-	const hasTabs = hasArtifact || hasInput || hasOptions;
+	const hasError = job.error !== undefined;
+	const hasTabs = hasArtifact || hasInput || hasOptions || hasError;
+	const errorTabIndex = (hasArtifact ? 1 : 0) + (hasInput ? 1 : 0) + (hasOptions ? 1 : 0);
 
 	return (
 		<Paper
@@ -63,11 +66,11 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 			}}
 		>
 			<Typography variant="h6" sx={{ mb: 2, color: '#7c4dff' }}>
-				📋 Детали Job: {job.name}
+				📋 Job details: {job.name}
 			</Typography>
 			<Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
 				<Chip
-					label={`Статус: ${job.status}`}
+					label={`Status: ${job.status}`}
 					sx={{
 						backgroundColor: 'rgba(0, 229, 255, 0.2)',
 						color: '#00e5ff',
@@ -75,23 +78,17 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 				/>
 				{job.startedAt && (
 					<Chip
-						label={`Начало: ${new Date(job.startedAt).toLocaleTimeString()}`}
+						label={`Started: ${new Date(job.startedAt).toLocaleTimeString()}`}
 						variant="outlined"
 					/>
 				)}
 				{job.finishedAt && (
 					<Chip
-						label={`Конец: ${new Date(job.finishedAt).toLocaleTimeString()}`}
+						label={`Finished: ${new Date(job.finishedAt).toLocaleTimeString()}`}
 						variant="outlined"
 					/>
 				)}
 			</Stack>
-
-			{job.error && (
-				<Alert severity="error" sx={{ mt: 2 }}>
-					{job.error.message}
-				</Alert>
-			)}
 
 			{hasTabs && (
 				<Box sx={{ mt: 3 }}>
@@ -112,12 +109,13 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 							},
 						}}
 					>
-						{hasArtifact && <Tab label="📦 Артефакт" />}
+						{hasArtifact && <Tab label="📦 Artefact" />}
 						{hasInput && <Tab label="📥 Input" />}
 						{hasOptions && <Tab label="⚙️ Options" />}
+						{hasError && <Tab label="⚠️ Error" />}
 					</Tabs>
 
-					{/* Вычисляем реальный индекс таба */}
+					{/* Compute actual tab index */}
 					{hasArtifact && (
 						<TabPanel value={tabIndex} index={0}>
 							<ArtifactView artifact={job.artifact!} />
@@ -140,6 +138,11 @@ export const JobDetailsPanel: React.FC<JobDetailsPanelProps> = ({
 								options={job.options!}
 								onEditClick={onOptionsEditClick ? () => onOptionsEditClick(job) : undefined}
 							/>
+						</TabPanel>
+					)}
+					{hasError && (
+						<TabPanel value={tabIndex} index={errorTabIndex}>
+							<ErrorView error={job.error!} />
 						</TabPanel>
 					)}
 				</Box>

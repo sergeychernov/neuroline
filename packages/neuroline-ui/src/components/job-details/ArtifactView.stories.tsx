@@ -16,7 +16,7 @@ const meta: Meta<typeof ArtifactView> = {
 export default meta;
 type Story = StoryObj<typeof ArtifactView>;
 
-/** Простой объект */
+/** Simple object */
 export const SimpleObject: Story = {
 	args: {
 		artifact: {
@@ -26,7 +26,7 @@ export const SimpleObject: Story = {
 	},
 };
 
-/** Сложный вложенный объект */
+/** Nested object */
 export const NestedObject: Story = {
 	args: {
 		artifact: {
@@ -43,28 +43,28 @@ export const NestedObject: Story = {
 	},
 };
 
-/** Строковое значение */
+/** String value */
 export const StringValue: Story = {
 	args: {
-		artifact: 'Операция завершена успешно',
+		artifact: 'Operation completed successfully',
 	},
 };
 
-/** Числовое значение */
+/** Number value */
 export const NumberValue: Story = {
 	args: {
 		artifact: 42,
 	},
 };
 
-/** Boolean значение */
+/** Boolean value */
 export const BooleanValue: Story = {
 	args: {
 		artifact: true,
 	},
 };
 
-/** Null значение */
+/** Null value */
 export const NullValue: Story = {
 	args: {
 		artifact: null,

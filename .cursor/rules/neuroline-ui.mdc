@@ -28,7 +28,14 @@ src/
     ├── JobNode.tsx
     ├── JobNode.stories.tsx
     ├── StageColumn.tsx
-    └── StatusBadge.tsx
+    ├── StatusBadge.tsx
+    └── job-details/
+        ├── JobDetailsPanel.tsx
+        ├── JobDetailsPanel.stories.tsx
+        ├── ArtifactView.tsx
+        ├── InputView.tsx
+        ├── OptionsView.tsx
+        └── ErrorView.tsx
 ```
 
 ## Соглашения React
@@ -105,3 +112,4 @@ export const Default: Story = {
 2. **Stories обязательны** для каждого компонента
 3. **Props типизированы** через interface
 4. **Без внешнего состояния** — компоненты controlled
+5. **Тексты интерфейса** в компонентах — на английском (например, Error, Artefact)

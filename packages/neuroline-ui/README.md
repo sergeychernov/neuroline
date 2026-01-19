@@ -15,16 +15,19 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 
 **Note:** This package has peer dependencies on React, MUI, and Emotion.
 
+**UI language:** English-only labels (e.g. Error, Artefact).
+
 ## Features
 
 - **PipelineViewer** - visual representation of pipeline execution flow
 - **JobNode** - individual job status display with timing information
-- **JobDetailsPanel** - detailed job information with tabs for artifact, input, options
+- **JobDetailsPanel** - detailed job information with tabs for artefact, input, options, error
 - **StageColumn** - stage grouping with parallel job visualization
 - **StatusBadge** - color-coded status indicators
 - **ArtifactView** - job artifact display
 - **InputView** - job input data display with edit button
 - **OptionsView** - job options display with edit button
+- **ErrorView** - job error details display
 - **TypeScript Support** - full type safety
 - **Storybook** - interactive component documentation
 
@@ -257,6 +260,16 @@ import { OptionsView } from 'neuroline-ui';
 />
 ```
 
+### ErrorView
+
+Display job error details.
+
+```typescript
+import { ErrorView } from 'neuroline-ui';
+
+<ErrorView error={{ message: 'Database connection timeout', stack: 'Error: ...' }} />
+```
+
 ## Types
 
 ```typescript
@@ -434,16 +447,19 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 
 **Примечание:** Этот пакет имеет peer-зависимости от React, MUI и Emotion.
 
+**Язык интерфейса:** только английский (например, Error, Artefact).
+
 ## Возможности
 
 - **PipelineViewer** - визуальное представление процесса выполнения pipeline
 - **JobNode** - отображение статуса отдельной job с информацией о времени
-- **JobDetailsPanel** - детальная информация о job с табами для artifact, input, options
+- **JobDetailsPanel** - детальная информация о job с табами для artefact, input, options, error
 - **StageColumn** - группировка stage с визуализацией параллельных jobs
 - **StatusBadge** - цветные индикаторы статуса
 - **ArtifactView** - отображение артефакта job
 - **InputView** - отображение входных данных job с кнопкой редактирования
 - **OptionsView** - отображение опций job с кнопкой редактирования
+- **ErrorView** - отображение деталей ошибки job
 - **TypeScript поддержка** - полная типобезопасность
 - **Storybook** - интерактивная документация компонентов
 
@@ -674,6 +690,16 @@ import { OptionsView } from 'neuroline-ui';
   options={{ batchSize: 50, parallel: true }}
   onEditClick={() => console.log('Редактировать options')}
 />
+```
+
+### ErrorView
+
+Отображение деталей ошибки job.
+
+```typescript
+import { ErrorView } from 'neuroline-ui';
+
+<ErrorView error={{ message: 'Database connection timeout', stack: 'Error: ...' }} />
 ```
 
 ## Типы

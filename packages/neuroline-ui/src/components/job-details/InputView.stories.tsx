@@ -20,7 +20,7 @@ const meta: Meta<typeof InputView> = {
 export default meta;
 type Story = StoryObj<typeof InputView>;
 
-/** Входные данные от synapses */
+/** Input data from synapses */
 export const SynapsesInput: Story = {
 	args: {
 		input: {
@@ -32,7 +32,7 @@ export const SynapsesInput: Story = {
 	},
 };
 
-/** Входные данные с параметрами заказа */
+/** Input data with order parameters */
 export const OrderInput: Story = {
 	args: {
 		input: {
@@ -47,7 +47,7 @@ export const OrderInput: Story = {
 	},
 };
 
-/** Простая строка */
+/** Simple string */
 export const StringInput: Story = {
 	args: {
 		input: 'user@example.com',
@@ -55,14 +55,14 @@ export const StringInput: Story = {
 	},
 };
 
-/** Null значение */
+/** Null value */
 export const NullInput: Story = {
 	args: {
 		input: null,
 	},
 };
 
-/** Без кнопки редактирования */
+/** Without edit button */
 export const WithoutEditButton: Story = {
 	args: {
 		input: {
