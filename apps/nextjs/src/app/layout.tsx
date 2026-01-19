@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { AppRouterCacheProvider } from '@mui/material-nextjs/v14-appRouter';
 import { ThemeProvider } from './providers';
+import { SiteHeader } from './components/SiteHeader';
 
 export const metadata: Metadata = {
   title: 'Neuroline Demo',
@@ -28,7 +29,10 @@ export default function RootLayout({
       </head>
       <body>
         <AppRouterCacheProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <SiteHeader />
+            {children}
+          </ThemeProvider>
         </AppRouterCacheProvider>
       </body>
     </html>
