@@ -62,6 +62,11 @@ neuroline/
 - JSDoc для всех экспортируемых функций/интерфейсов
 - Базовые типы (JobError, JobStatus, PipelineStatus и т.п.) всегда импортировать из `neuroline`, не дублировать
 
+### Зависимости и версии
+
+- Для пакетов в `packages/*` (публикуемых) **не использовать** `workspace:*` в `dependencies` и `peerDependencies` — только semver диапазоны (например `^0.7.0`)
+- `workspace:*` допустим только в `devDependencies` и в `apps/*`/`private` пакетах
+
 ### Именование
 
 | Сущность | Стиль | Пример |
