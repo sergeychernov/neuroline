@@ -1,6 +1,7 @@
 {
   "name": "neuroline-nestjs",
   "version": "0.4.1",
+  "description": "NestJS module and controllers for Neuroline pipeline APIs with DI.",
   "homepage": "https://neuroline.vercel.app/",
   "repository": {
     "type": "git",

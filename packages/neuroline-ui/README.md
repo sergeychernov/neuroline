@@ -1,3 +1,5 @@
+React UI components for visualizing Neuroline pipelines with MUI.
+
 [English](#neuroline-ui) | [Русский](#neuroline-ui-1)
 
 # neuroline-ui

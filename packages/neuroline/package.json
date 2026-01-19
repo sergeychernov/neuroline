@@ -1,6 +1,7 @@
 {
 	"name": "neuroline",
 	"version": "0.6.0",
+	"description": "Framework-agnostic pipeline orchestration with typed jobs and pluggable storage.",
 	"homepage": "https://neuroline.vercel.app/",
 	"repository": {
 		"type": "git",

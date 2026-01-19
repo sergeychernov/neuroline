@@ -1,258 +1,72 @@
+[English](#neuroline-monorepo) | [Русский](#neuroline-monorepo-1)
+
 # Neuroline Monorepo
 
 [![Demo](https://img.shields.io/badge/Demo-neuroline.vercel.app-blue)](https://neuroline.vercel.app/)
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
-Мультипакетный репозиторий для оркестрации и визуализации pipeline.
+Monorepo for Neuroline pipeline orchestration: core library, UI, and framework integrations.
 
-## 📦 Пакеты
+## Packages
 
-| Пакет | Описание |
-|-------|----------|
-| `neuroline` | Фреймворк-агностик библиотека для оркестрации pipeline |
-| `neuroline-ui` | React компоненты для визуализации pipeline |
-| `neuroline-nextjs` | Хелперы для Next.js App Router |
-| `neuroline-nestjs` | Модуль и контроллер для NestJS |
+- `neuroline` — Core orchestration with typed jobs and pluggable storage. Docs: `packages/neuroline/README.md`
+- `neuroline-ui` — React UI components for pipeline visualization. Docs: `packages/neuroline-ui/README.md`
+- `neuroline-nextjs` — Next.js App Router API handlers. Docs: `packages/neuroline-nextjs/README.md`
+- `neuroline-nestjs` — NestJS module and controllers. Docs: `packages/neuroline-nestjs/README.md`
 
-## 🚀 Приложения
+## Apps
 
-| Приложение | Описание |
-|------------|----------|
-| `@neuroline/nextjs` | Демо Next.js с визуализацией |
-| `@neuroline/nestjs-example` | Пример бекенда на NestJS |
+- `apps/nextjs` — Next.js demo with pipeline visualization.
+- `apps/nestjs` — NestJS backend example (see `apps/nestjs/README.md`).
 
-## 🧠 Концепция
-
-Pipeline — это последовательность **stages**, каждый из которых содержит одну или несколько **jobs**.
-Jobs внутри stage выполняются параллельно, а stages — последовательно.
-
-Каждая Job похожа на **нейрон**:
-- Принимает входные данные (от предыдущих jobs или input pipeline)
-- Обрабатывает их (execute функция)
-- Возвращает результат (артефакт) для следующих jobs
-- Поддерживает автоматический **retry** при ошибках
-
-```
-Pipeline
-├── Stage 1: [fetch-data]              ← последовательно
-├── Stage 2: [validate, notify-start]  ← параллельно
-├── Stage 3: [transform-data]          ← последовательно
-├── Stage 4: [save-to-db, update-cache]← параллельно
-└── Stage 5: [notify-complete]         ← последовательно
-```
-
-## 🚀 Быстрый старт
+## Quick start
 
 ```bash
-# Установка зависимостей
 yarn install
-
-# Сборка всех пакетов
 yarn build:packages
-
-# Запуск Next.js демо (порт 3000)
 yarn dev
-
-# Запуск NestJS бекенда (порт 3003)
-yarn dev:nestjs
-
-# Запуск Storybook (порт 6006)
-yarn storybook
 ```
 
-## 📡 API Endpoints
+Other commands: `yarn dev:nestjs`, `yarn storybook`.
 
-Оба хелпера (`neuroline-nextjs` и `neuroline-nestjs`) предоставляют одинаковый API:
+## Documentation
 
-### POST /pipeline - Запуск pipeline
+Full usage and API details live in the package READMEs listed above.
+
+## License
+
+UNLICENSED
+
+# Neuroline Monorepo
+
+Мультипакетный репозиторий Neuroline: ядро оркестрации, UI и интеграции с фреймворками.
+
+## Пакеты
+
+- `neuroline` — ядро оркестрации с типизированными jobs и хранилищами. Документация: `packages/neuroline/README.md`
+- `neuroline-ui` — React UI компоненты визуализации. Документация: `packages/neuroline-ui/README.md`
+- `neuroline-nextjs` — хендлеры API для Next.js App Router. Документация: `packages/neuroline-nextjs/README.md`
+- `neuroline-nestjs` — модуль и контроллеры для NestJS. Документация: `packages/neuroline-nestjs/README.md`
+
+## Приложения
+
+- `apps/nextjs` — демо Next.js с визуализацией.
+- `apps/nestjs` — пример бекенда на NestJS (см. `apps/nestjs/README.md`).
+
+## Быстрый старт
 
 ```bash
-curl -X POST http://localhost:3003/pipeline \
-  -H "Content-Type: application/json" \
-  -d '{
-    "pipelineType": "demo-pipeline",
-    "input": { "url": "https://api.example.com/data" }
-  }'
+yarn install
+yarn build:packages
+yarn dev
 ```
 
-### GET /pipeline/status?id=xxx - Статус
+Другие команды: `yarn dev:nestjs`, `yarn storybook`.
 
-```bash
-curl "http://localhost:3003/pipeline/status?id=abc123"
-```
+## Документация
 
-### GET /pipeline/result?id=xxx - Результаты
+Подробности по использованию и API см. в README пакетов выше.
 
-```bash
-curl "http://localhost:3003/pipeline/result?id=abc123"
-```
-
-### GET /pipeline/list?page=1&limit=10 - Список с пагинацией
-
-```bash
-curl "http://localhost:3003/pipeline/list?page=1&limit=10"
-```
-
-## 🔧 Использование
-
-### Next.js (App Router)
-
-```typescript
-// app/api/pipeline/route.ts
-import { createPipelineRouteHandler } from 'neuroline-nextjs';
-import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
-import { myPipeline } from '@/pipelines';
-
-const storage = new InMemoryPipelineStorage();
-const manager = new PipelineManager({ storage });
-
-const handlers = createPipelineRouteHandler({
-  manager,
-  storage,
-  pipelines: [myPipeline],
-});
-
-// GET /api/pipeline?action=status&id=xxx
-// GET /api/pipeline?action=result&id=xxx
-// GET /api/pipeline?action=list&page=1&limit=10
-export const GET = handlers.GET;
-
-// POST /api/pipeline
-export const POST = handlers.POST;
-```
-
-### NestJS
-
-```typescript
-// app.module.ts
-import { Module } from '@nestjs/common';
-import { PipelineManager, InMemoryPipelineStorage } from 'neuroline';
-import { NeurolineModule } from 'neuroline-nestjs';
-import { myPipeline } from './pipelines';
-
-const storage = new InMemoryPipelineStorage();
-const manager = new PipelineManager({ storage });
-
-@Module({
-  imports: [
-    NeurolineModule.register({
-      manager,
-      storage,
-      pipelines: [myPipeline],
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-Endpoints доступны автоматически:
-- `POST /pipeline` - запуск
-- `GET /pipeline/status?id=xxx` - статус
-- `GET /pipeline/result?id=xxx` - результаты
-- `GET /pipeline/list?page=1&limit=10` - список
-
-### NestJS с MongoDB
-
-```typescript
-import { Module } from '@nestjs/common';
-import { MongooseModule, getModelToken } from '@nestjs/mongoose';
-import { PipelineManager, MongoPipelineStorage, PipelineSchema } from 'neuroline';
-import { NeurolineModule } from 'neuroline-nestjs';
-
-@Module({
-  imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/neuroline'),
-    MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }]),
-    NeurolineModule.registerAsync({
-      imports: [MongooseModule],
-      useFactory: (pipelineModel) => {
-        const storage = new MongoPipelineStorage(pipelineModel);
-        const manager = new PipelineManager({ storage });
-        return { manager, storage, pipelines: [myPipeline] };
-      },
-      inject: [getModelToken('Pipeline')],
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-## 📁 Структура
-
-```
-neuroline/
-├── packages/
-│   ├── neuroline/           # Основная библиотека
-│   │   ├── src/
-│   │   │   ├── manager.ts   # PipelineManager
-│   │   │   ├── storage.ts   # InMemoryStorage
-│   │   │   ├── mongo-storage.ts
-│   │   │   ├── types.ts
-│   │   │   └── index.ts
-│   │   └── package.json
-│   │
-│   ├── neuroline-ui/        # UI компоненты
-│   │   ├── src/
-│   │   │   ├── components/
-│   │   │   │   ├── PipelineViewer.tsx
-│   │   │   │   ├── JobNode.tsx
-│   │   │   │   └── ...
-│   │   │   └── index.ts
-│   │   └── package.json
-│   │
-│   ├── neuroline-nextjs/    # Next.js хелперы
-│   │   ├── src/
-│   │   │   ├── handlers.ts
-│   │   │   ├── route-handler.ts
-│   │   │   └── index.ts
-│   │   └── package.json
-│   │
-│   └── neuroline-nestjs/    # NestJS модуль
-│       ├── src/
-│       │   ├── neuroline.module.ts
-│       │   ├── neuroline.controller.ts
-│       │   ├── neuroline.service.ts
-│       │   └── index.ts
-│       └── package.json
-│
-├── apps/
-│   ├── nextjs/              # Next.js демо
-│   │   └── src/app/
-│   │
-│   └── nestjs/              # NestJS пример
-│       ├── src/
-│       │   ├── main.ts
-│       │   ├── app.module.ts
-│       │   └── pipelines/
-│       └── package.json
-│
-├── package.json
-└── README.md
-```
-
-## 🚢 Деплой
-
-### Vercel (Next.js)
-
-Репозиторий настроен для автоматического деплоя на Vercel при пуше в `main`.
-
-### Docker (NestJS)
-
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY . .
-RUN yarn install && yarn build:packages
-WORKDIR /app/apps/nestjs
-RUN yarn build
-CMD ["yarn", "start:prod"]
-```
-
-## 📚 Документация
-
-- [neuroline](packages/neuroline/README.md) - Pipeline Manager
-- [neuroline-nestjs](apps/nestjs/README.md) - NestJS Example
-
-## 📝 Лицензия
+## Лицензия
 
 UNLICENSED

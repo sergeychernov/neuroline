@@ -1,3 +1,5 @@
+NestJS module and controllers for Neuroline pipeline APIs with DI support.
+
 [English](#neuroline-nestjs) | [Русский](#neuroline-nestjs-1)
 
 # neuroline-nestjs

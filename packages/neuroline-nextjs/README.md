@@ -1,3 +1,5 @@
+Next.js App Router handlers for Neuroline pipeline APIs.
+
 [English](#neuroline-nextjs) | [Русский](#neuroline-nextjs-1)
 
 # neuroline-nextjs

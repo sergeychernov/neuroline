@@ -1,6 +1,7 @@
 {
   "name": "neuroline-ui",
   "version": "0.4.2",
+  "description": "React UI components for visualizing Neuroline pipelines with MUI.",
   "homepage": "https://neuroline.vercel.app/",
   "repository": {
     "type": "git",

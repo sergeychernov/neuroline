@@ -1,3 +1,5 @@
+Framework-agnostic pipeline orchestration library with typed jobs and pluggable storage.
+
 [English](#neuroline) | [Русский](#neuroline-1)
 
 # Neuroline
