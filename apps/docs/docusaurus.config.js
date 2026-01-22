@@ -22,6 +22,11 @@ const docsPlugins = packages.map((pkg) => [
 ]);
 
 const navbarItems = [
+	{
+		href: 'https://neuroline.vercel.app/',
+		label: 'Site',
+		position: 'left',
+	},
 	...packages.map((pkg) => ({
 		to: `/${pkg.id}/`,
 		label: pkg.label,
