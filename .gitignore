@@ -37,6 +37,10 @@ yarn-error.log*
 storybook-static
 apps/nextjs/public/packages/*/storybook/
 
+# Docusaurus
+.docusaurus
+apps/nextjs/public/docs/
+
 # Vercel
 .vercel
 

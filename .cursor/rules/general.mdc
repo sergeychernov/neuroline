@@ -19,7 +19,7 @@ Neuroline — фреймворк-агностик библиотека для о
 | Область | Технология |
 |---------|------------|
 | Язык | TypeScript 5.3+ (strict mode) |
-| Runtime | Node.js 18+ |
+| Runtime | Node.js 20+ |
 | Package Manager | **Yarn 4** (Berry) с workspaces |
 | Bundler | tsup (ESM + CJS + DTS) |
 | Testing | Vitest |

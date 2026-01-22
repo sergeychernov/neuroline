@@ -1,0 +1,108 @@
+:root,
+html[data-theme='dark'] {
+	--ifm-font-family-base: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace;
+	--ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace;
+	--ifm-color-primary: #7c4dff;
+	--ifm-color-primary-dark: #5b2fe6;
+	--ifm-color-primary-darker: #4b24d6;
+	--ifm-color-primary-light: #9d6dff;
+	--ifm-color-primary-lighter: #b47cff;
+	--ifm-color-secondary: #00e5ff;
+	--ifm-background-color: #0a0a0f;
+	--ifm-background-surface-color: #13131a;
+	--ifm-navbar-background-color: rgba(10, 10, 18, 0.92);
+	--ifm-footer-background-color: #0a0a12;
+	--ifm-font-color-base: #e8e8e8;
+	--ifm-font-color-secondary: #a0a0a0;
+	--ifm-heading-color: #f5f5f5;
+	--ifm-link-color: #7c4dff;
+	--ifm-link-hover-color: #00e5ff;
+	--ifm-menu-color: #e8e8e8;
+	--ifm-menu-color-active: #00e5ff;
+	--ifm-menu-color-background-active: rgba(124, 77, 255, 0.12);
+	--ifm-color-emphasis-100: #0f0f18;
+	--ifm-color-emphasis-200: #161624;
+	--ifm-color-emphasis-300: #24243a;
+	--ifm-color-emphasis-400: #303048;
+	--ifm-color-emphasis-500: #3e3e5a;
+	--ifm-color-emphasis-600: #6c6c80;
+	--ifm-color-emphasis-700: #a0a0a0;
+	--ifm-color-emphasis-800: #c4c4c4;
+	--ifm-color-emphasis-900: #e0e0e0;
+	--ifm-code-background: rgba(0, 0, 0, 0.35);
+	--ifm-code-color: #e8e8e8;
+	--ifm-pre-background: rgba(0, 0, 0, 0.35);
+	--ifm-toc-border-color: rgba(124, 77, 255, 0.2);
+	--ifm-table-border-color: rgba(124, 77, 255, 0.2);
+}
+
+body {
+	background:
+		radial-gradient(ellipse at 10% 20%, rgba(124, 77, 255, 0.12) 0%, transparent 50%),
+		radial-gradient(ellipse at 90% 80%, rgba(0, 229, 255, 0.08) 0%, transparent 50%),
+		linear-gradient(135deg, #050508 0%, #0a0a12 50%, #0f0f1a 100%);
+	color: var(--ifm-font-color-base);
+}
+
+.main-wrapper {
+	background: transparent;
+}
+
+.navbar {
+	backdrop-filter: blur(20px);
+	border-bottom: 1px solid rgba(124, 77, 255, 0.2);
+}
+
+.navbar__title {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+.theme-doc-sidebar-container {
+	background-color: rgba(10, 10, 18, 0.6);
+	border-right: 1px solid rgba(124, 77, 255, 0.2);
+}
+
+.theme-doc-sidebar-menu {
+	padding-top: 0.5rem;
+}
+
+.footer {
+	border-top: 1px solid rgba(124, 77, 255, 0.2);
+}
+
+.docs-home {
+	padding: 2rem 0 3rem;
+}
+
+.docs-home-header {
+	margin-bottom: 1.5rem;
+}
+
+.docs-home-grid {
+	display: grid;
+	gap: 1.25rem;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.docs-home-card {
+	background: rgba(19, 19, 26, 0.6);
+	border: 1px solid rgba(124, 77, 255, 0.2);
+	border-radius: 12px;
+	color: inherit;
+	display: block;
+	padding: 1.25rem;
+	text-decoration: none;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.docs-home-card:hover {
+	border-color: var(--ifm-color-primary);
+	box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+	text-decoration: none;
+}
+
+.docs-home-card p {
+	margin-bottom: 0;
+	color: var(--ifm-font-color-secondary);
+}

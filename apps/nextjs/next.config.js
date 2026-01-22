@@ -10,8 +10,10 @@ const storybookIndexPath = path.join(
   'storybook',
   'index.html',
 );
+const docsIndexPath = path.join(__dirname, 'public', 'docs', 'index.html');
 
 const hasEmbeddedStorybook = fs.existsSync(storybookIndexPath);
+const hasEmbeddedDocs = fs.existsSync(docsIndexPath);
 
 const nextConfig = {
   transpilePackages: ['neuroline', 'neuroline-ui', 'neuroline-nextjs', 'demo-pipelines'],
@@ -19,10 +21,10 @@ const nextConfig = {
     optimizePackageImports: ['@mui/material'],
   },
   async rewrites() {
-    if (!hasEmbeddedStorybook) return [];
+    const beforeFiles = [];
 
-    return {
-      beforeFiles: [
+    if (hasEmbeddedStorybook) {
+      beforeFiles.push(
         {
           source: '/packages/neuroline-ui/storybook',
           destination: '/packages/neuroline-ui/storybook/index.html',
@@ -31,8 +33,29 @@ const nextConfig = {
           source: '/packages/neuroline-ui/storybook/',
           destination: '/packages/neuroline-ui/storybook/index.html',
         },
-      ],
-    };
+      );
+    }
+
+    if (hasEmbeddedDocs) {
+      beforeFiles.push(
+        {
+          source: '/docs',
+          destination: '/docs/index.html',
+        },
+        {
+          source: '/docs/',
+          destination: '/docs/index.html',
+        },
+        {
+          source: '/docs/:path*/',
+          destination: '/docs/:path*/index.html',
+        },
+      );
+    }
+
+    if (!beforeFiles.length) return [];
+
+    return { beforeFiles };
   },
   webpack: (config, { isServer }) => {
     // Игнорируем опциональные зависимости mongodb для client-side encryption
