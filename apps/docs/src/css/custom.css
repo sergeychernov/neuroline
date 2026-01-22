@@ -115,6 +115,20 @@ body {
 	.navbar-sidebar__item .menu__link--active {
 		color: var(--ifm-color-primary);
 	}
+
+	.navbar-sidebar .navbar__item {
+		display: block;
+	}
+
+	.navbar-sidebar .navbar__link {
+		color: var(--ifm-font-color-base);
+		font-weight: 600;
+	}
+
+	.navbar-sidebar .navbar__link:hover,
+	.navbar-sidebar .navbar__link--active {
+		color: var(--ifm-color-primary);
+	}
 }
 
 .theme-doc-sidebar-container {
