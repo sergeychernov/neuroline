@@ -1,6 +1,6 @@
 {
   "name": "neuroline-nextjs",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Next.js App Router handlers for Neuroline pipeline APIs.",
   "homepage": "https://neuroline.vercel.app/",
   "repository": {
@@ -27,7 +27,7 @@
     "lint": "tsc --noEmit"
   },
   "peerDependencies": {
-    "neuroline": "^0.7.0",
+    "neuroline": "^0.8.0",
     "next": ">=14.0.0"
   },
   "devDependencies": {

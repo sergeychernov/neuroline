@@ -10,14 +10,18 @@ import ReplayIcon from '@mui/icons-material/Replay';
 // ============================================================================
 
 export interface PipelineControlPanelProps {
-	/** Запуск Next.js success pipeline */
+	/** Запуск Next.js success pipeline (admin endpoint с jobOptions) */
 	onNextjsSuccess: () => void;
+	/** Запуск Next.js success pipeline (базовый endpoint без jobOptions) */
+	onNextjsSuccessBasic: () => void;
 	/** Запуск Next.js error pipeline */
 	onNextjsError: () => void;
 	/** Запуск Next.js pipeline с retry (unstableFailCount = 1) */
 	onNextjsRetry: () => void;
-	/** Запуск NestJS success pipeline */
+	/** Запуск NestJS success pipeline (admin endpoint с jobOptions) */
 	onNestjsSuccess: () => void;
+	/** Запуск NestJS success pipeline (базовый endpoint без jobOptions) */
+	onNestjsSuccessBasic: () => void;
 	/** Запуск NestJS error pipeline */
 	onNestjsError: () => void;
 	/** Запуск NestJS pipeline с retry (unstableFailCount = 1) */
@@ -38,18 +42,22 @@ export interface PipelineControlPanelProps {
  */
 export function PipelineControlPanel({
 	onNextjsSuccess,
+	onNextjsSuccessBasic,
 	onNextjsError,
 	onNextjsRetry,
 	onNestjsSuccess,
+	onNestjsSuccessBasic,
 	onNestjsError,
 	onNestjsRetry,
 	isRunning,
 	currentPipelineType,
 }: PipelineControlPanelProps) {
 	const isNextjsSuccessRunning = isRunning && currentPipelineType === 'nextjs-success';
+	const isNextjsSuccessBasicRunning = isRunning && currentPipelineType === 'nextjs-success-basic';
 	const isNextjsErrorRunning = isRunning && currentPipelineType === 'nextjs-error';
 	const isNextjsRetryRunning = isRunning && currentPipelineType === 'nextjs-retry';
 	const isNestjsSuccessRunning = isRunning && currentPipelineType === 'nestjs-success';
+	const isNestjsSuccessBasicRunning = isRunning && currentPipelineType === 'nestjs-success-basic';
 	const isNestjsErrorRunning = isRunning && currentPipelineType === 'nestjs-error';
 	const isNestjsRetryRunning = isRunning && currentPipelineType === 'nestjs-retry';
 
@@ -86,7 +94,7 @@ export function PipelineControlPanel({
 						>
 							NEXT.JS API
 						</Typography>
-						<Stack direction="row" spacing={1}>
+						<Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
 							<Button
 								variant="contained"
 								size="small"
@@ -114,6 +122,36 @@ export function PipelineControlPanel({
 								}}
 							>
 								Success
+							</Button>
+							<Button
+								variant="outlined"
+								size="small"
+								onClick={onNextjsSuccessBasic}
+								disabled={isRunning}
+								startIcon={
+									isNextjsSuccessBasicRunning ? (
+										<CircularProgress size={14} color="inherit" />
+									) : (
+										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
+									)
+								}
+								sx={{
+									px: 2,
+									py: 0.75,
+									fontSize: '0.8rem',
+									borderColor: '#00e676',
+									color: '#00e676',
+									'&:hover': {
+										borderColor: '#69f0ae',
+										backgroundColor: 'rgba(0, 230, 118, 0.1)',
+									},
+									'&:disabled': {
+										borderColor: 'rgba(0, 230, 118, 0.3)',
+										color: 'rgba(0, 230, 118, 0.5)',
+									},
+								}}
+							>
+								Basic
 							</Button>
 							<Button
 								variant="contained"
@@ -198,7 +236,7 @@ export function PipelineControlPanel({
 						>
 							NESTJS API (localhost:3003)
 						</Typography>
-						<Stack direction="row" spacing={1}>
+						<Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
 							<Button
 								variant="outlined"
 								size="small"
@@ -228,6 +266,36 @@ export function PipelineControlPanel({
 								}}
 							>
 								Success
+							</Button>
+							<Button
+								variant="outlined"
+								size="small"
+								onClick={onNestjsSuccessBasic}
+								disabled={isRunning}
+								startIcon={
+									isNestjsSuccessBasicRunning ? (
+										<CircularProgress size={14} color="inherit" />
+									) : (
+										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
+									)
+								}
+								sx={{
+									px: 2,
+									py: 0.75,
+									fontSize: '0.8rem',
+									borderColor: 'rgba(255, 213, 79, 0.6)',
+									color: 'rgba(255, 213, 79, 0.8)',
+									'&:hover': {
+										borderColor: '#ffd54f',
+										backgroundColor: 'rgba(255, 213, 79, 0.1)',
+									},
+									'&:disabled': {
+										borderColor: 'rgba(255, 213, 79, 0.3)',
+										color: 'rgba(255, 213, 79, 0.5)',
+									},
+								}}
+							>
+								Basic
 							</Button>
 							<Button
 								variant="outlined"

@@ -1,6 +1,6 @@
 {
   "name": "neuroline-nestjs",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "NestJS module and controllers for Neuroline pipeline APIs with DI.",
   "homepage": "https://neuroline.vercel.app/",
   "repository": {
@@ -29,7 +29,7 @@
   "peerDependencies": {
     "@nestjs/common": ">=10.0.0",
     "@nestjs/core": ">=10.0.0",
-    "neuroline": "^0.7.0"
+    "neuroline": "^0.8.0"
   },
   "devDependencies": {
     "@nestjs/common": "^10.3.0",

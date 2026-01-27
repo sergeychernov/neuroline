@@ -8,7 +8,7 @@ import {
 	handleGetPipeline,
 } from './handlers';
 
-export interface PipelineRouteHandlerOptions {
+export interface PipelineRouteHandlerOptions<TInput = unknown> {
 	/** PipelineManager инстанс */
 	manager: PipelineManager;
 	/** Storage для списка */
@@ -31,14 +31,36 @@ export interface PipelineRouteHandlerOptions {
 	 */
 	waitUntil?: (promise: Promise<unknown>) => void;
 	/**
-	 * Включить debug-эндпоинты (action=pipeline, action=job)
+	 * Включить admin-эндпоинты (action=pipeline, action=job, action=startWithOptions)
 	 * 
 	 * ⚠️ ВНИМАНИЕ: Эти эндпоинты возвращают полные данные pipeline/job,
-	 * включая input, options и artifacts. Не включайте в production!
+	 * включая input, options и artifacts, или позволяют передавать jobOptions напрямую.
+	 * Не включайте в production без защиты!
 	 * 
 	 * @default false
 	 */
 	enableDebugEndpoints?: boolean;
+	/**
+	 * Асинхронная функция для получения jobOptions на основе input и request.
+	 * 
+	 * Используется только для базового POST endpoint.
+	 * Admin endpoint (action=startWithOptions) получает jobOptions напрямую из body.
+	 * 
+	 * @param input - входные данные pipeline (body запроса)
+	 * @param request - HTTP Request объект (для доступа к headers и т.д.)
+	 * @returns jobOptions или Promise<jobOptions>
+	 * 
+	 * @example
+	 * ```typescript
+	 * getJobOptions: async (input, request) => {
+	 *     const authHeader = request.headers.get('Authorization');
+	 *     return {
+	 *         myJob: { token: authHeader, apiKey: process.env.API_KEY },
+	 *     };
+	 * }
+	 * ```
+	 */
+	getJobOptions?: (input: TInput, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 export interface PipelineRouteHandlers {
@@ -77,10 +99,10 @@ export interface PipelineRouteHandlers {
  * - GET /api/pipeline/success?action=job&id=xxx&jobName=yyy - данные job
  * - GET /api/pipeline/success?action=pipeline&id=xxx - полные данные pipeline
  */
-export function createPipelineRouteHandler(
-	options: PipelineRouteHandlerOptions,
+export function createPipelineRouteHandler<TInput = unknown>(
+	options: PipelineRouteHandlerOptions<TInput>,
 ): PipelineRouteHandlers {
-	const { manager, storage, pipeline, waitUntil, enableDebugEndpoints = false } = options;
+	const { manager, storage, pipeline, waitUntil, enableDebugEndpoints = false, getJobOptions } = options;
 
 	// Регистрируем pipeline при создании
 	manager.registerPipeline(pipeline);
@@ -89,7 +111,11 @@ export function createPipelineRouteHandler(
 
 	return {
 		POST: async (request: Request) => {
-			return handleStartPipeline(request, manager, pipelineType, { waitUntil });
+			return handleStartPipeline(request, manager, pipelineType, {
+				waitUntil,
+				enableAdminStart: enableDebugEndpoints,
+				getJobOptions: getJobOptions as ((input: unknown, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined,
+			});
 		},
 
 		GET: async (request: Request) => {

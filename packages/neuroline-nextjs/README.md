@@ -49,6 +49,15 @@ const handlers = createPipelineRouteHandler({
     manager,
     storage,
     pipeline: myPipelineConfig, // One pipeline per route
+    // Get jobOptions from request context (headers, cookies, etc.)
+    getJobOptions: async (input, request) => {
+        const authHeader = request.headers.get('Authorization');
+        return {
+            myJob: { token: authHeader, apiKey: process.env.API_KEY },
+        };
+    },
+    // Enable admin endpoints for development
+    enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 
 export const GET = handlers.GET;
@@ -65,13 +74,16 @@ Each route handles one pipeline. The URL determines which pipeline to use.
 
 Start a new pipeline or return existing one.
 
-**Request body:**
+**Request body:** `TInput` directly (no wrapper)
+
 ```typescript
 {
-  input: unknown;        // Input data
-  jobOptions?: Record<string, unknown>;  // Optional job options
+  url: 'https://api.example.com/data',
+  userId: 'user-123',
 }
 ```
+
+`jobOptions` are obtained on the server via `getJobOptions(input, request)`.
 
 **Example:**
 ```typescript
@@ -79,18 +91,25 @@ const response = await fetch('/api/pipeline/my-pipeline', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    input: {
-      url: 'https://api.example.com/data',
-      userId: 'user-123',
-    },
-    jobOptions: {
-      'fetch-data': { timeout: 10000 },
-    },
+    url: 'https://api.example.com/data',
+    userId: 'user-123',
   }),
 });
 
 const result = await response.json();
 // { success: true, data: { pipelineId: "abc123", isNew: true } }
+```
+
+### POST `/api/pipeline/my-pipeline?action=startWithOptions`
+
+Admin endpoint: start pipeline with explicit `jobOptions`. Requires `enableDebugEndpoints: true`.
+
+**Request body:**
+```typescript
+{
+  input: unknown;        // Input data
+  jobOptions?: Record<string, unknown>;  // Explicit job options
+}
 ```
 
 ### GET `/api/pipeline/my-pipeline?action=status&id=:id`
@@ -389,6 +408,15 @@ const handlers = createPipelineRouteHandler({
     manager,
     storage,
     pipeline: myPipelineConfig, // Один pipeline на route
+    // Получение jobOptions из контекста запроса (headers, cookies и т.д.)
+    getJobOptions: async (input, request) => {
+        const authHeader = request.headers.get('Authorization');
+        return {
+            myJob: { token: authHeader, apiKey: process.env.API_KEY },
+        };
+    },
+    // Включить admin-эндпоинты для разработки
+    enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 
 export const GET = handlers.GET;
@@ -405,17 +433,44 @@ export const POST = handlers.POST;
 
 Запустить новый pipeline или вернуть существующий.
 
-**Тело запроса:**
+**Тело запроса:** `TInput` напрямую (без обёртки)
+
 ```typescript
 {
-  input: unknown;        // Входные данные
-  jobOptions?: Record<string, unknown>;  // Опционально: опции для jobs
+  url: 'https://api.example.com/data',
+  userId: 'user-123',
 }
 ```
+
+`jobOptions` получаются на сервере через `getJobOptions(input, request)`.
 
 **Пример:**
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    url: 'https://api.example.com/data',
+    userId: 'user-123',
+  }),
+});
+```
+
+### POST `/api/pipeline/my-pipeline?action=startWithOptions`
+
+Admin-эндпоинт: запуск pipeline с явными `jobOptions`. Требует `enableDebugEndpoints: true`.
+
+**Тело запроса:**
+```typescript
+{
+  input: unknown;        // Входные данные
+  jobOptions?: Record<string, unknown>;  // Явные опции для jobs
+}
+```
+
+**Пример (устаревший формат для совместимости):**
+```typescript
+const response = await fetch('/api/pipeline/my-pipeline?action=startWithOptions', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({

@@ -1,14 +1,7 @@
-import type { JobDetailsResponse } from 'neuroline';
+import type { JobDetailsResponse, StartWithOptionsBody } from 'neuroline';
 
-/**
- * Тело запроса для запуска pipeline
- */
-export interface StartPipelineBody {
-	/** Входные данные */
-	input: unknown;
-	/** Опции для jobs */
-	jobOptions?: Record<string, unknown>;
-}
+// Реэкспорт из core для удобства
+export type { StartWithOptionsBody };
 
 /**
  * Query параметры для статуса

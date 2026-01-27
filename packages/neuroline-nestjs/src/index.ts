@@ -21,7 +21,7 @@ export { NeurolineService } from './neuroline.service';
 export { NEUROLINE_MANAGER, NEUROLINE_STORAGE } from './constants';
 
 // DTO типы
-export type { ApiResponse, StartPipelineBody, GetQueryParams } from './dto';
+export type { ApiResponse, StartWithOptionsBody, GetQueryParams } from './dto';
 
 // Реэкспорт из neuroline/mongo для удобства
 export {

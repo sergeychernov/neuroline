@@ -42,7 +42,7 @@ import { NeurolineService } from './neuroline.service';
 /**
  * Опции для создания pipeline контроллера
  */
-export interface PipelineControllerOptions {
+export interface PipelineControllerOptions<TInput = unknown> {
 	/** Путь контроллера (например, 'api/v1/my-pipeline') */
 	path: string;
 	/** Конфигурация pipeline из neuroline */
@@ -50,9 +50,10 @@ export interface PipelineControllerOptions {
 	/** Guards для всего контроллера (опционально) */
 	guards?: Type[];
 	/**
-	 * Guards для admin-эндпоинтов (action=job, action=pipeline)
+	 * Guards для admin-эндпоинтов (action=job, action=pipeline, action=startWithOptions)
 	 * 
-	 * Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts).
+	 * Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts)
+	 * или позволяют передавать jobOptions напрямую.
 	 * 
 	 * - Если указаны — admin-эндпоинты доступны только после прохождения guards
 	 * - Если не указаны — admin-эндпоинты отключены (возвращают 403)
@@ -68,6 +69,27 @@ export interface PipelineControllerOptions {
 	 * ```
 	 */
 	adminGuards?: Type[];
+	/**
+	 * Асинхронная функция для получения jobOptions на основе input и request.
+	 * 
+	 * Используется только для базового POST endpoint.
+	 * Admin endpoint (action=startWithOptions) получает jobOptions напрямую из body.
+	 * 
+	 * @param input - входные данные pipeline (body запроса)
+	 * @param request - HTTP request объект (для доступа к headers, user и т.д.)
+	 * @returns jobOptions или Promise<jobOptions>
+	 * 
+	 * @example
+	 * ```typescript
+	 * getJobOptions: async (input, request) => {
+	 *     const user = request.user;
+	 *     return {
+	 *         myJob: { userId: user.id, apiKey: process.env.API_KEY },
+	 *     };
+	 * }
+	 * ```
+	 */
+	getJobOptions?: (input: TInput, request: any) => Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 /**
@@ -120,8 +142,8 @@ export interface NeurolineModuleAsyncOptions {
 	staleJobsWatchdog?: StaleJobsWatchdogOptions;
 }
 
-/** Body для запуска pipeline */
-interface StartPipelineBody {
+/** Body для admin-запуска pipeline (action=startWithOptions) */
+interface StartWithOptionsBody {
 	input: unknown;
 	jobOptions?: Record<string, unknown>;
 }
@@ -155,7 +177,7 @@ function createDynamicController(
 	controllerOptions: PipelineControllerOptions,
 	adminGuardTypes: Type[] | undefined,
 ): Type<unknown> {
-	const { path, pipeline } = controllerOptions;
+	const { path, pipeline, getJobOptions } = controllerOptions;
 	const pipelineType = pipeline.name;
 	// undefined = disabled, [] = open, [...guards] = protected
 	const adminEnabled = adminGuardTypes !== undefined;
@@ -248,20 +270,48 @@ function createDynamicController(
 
 		/**
 		 * POST - запуск pipeline
+		 * 
+		 * Базовый режим: body = TInput напрямую, jobOptions получаются через getJobOptions
+		 * Admin режим (?action=startWithOptions): body = { input, jobOptions }
 		 */
 		@Post()
-		async start(@Body() body: StartPipelineBody): Promise<ApiResponse> {
+		async start(
+			@Body() body: unknown,
+			@Query('action') action: string | undefined,
+			@Req() request: any,
+		): Promise<ApiResponse> {
 			try {
-				if (body.input === undefined) {
-					throw new HttpException(
-						{ success: false, error: 'input is required' },
-						HttpStatus.BAD_REQUEST,
-					);
+				// Admin режим: action=startWithOptions
+				if (action === 'startWithOptions') {
+					await this.checkAdminGuards(request);
+					
+					const adminBody = body as StartWithOptionsBody;
+					if (adminBody.input === undefined) {
+						throw new HttpException(
+							{ success: false, error: 'input is required' },
+							HttpStatus.BAD_REQUEST,
+						);
+					}
+
+					const result = await this.manager.startPipeline(pipelineType, {
+						data: adminBody.input,
+						jobOptions: adminBody.jobOptions,
+					});
+
+					return { success: true, data: result };
 				}
 
+				// Базовый режим: body = TInput
+				const input = body;
+				
+				// Получаем jobOptions через функцию из конфигурации
+				const jobOptions = getJobOptions
+					? await getJobOptions(input, request)
+					: undefined;
+
 				const result = await this.manager.startPipeline(pipelineType, {
-					data: body.input,
-					jobOptions: body.jobOptions,
+					data: input,
+					jobOptions,
 				});
 
 				return { success: true, data: result };

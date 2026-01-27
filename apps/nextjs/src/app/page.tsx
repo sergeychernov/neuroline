@@ -210,7 +210,8 @@ export default function HomePage() {
       };
 
       try {
-        const polling = await client.startAndPoll(
+        // Используем admin endpoint (startAndPollWithOptions) для передачи jobOptions
+        const polling = await client.startAndPollWithOptions(
           {
             input,
             jobOptions: {
@@ -234,10 +235,61 @@ export default function HomePage() {
     [handleUpdate, handleError],
   );
 
+  /**
+   * Запуск pipeline через базовый endpoint (без jobOptions)
+   * Демонстрирует body = TInput напрямую
+   */
+  const startPipelineBasic = useCallback(
+    async (
+      client: PipelineClient,
+      pipelineTypeLabel: string,
+      options: { fail?: boolean; unstableFailCount?: number } = {},
+    ) => {
+      // Остановить предыдущий polling
+      stopRef.current?.();
+
+      setIsRunning(true);
+      setCurrentPipelineType(pipelineTypeLabel);
+      setSelectedJob(null);
+      setPipeline(null);
+      currentClientRef.current = client;
+
+      const input: DemoPipelineInput = {
+        seed: Math.floor(Math.random() * 1000),
+        name: `test-${Date.now()}`,
+        iterations: 10,
+        fail: options.fail ?? false,
+        unstableFailCount: options.unstableFailCount ?? 0,
+      };
+
+      try {
+        // Базовый endpoint: body = TInput напрямую (без jobOptions)
+        // jobOptions получаются на сервере через getJobOptions
+        const polling = await client.startAndPoll(
+          input,
+          handleUpdate,
+          handleError,
+        );
+
+        currentPipelineIdRef.current = polling.pipelineId;
+        stopRef.current = polling.stop;
+      } catch (e) {
+        console.error('Failed to start pipeline', e);
+        setIsRunning(false);
+      }
+    },
+    [handleUpdate, handleError],
+  );
+
   // Next.js handlers
   const handleNextjsSuccess = useCallback(
     () => startPipeline(nextjsClient, 'nextjs-success', { fail: false }),
     [nextjsClient, startPipeline],
+  );
+
+  const handleNextjsSuccessBasic = useCallback(
+    () => startPipelineBasic(nextjsClient, 'nextjs-success-basic', { fail: false }),
+    [nextjsClient, startPipelineBasic],
   );
 
   const handleNextjsError = useCallback(
@@ -254,6 +306,11 @@ export default function HomePage() {
   const handleNestjsSuccess = useCallback(
     () => startPipeline(nestjsClient, 'nestjs-success', { fail: false }),
     [nestjsClient, startPipeline],
+  );
+
+  const handleNestjsSuccessBasic = useCallback(
+    () => startPipelineBasic(nestjsClient, 'nestjs-success-basic', { fail: false }),
+    [nestjsClient, startPipelineBasic],
   );
 
   const handleNestjsError = useCallback(
@@ -363,9 +420,11 @@ export default function HomePage() {
         {/* Панель управления */}
         <PipelineControlPanel
           onNextjsSuccess={handleNextjsSuccess}
+          onNextjsSuccessBasic={handleNextjsSuccessBasic}
           onNextjsError={handleNextjsError}
           onNextjsRetry={handleNextjsRetry}
           onNestjsSuccess={handleNestjsSuccess}
+          onNestjsSuccessBasic={handleNestjsSuccessBasic}
           onNestjsError={handleNestjsError}
           onNestjsRetry={handleNestjsRetry}
           isRunning={isRunning}

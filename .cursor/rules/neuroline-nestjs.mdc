@@ -47,6 +47,13 @@ import { AuthGuard } from './guards';
           pipeline: demoPipelineConfig,
           guards: [AuthGuard],       // guards для всего контроллера
           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
+          // Асинхронное получение jobOptions (для базового POST)
+          getJobOptions: async (input, request) => {
+            const user = request.user;
+            return {
+              myJob: { userId: user.id, apiKey: process.env.API_KEY },
+            };
+          },
         },
       ],
       // Фоновый watchdog для "зависших" джоб
@@ -86,21 +93,22 @@ export class MyService {
 
 API совместим с `neuroline/client` (query-параметр `action`):
 
-| Method | Path | Описание |
-|--------|------|----------|
-| POST | `/<path>` | Запуск pipeline |
-| GET | `/<path>?action=status&id=<id>` | Статус pipeline |
-| GET | `/<path>?action=result&id=<id>[&jobName=<job>]` | Результат (артефакт) одной job |
-| GET | `/<path>?action=list&page=1&limit=10` | Список pipelines (по типу контроллера) |
+| Method | Path | Body | Описание |
+|--------|------|------|----------|
+| POST | `/<path>` | `TInput` | Запуск pipeline (jobOptions через getJobOptions) |
+| GET | `/<path>?action=status&id=<id>` | — | Статус pipeline |
+| GET | `/<path>?action=result&id=<id>[&jobName=<job>]` | — | Результат (артефакт) одной job |
+| GET | `/<path>?action=list&page=1&limit=10` | — | Список pipelines (по типу контроллера) |
 
-### Debug-эндпоинты (требуют `enableDebugEndpoints: true`)
+### Admin-эндпоинты (требуют `adminGuards`)
 
-⚠️ **Отключены по умолчанию** — возвращают чувствительные данные (input, options, artifacts).
+⚠️ **Отключены по умолчанию** — возвращают чувствительные данные или позволяют передавать jobOptions напрямую.
 
-| Method | Path | Описание |
-|--------|------|----------|
-| GET | `/<path>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
-| GET | `/<path>?action=pipeline&id=<id>` | Полное состояние pipeline |
+| Method | Path | Body | Описание |
+|--------|------|------|----------|
+| POST | `/<path>?action=startWithOptions` | `{ input, jobOptions }` | Запуск с явными jobOptions |
+| GET | `/<path>?action=job&id=<id>&jobName=<job>` | — | Данные job (input/options/artifact) |
+| GET | `/<path>?action=pipeline&id=<id>` | — | Полное состояние pipeline |
 
 ## Опции NeurolineModuleAsyncOptions
 
@@ -111,6 +119,16 @@ API совместим с `neuroline/client` (query-параметр `action`):
 | `controllers` | Массив конфигураций контроллеров |
 | `logger` | Логгер для PipelineManager |
 | `staleJobsWatchdog` | Опции для фонового watchdog зависших джоб |
+
+### PipelineControllerOptions
+
+| Опция | Описание |
+|-------|----------|
+| `path` | Путь контроллера (например, `api/v1/demo-pipeline`) |
+| `pipeline` | Конфигурация pipeline |
+| `guards` | Guards для всего контроллера |
+| `adminGuards` | Guards для admin-эндпоинтов (если не указаны — admin отключен) |
+| `getJobOptions` | Функция `(input, request) => jobOptions` для базового POST |
 
 ### staleJobsWatchdog
 

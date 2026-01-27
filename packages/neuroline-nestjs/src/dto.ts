@@ -2,15 +2,8 @@
  * DTO для API endpoints
  */
 
-/**
- * Body для запуска pipeline
- */
-export interface StartPipelineBody {
-	/** Входные данные */
-	input: unknown;
-	/** Опции для jobs */
-	jobOptions?: Record<string, unknown>;
-}
+// Реэкспорт из core для удобства
+export type { StartWithOptionsBody } from 'neuroline';
 
 /**
  * Query параметры для GET запросов

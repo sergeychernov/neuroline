@@ -31,6 +31,13 @@ const handlers = createPipelineRouteHandler({
 	manager,
 	storage,
 	pipeline: demoPipeline, // один route = один pipeline
+	// Асинхронное получение jobOptions для базового POST
+	getJobOptions: async (input, request) => {
+		const authHeader = request.headers.get('Authorization');
+		return {
+			myJob: { token: authHeader, apiKey: process.env.API_KEY },
+		};
+	},
 });
 
 export const POST = handlers.POST;
@@ -47,28 +54,32 @@ export const GET = handlers.GET;
 
 Один route обслуживает один pipeline, поэтому `pipelineType` берётся из конфигурации route.
 
-| Method | Path | Описание |
-|--------|------|----------|
-| POST | `/api/pipeline/<pipeline>` | Запуск pipeline |
-| GET | `/api/pipeline/<pipeline>?action=status&id=<id>` | Статус pipeline |
-| GET | `/api/pipeline/<pipeline>?action=result&id=<id>[&jobName=<job>]` | Результат (артефакт) одной job |
-| GET | `/api/pipeline/<pipeline>?action=list&page=1&limit=10` | Список pipeline этого типа |
+| Method | Path | Body | Описание |
+|--------|------|------|----------|
+| POST | `/api/pipeline/<pipeline>` | `TInput` | Запуск pipeline (jobOptions через getJobOptions) |
+| GET | `/api/pipeline/<pipeline>?action=status&id=<id>` | — | Статус pipeline |
+| GET | `/api/pipeline/<pipeline>?action=result&id=<id>[&jobName=<job>]` | — | Результат (артефакт) одной job |
+| GET | `/api/pipeline/<pipeline>?action=list&page=1&limit=10` | — | Список pipeline этого типа |
 
-### Debug-эндпоинты (требуют `enableDebugEndpoints: true`)
+### Admin-эндпоинты (требуют `enableDebugEndpoints: true`)
 
-⚠️ **Отключены по умолчанию** — возвращают чувствительные данные (input, options, artifacts).
+⚠️ **Отключены по умолчанию** — возвращают чувствительные данные или позволяют передавать jobOptions напрямую.
 
-| Method | Path | Описание |
-|--------|------|----------|
-| GET | `/api/pipeline/<pipeline>?action=job&id=<id>&jobName=<job>` | Данные job (input/options/artifact) |
-| GET | `/api/pipeline/<pipeline>?action=pipeline&id=<id>` | Полное состояние pipeline |
+| Method | Path | Body | Описание |
+|--------|------|------|----------|
+| POST | `/api/pipeline/<pipeline>?action=startWithOptions` | `{ input, jobOptions }` | Запуск с явными jobOptions |
+| GET | `/api/pipeline/<pipeline>?action=job&id=<id>&jobName=<job>` | — | Данные job (input/options/artifact) |
+| GET | `/api/pipeline/<pipeline>?action=pipeline&id=<id>` | — | Полные данные pipeline |
 
 ```typescript
 const handlers = createPipelineRouteHandler({
 	manager,
 	storage,
 	pipeline: demoPipeline,
-	enableDebugEndpoints: process.env.NODE_ENV === 'development', // только для dev
+	enableDebugEndpoints: process.env.NODE_ENV === 'development', // только для dev/admin
+	getJobOptions: async (input, request) => ({
+		myJob: { apiKey: process.env.API_KEY },
+	}),
 });
 ```
 

@@ -13,6 +13,7 @@ import type {
 	PipelineStatusResponse,
 	PipelineResultResponse,
 	JobDetailsResponse,
+	StartWithOptionsBody,
 } from './types';
 
 /** Ответ API */
@@ -34,13 +35,11 @@ export interface PipelineClientConfig {
 	fetch?: typeof fetch;
 }
 
-/** Параметры запуска pipeline */
-export interface StartPipelineParams<TData = unknown> {
-	/** Входные данные */
-	input: TData;
-	/** Опции для jobs */
-	jobOptions?: Record<string, unknown>;
-}
+/**
+ * Параметры запуска pipeline с явными jobOptions (admin режим)
+ * Реэкспорт из core types для удобства
+ */
+export type StartWithOptionsParams<TData = unknown> = StartWithOptionsBody<TData>;
 
 /** Событие обновления pipeline (только статус) */
 export interface PipelineUpdateEvent {
@@ -104,12 +103,43 @@ export class PipelineClient {
 	}
 
 	/**
-	 * Запускает pipeline
+	 * Запускает pipeline (базовый режим)
+	 * 
+	 * Body = TInput напрямую. jobOptions получаются на сервере через getJobOptions.
+	 * 
+	 * @param input - входные данные pipeline
 	 */
-	async start<TData = unknown>(
-		params: StartPipelineParams<TData>,
+	async start<TInput = unknown>(
+		input: TInput,
 	): Promise<StartPipelineResponse> {
 		const response = await this.config.fetch(this.config.baseUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(input),
+		});
+
+		const data: ApiResponse<StartPipelineResponse> = await response.json();
+
+		if (!data.success || !data.data) {
+			throw new Error(data.error ?? 'Failed to start pipeline');
+		}
+
+		return data.data;
+	}
+
+	/**
+	 * Запускает pipeline с явными jobOptions (admin режим)
+	 * 
+	 * Требует enableDebugEndpoints: true на сервере (Next.js) 
+	 * или adminGuards на сервере (NestJS).
+	 * 
+	 * @param params - { input, jobOptions }
+	 */
+	async startWithOptions<TData = unknown>(
+		params: StartWithOptionsParams<TData>,
+	): Promise<StartPipelineResponse> {
+		const url = `${this.config.baseUrl}?action=startWithOptions`;
+		const response = await this.config.fetch(url, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(params),
@@ -242,14 +272,36 @@ export class PipelineClient {
 	}
 
 	/**
-	 * Запускает pipeline и сразу начинает polling
+	 * Запускает pipeline и сразу начинает polling (базовый режим)
+	 * 
+	 * @param input - входные данные pipeline (body = TInput)
 	 */
-	async startAndPoll<TData = unknown>(
-		params: StartPipelineParams<TData>,
+	async startAndPoll<TInput = unknown>(
+		input: TInput,
 		onUpdate?: PipelineUpdateCallback,
 		onError?: PipelineErrorCallback,
 	): Promise<PollingResult & { pipelineId: string }> {
-		const { pipelineId } = await this.start(params);
+		const { pipelineId } = await this.start(input);
+
+		const polling = this.poll(pipelineId, onUpdate, onError);
+
+		return {
+			...polling,
+			pipelineId,
+		};
+	}
+
+	/**
+	 * Запускает pipeline с явными jobOptions и сразу начинает polling (admin режим)
+	 * 
+	 * @param params - { input, jobOptions }
+	 */
+	async startAndPollWithOptions<TData = unknown>(
+		params: StartWithOptionsParams<TData>,
+		onUpdate?: PipelineUpdateCallback,
+		onError?: PipelineErrorCallback,
+	): Promise<PollingResult & { pipelineId: string }> {
+		const { pipelineId } = await this.startWithOptions(params);
 
 		const polling = this.poll(pipelineId, onUpdate, onError);
 
@@ -276,8 +328,10 @@ export interface UsePipelineState<TInput = unknown> {
 	error: Error | null;
 	/** Pipeline выполняется */
 	isRunning: boolean;
-	/** Запустить pipeline */
-	start: (params: StartPipelineParams<TInput>) => Promise<void>;
+	/** Запустить pipeline (базовый режим, body = TInput) */
+	start: (input: TInput) => Promise<void>;
+	/** Запустить pipeline с явными jobOptions (admin режим) */
+	startWithOptions: (params: StartWithOptionsParams<TInput>) => Promise<void>;
 	/** Остановить polling */
 	stop: () => void;
 	/** Получить результат job (клиент для запроса) */
@@ -330,8 +384,11 @@ export function createUsePipelineHook(react: {
 			setIsRunning(false);
 		}, []);
 
+		/**
+		 * Запуск pipeline (базовый режим, body = TInput)
+		 */
 		const start = useCallback(
-			async (params: StartPipelineParams<TInput>) => {
+			async (input: TInput) => {
 				// Остановить предыдущий polling
 				stop();
 
@@ -341,6 +398,44 @@ export function createUsePipelineHook(react: {
 
 				try {
 					const polling = await client.startAndPoll(
+						input,
+						(event) => {
+							setStatus(event.status);
+						},
+						(err) => {
+							setError(err);
+							setIsRunning(false);
+						},
+					);
+
+					setPipelineId(polling.pipelineId);
+					stopRef.current = polling.stop;
+
+					// Ждём завершения
+					await polling.completed;
+					setIsRunning(false);
+				} catch (err) {
+					setError(err instanceof Error ? err : new Error(String(err)));
+					setIsRunning(false);
+				}
+			},
+			[client, stop],
+		);
+
+		/**
+		 * Запуск pipeline с явными jobOptions (admin режим)
+		 */
+		const startWithOptions = useCallback(
+			async (params: StartWithOptionsParams<TInput>) => {
+				// Остановить предыдущий polling
+				stop();
+
+				setError(null);
+				setStatus(null);
+				setIsRunning(true);
+
+				try {
+					const polling = await client.startAndPollWithOptions(
 						params,
 						(event) => {
 							setStatus(event.status);
@@ -378,6 +473,7 @@ export function createUsePipelineHook(react: {
 			error,
 			isRunning,
 			start,
+			startWithOptions,
 			stop,
 			client,
 		};

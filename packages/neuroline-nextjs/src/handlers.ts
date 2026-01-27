@@ -1,5 +1,5 @@
 import type { PipelineManager, PipelineStorage } from 'neuroline';
-import type { StartPipelineBody, ApiResponse, JobDetailsResponse } from './types';
+import type { StartWithOptionsBody, ApiResponse, JobDetailsResponse } from './types';
 
 /**
  * Хелпер для создания JSON ответа
@@ -21,15 +21,28 @@ export interface HandleStartPipelineOptions {
 	 * Для Vercel/Next.js передайте waitUntil из next/server
 	 */
 	waitUntil?: (promise: Promise<unknown>) => void;
+	/**
+	 * Включить admin режим (action=startWithOptions)
+	 * @default false
+	 */
+	enableAdminStart?: boolean;
+	/**
+	 * Асинхронная функция для получения jobOptions на основе input и request.
+	 * Используется только для базового POST endpoint.
+	 */
+	getJobOptions?: (input: unknown, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 /**
  * Хендлер для POST /pipeline - запуск pipeline
  *
+ * Базовый режим: body = TInput напрямую, jobOptions получаются через getJobOptions
+ * Admin режим (?action=startWithOptions): body = { input, jobOptions }
+ * 
  * @param request - HTTP запрос
  * @param manager - PipelineManager инстанс
  * @param pipelineType - тип pipeline (определяется route)
- * @param options - опции запуска (waitUntil для serverless)
+ * @param options - опции запуска (waitUntil для serverless, getJobOptions)
  */
 export async function handleStartPipeline(
 	request: Request,
@@ -38,23 +51,59 @@ export async function handleStartPipeline(
 	options?: HandleStartPipelineOptions,
 ): Promise<Response> {
 	try {
-		const body: StartPipelineBody = await request.json();
+		const { searchParams } = new URL(request.url);
+		const action = searchParams.get('action');
 
-		if (body.input === undefined) {
-			return jsonResponse<ApiResponse>(
-				{ success: false, error: 'input is required' },
-				{ status: 400 },
+		// Admin режим: action=startWithOptions
+		if (action === 'startWithOptions') {
+			if (!options?.enableAdminStart) {
+				return jsonResponse<ApiResponse>(
+					{ success: false, error: 'Admin endpoints are disabled. Set enableDebugEndpoints: true to enable.' },
+					{ status: 403 },
+				);
+			}
+
+			const body: StartWithOptionsBody = await request.json();
+
+			if (body.input === undefined) {
+				return jsonResponse<ApiResponse>(
+					{ success: false, error: 'input is required' },
+					{ status: 400 },
+				);
+			}
+
+			const result = await manager.startPipeline(
+				pipelineType,
+				{
+					data: body.input,
+					jobOptions: body.jobOptions,
+				},
+				{
+					onExecutionStart: options?.waitUntil,
+				},
 			);
+
+			return jsonResponse<ApiResponse>({
+				success: true,
+				data: result,
+			});
 		}
+
+		// Базовый режим: body = TInput
+		const input: unknown = await request.json();
+
+		// Получаем jobOptions через функцию из конфигурации
+		const jobOptions = options?.getJobOptions
+			? await options.getJobOptions(input, request)
+			: undefined;
 
 		const result = await manager.startPipeline(
 			pipelineType,
 			{
-				data: body.input,
-				jobOptions: body.jobOptions,
+				data: input,
+				jobOptions,
 			},
 			{
-				// Передаём waitUntil для serverless окружений
 				onExecutionStart: options?.waitUntil,
 			},
 		);

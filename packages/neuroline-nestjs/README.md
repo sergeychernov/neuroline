@@ -53,8 +53,15 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/my-pipeline',
           pipeline: myPipeline,
-          guards: [AuthGuard],       // guards для всего контроллера
-          adminGuards: [AdminGuard], // guards для admin-эндпоинтов
+          guards: [AuthGuard],       // guards for entire controller
+          adminGuards: [AdminGuard], // guards for admin endpoints
+          // Get jobOptions from request context
+          getJobOptions: async (input, request) => {
+            const user = request.user;
+            return {
+              myJob: { userId: user?.id, apiKey: process.env.API_KEY },
+            };
+          },
         },
       ],
     }),
@@ -106,19 +113,16 @@ The generated controllers expose the following endpoints:
 
 ### POST `/api/v1/my-pipeline`
 
-Start a new pipeline.
+Start a new pipeline. Request body = `TInput` directly.
 
 **Request:**
 ```bash
 curl -X POST http://localhost:3000/api/v1/my-pipeline \
   -H "Content-Type: application/json" \
-  -d '{
-    "input": { "seed": 123, "name": "test" },
-    "jobOptions": {
-      "compute": { "multiplier": 2.0 }
-    }
-  }'
+  -d '{ "seed": 123, "name": "test" }'
 ```
+
+`jobOptions` are obtained on the server via `getJobOptions(input, request)`.
 
 **Response:**
 ```json
@@ -129,6 +133,22 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
     "isNew": true
   }
 }
+```
+
+### POST `/api/v1/my-pipeline?action=startWithOptions`
+
+Admin endpoint: start pipeline with explicit `jobOptions`. Requires `adminGuards`.
+
+**Request:**
+```bash
+curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": { "seed": 123, "name": "test" },
+    "jobOptions": {
+      "compute": { "multiplier": 2.0 }
+    }
+  }'
 ```
 
 ### GET `?action=status&id=xxx`
@@ -145,12 +165,13 @@ List pipelines with pagination.
 
 ### Admin Endpoints
 
-These endpoints return full pipeline/job data (input, options, artifacts) and are **disabled by default**. Enable with `adminGuards`.
+These endpoints return full pipeline/job data (input, options, artifacts) or allow passing `jobOptions` directly. They are **disabled by default**. Enable with `adminGuards`.
 
 | Endpoint | Description |
 |----------|-------------|
-| `?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact) |
-| `?action=pipeline&id=xxx` | Full pipeline state |
+| `POST ?action=startWithOptions` | Start pipeline with explicit jobOptions |
+| `GET ?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact) |
+| `GET ?action=pipeline&id=xxx` | Full pipeline state |
 
 ```typescript
 // Admin доступен только авторизованным
@@ -256,6 +277,13 @@ import { AuthGuard } from './guards';
           pipeline: myPipeline,
           guards: [AuthGuard],       // guards для всего контроллера
           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
+          // Получение jobOptions из контекста запроса
+          getJobOptions: async (input, request) => {
+            const user = request.user;
+            return {
+              myJob: { userId: user?.id, apiKey: process.env.API_KEY },
+            };
+          },
         },
       ],
     }),
@@ -307,19 +335,16 @@ export class MyService {
 
 ### POST `/api/v1/my-pipeline`
 
-Запустить новый pipeline.
+Запустить новый pipeline. Тело запроса = `TInput` напрямую.
 
 **Запрос:**
 ```bash
 curl -X POST http://localhost:3000/api/v1/my-pipeline \
   -H "Content-Type: application/json" \
-  -d '{
-    "input": { "seed": 123, "name": "test" },
-    "jobOptions": {
-      "compute": { "multiplier": 2.0 }
-    }
-  }'
+  -d '{ "seed": 123, "name": "test" }'
 ```
+
+`jobOptions` получаются на сервере через `getJobOptions(input, request)`.
 
 **Ответ:**
 ```json
@@ -330,6 +355,22 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
     "isNew": true
   }
 }
+```
+
+### POST `/api/v1/my-pipeline?action=startWithOptions`
+
+Admin-эндпоинт: запуск pipeline с явными `jobOptions`. Требует `adminGuards`.
+
+**Запрос:**
+```bash
+curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input": { "seed": 123, "name": "test" },
+    "jobOptions": {
+      "compute": { "multiplier": 2.0 }
+    }
+  }'
 ```
 
 ### GET `?action=status&id=xxx`
@@ -346,12 +387,13 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 
 ### Admin-эндпоинты
 
-Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts) и **отключены по умолчанию**. Включите через `adminGuards`.
+Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts) или позволяют передавать `jobOptions` напрямую. **Отключены по умолчанию**. Включите через `adminGuards`.
 
 | Эндпоинт | Описание |
 |----------|----------|
-| `?action=job&id=xxx&jobName=yyy` | Детали job (input, options, artifact) |
-| `?action=pipeline&id=xxx` | Полное состояние pipeline |
+| `POST ?action=startWithOptions` | Запуск pipeline с явными jobOptions |
+| `GET ?action=job&id=xxx&jobName=yyy` | Детали job (input, options, artifact) |
+| `GET ?action=pipeline&id=xxx` | Полное состояние pipeline |
 
 ```typescript
 // Admin доступен только авторизованным

@@ -17,6 +17,17 @@ import { demoPipeline } from 'demo-pipelines';
 					path: 'api/pipeline/demo',
 					pipeline: demoPipeline,
 					adminGuards: [], // открытый доступ к admin-эндпоинтам
+					// Асинхронное получение jobOptions для базового POST
+					// В реальном приложении здесь можно получать данные из request.user, headers и т.д.
+					getJobOptions: async (input, request) => {
+						// Пример: те же опции, что передаются в админке через startWithOptions
+						return {
+							compute: {
+								multiplier: 2.0,
+								iterationDelayMs: 80,
+							},
+						};
+					},
 				},
 			],
 			// Фоновый watchdog для отслеживания "зависших" джоб
@@ -28,4 +39,4 @@ import { demoPipeline } from 'demo-pipelines';
 		}),
 	],
 })
-export class AppModule {}
+export class AppModule { }

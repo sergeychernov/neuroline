@@ -156,6 +156,20 @@ export interface StartPipelineOptions {
     onExecutionStart?: (executionPromise: Promise<void>) => void;
 }
 
+/**
+ * Body для запуска pipeline с явными jobOptions (admin endpoint)
+ * 
+ * Используется в:
+ * - API endpoint: POST /<path>?action=startWithOptions
+ * - Клиент: client.startWithOptions({ input, jobOptions })
+ */
+export interface StartWithOptionsBody<TInput = unknown> {
+    /** Входные данные pipeline */
+    input: TInput;
+    /** Опции для jobs (ключ — имя job) */
+    jobOptions?: Record<string, unknown>;
+}
+
 // ============================================================================
 // Job State Types (для хранилища)
 // ============================================================================
