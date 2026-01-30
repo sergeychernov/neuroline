@@ -1,4 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { fn } from 'storybook/test';
 import { PipelineViewer } from './PipelineViewer';
 import type { PipelineDisplayData } from '../types';
 
@@ -9,13 +10,9 @@ const meta: Meta<typeof PipelineViewer> = {
     layout: 'padded',
   },
   tags: ['autodocs'],
-  argTypes: {
-    showArtifacts: {
-      control: 'boolean',
-    },
-    showInput: {
-      control: 'boolean',
-    },
+  args: {
+    onJobClick: fn(),
+    onJobRetry: fn(),
   },
 };
 
@@ -87,7 +84,6 @@ const processingPipeline: PipelineDisplayData = {
 export const Processing: Story = {
   args: {
     pipeline: processingPipeline,
-    showInput: true,
   },
 };
 
@@ -158,7 +154,6 @@ const completedPipeline: PipelineDisplayData = {
 export const Completed: Story = {
   args: {
     pipeline: completedPipeline,
-    showArtifacts: true,
   },
 };
 
@@ -244,7 +239,6 @@ const simplePipeline: PipelineDisplayData = {
 export const Simple: Story = {
   args: {
     pipeline: simplePipeline,
-    showArtifacts: true,
   },
 };
 

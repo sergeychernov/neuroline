@@ -156,6 +156,32 @@ export interface StartPipelineOptions {
     onExecutionStart?: (executionPromise: Promise<void>) => void;
 }
 
+/** Опции для перезапуска пайплайна с определённой job */
+export interface RestartPipelineOptions {
+    /**
+     * Callback вызываемый при старте выполнения pipeline
+     * Используется для интеграции с waitUntil() в serverless окружениях
+     */
+    onExecutionStart?: (executionPromise: Promise<void>) => void;
+    /**
+     * Новые опции для jobs (полностью заменяют существующие)
+     * Ключ — имя job, значение — опции
+     */
+    jobOptions?: Record<string, unknown>;
+}
+
+/** Ответ на перезапуск пайплайна */
+export interface RestartPipelineResponse {
+    /** ID пайплайна */
+    pipelineId: string;
+    /** Имя job, с которой начат перезапуск */
+    fromJobName: string;
+    /** Индекс job в плоском списке */
+    fromJobIndex: number;
+    /** Количество jobs, которые будут перезапущены */
+    jobsToRerun: number;
+}
+
 /**
  * Body для запуска pipeline с явными jobOptions (admin endpoint)
  * 

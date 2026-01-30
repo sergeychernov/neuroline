@@ -7,6 +7,16 @@
 
 Monorepo for Neuroline pipeline orchestration: core library, UI, and framework integrations.
 
+## Features
+
+- **Typed Jobs** — JobDefinition with input/output/options types
+- **Stages** — Sequential stages with parallel jobs inside
+- **Synapses** — Data transformation between jobs
+- **Retry** — Automatic retry with configurable delay
+- **Restart** — Restart failed pipelines from any job
+- **Storage** — In-memory (tests) or MongoDB (production)
+- **Watchdog** — Background monitoring for stale jobs
+
 ## Packages
 
 - `neuroline` — Core orchestration with typed jobs and pluggable storage. Docs: `packages/neuroline/README.md`
@@ -40,6 +50,16 @@ UNLICENSED
 # Neuroline Monorepo
 
 Мультипакетный репозиторий Neuroline: ядро оркестрации, UI и интеграции с фреймворками.
+
+## Возможности
+
+- **Типизированные Jobs** — JobDefinition с типами input/output/options
+- **Stages** — Последовательные stages с параллельными jobs внутри
+- **Synapses** — Трансформация данных между jobs
+- **Retry** — Автоматический retry с настраиваемой задержкой
+- **Restart** — Перезапуск упавших pipelines с любой job
+- **Storage** — In-memory (тесты) или MongoDB (продакшн)
+- **Watchdog** — Фоновый мониторинг зависших jobs
 
 ## Пакеты
 

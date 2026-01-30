@@ -1,5 +1,5 @@
 import type { PipelineManager, PipelineStorage } from 'neuroline';
-import type { StartWithOptionsBody, ApiResponse, JobDetailsResponse } from './types';
+import type { StartWithOptionsBody, RetryBody, ApiResponse, JobDetailsResponse } from './types';
 
 /**
  * Хелпер для создания JSON ответа
@@ -334,6 +334,73 @@ export async function handleGetPipeline(
 		return jsonResponse<ApiResponse>(
 			{ success: false, error: message },
 			{ status: 500 },
+		);
+	}
+}
+
+/** Опции для перезапуска pipeline */
+export interface HandleRestartPipelineOptions {
+	/**
+	 * Callback для регистрации фонового выполнения в serverless окружении
+	 * Для Vercel/Next.js передайте waitUntil из next/server
+	 */
+	waitUntil?: (promise: Promise<unknown>) => void;
+}
+
+/**
+ * Хендлер для POST /pipeline?action=retry&id=xxx - перезапуск pipeline с указанной job
+ * 
+ * Body: { jobName: string, jobOptions?: Record<string, unknown> }
+ * 
+ * @param request - HTTP запрос
+ * @param manager - PipelineManager инстанс
+ * @param options - опции (waitUntil для serverless)
+ */
+export async function handleRestartPipeline(
+	request: Request,
+	manager: PipelineManager,
+	options?: HandleRestartPipelineOptions,
+): Promise<Response> {
+	try {
+		const { searchParams } = new URL(request.url);
+		const id = searchParams.get('id');
+
+		if (!id) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: 'id query parameter is required' },
+				{ status: 400 },
+			);
+		}
+
+		const body: RetryBody = await request.json();
+
+		if (!body.jobName) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: 'jobName is required' },
+				{ status: 400 },
+			);
+		}
+
+		const result = await manager.restartPipelineFromJob(
+			id,
+			body.jobName,
+			{
+				jobOptions: body.jobOptions,
+				onExecutionStart: options?.waitUntil,
+			},
+		);
+
+		return jsonResponse<ApiResponse>({
+			success: true,
+			data: result,
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Unknown error';
+		const status = message.includes('not found') ? 404 : 
+			message.includes('processing') ? 409 : 400;
+		return jsonResponse<ApiResponse>(
+			{ success: false, error: message },
+			{ status },
 		);
 	}
 }

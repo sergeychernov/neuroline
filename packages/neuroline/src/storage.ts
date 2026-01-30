@@ -129,6 +129,26 @@ export interface PipelineStorage {
      * @returns количество обновлённых джоб
      */
     findAndTimeoutStaleJobs(timeoutMs?: number): Promise<number>;
+
+    /**
+     * Сбросить состояние jobs для перезапуска pipeline
+     * 
+     * Для каждой job из resetJobIndices (или всех, если не указано):
+     * - статус → 'pending'
+     * - очищаются: artifact, errors, startedAt, finishedAt, retryCount
+     * 
+     * Также обновляет:
+     * - статус pipeline → 'processing'
+     * - currentJobIndex → минимальный индекс из resetJobIndices (или 0)
+     * - jobOptions (если переданы новые — полностью заменяют существующие)
+     */
+    resetJobs(options: {
+        pipelineId: string;
+        /** Индексы jobs для сброса. Если не указано — сбрасываются все jobs */
+        resetJobIndices?: Set<number>;
+        /** Новые опции для jobs (полностью заменяют существующие) */
+        jobOptions?: Record<string, unknown>;
+    }): Promise<void>;
 }
 
 /**
@@ -144,26 +164,26 @@ export class InMemoryPipelineStorage implements PipelineStorage {
     async findAll(params?: PaginationParams): Promise<PaginatedResult<PipelineState>> {
         const page = params?.page ?? 1;
         const limit = params?.limit ?? 10;
-        
+
         let items = Array.from(this.pipelines.values());
-        
+
         // Фильтрация по типу
         if (params?.pipelineType) {
             items = items.filter(p => p.pipelineType === params.pipelineType);
         }
-        
+
         // Сортировка по дате создания (новые первыми)
         items.sort((a, b) => {
             const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
             return dateB - dateA;
         });
-        
+
         const total = items.length;
         const totalPages = Math.ceil(total / limit);
         const startIndex = (page - 1) * limit;
         const paginatedItems = items.slice(startIndex, startIndex + limit);
-        
+
         return {
             items: paginatedItems,
             total,
@@ -332,6 +352,46 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         }
 
         return timedOutCount;
+    }
+
+    async resetJobs(options: {
+        pipelineId: string;
+        resetJobIndices?: Set<number>;
+        jobOptions?: Record<string, unknown>;
+    }): Promise<void> {
+        const { pipelineId, resetJobIndices, jobOptions } = options;
+        const pipeline = this.pipelines.get(pipelineId);
+        if (!pipeline) return;
+
+        // Определяем какие jobs сбрасывать
+        const indicesToReset = resetJobIndices ?? new Set(pipeline.jobs.map((_, i) => i));
+
+        // Сбрасываем указанные jobs
+        for (const i of indicesToReset) {
+            const job = pipeline.jobs[i];
+            if (!job) continue;
+
+            job.status = 'pending';
+            job.artifact = undefined;
+            job.errors = [];
+            job.startedAt = undefined;
+            job.finishedAt = undefined;
+            job.retryCount = undefined;
+            job.maxRetries = undefined;
+            // input и options сохраняем — они будут перезаписаны при выполнении
+        }
+
+        // Обновляем статус pipeline
+        pipeline.status = 'processing';
+        // currentJobIndex = минимальный индекс из сбрасываемых
+        pipeline.currentJobIndex = indicesToReset.size > 0 ? Math.min(...indicesToReset) : 0;
+
+        // Новые jobOptions полностью заменяют существующие
+        if (jobOptions) {
+            pipeline.jobOptions = jobOptions;
+        }
+
+        pipeline.updatedAt = new Date();
     }
 
     /** Для тестов: очистить все данные */

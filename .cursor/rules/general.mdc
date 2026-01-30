@@ -67,6 +67,30 @@ neuroline/
 - Для пакетов в `packages/*` (публикуемых) **не использовать** `workspace:*` в `dependencies` и `peerDependencies` — только semver диапазоны (например `^0.7.0`)
 - `workspace:*` допустим только в `devDependencies` и в `apps/*`/`private` пакетах
 
+### Lodash
+
+- Использовать **lodash** для типичных операций с массивами, объектами и коллекциями, где это упрощает код
+- **Импортировать функции по отдельности** для оптимизации tree-shaking:
+
+```typescript
+// ✅ Правильно — отдельный импорт
+import get from 'lodash/get';
+import groupBy from 'lodash/groupBy';
+import omit from 'lodash/omit';
+
+// ❌ Неправильно — импорт всей библиотеки
+import _ from 'lodash';
+import { get, groupBy, omit } from 'lodash';
+```
+
+- Типичные случаи применения:
+  - `get` / `set` — безопасный доступ к вложенным свойствам
+  - `groupBy` / `keyBy` — группировка коллекций
+  - `omit` / `pick` — выборка свойств объекта
+  - `cloneDeep` — глубокое копирование
+  - `debounce` / `throttle` — контроль частоты вызовов
+  - `isEqual` — глубокое сравнение объектов
+
 ### Именование
 
 | Сущность | Стиль | Пример |

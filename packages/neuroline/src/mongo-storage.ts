@@ -363,5 +363,49 @@ export class MongoPipelineStorage implements PipelineStorage {
 
         return result.modifiedCount;
     }
+
+    async resetJobs(options: {
+        pipelineId: string;
+        resetJobIndices?: Set<number>;
+        jobOptions?: Record<string, unknown>;
+    }): Promise<void> {
+        const { pipelineId, resetJobIndices, jobOptions } = options;
+
+        // Сначала получаем документ, чтобы узнать количество jobs
+        const doc = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
+        if (!doc) return;
+
+        // Определяем какие jobs сбрасывать
+        const indicesToReset = resetJobIndices ?? new Set(doc.jobs.map((_, i) => i));
+
+        // currentJobIndex = минимальный индекс из сбрасываемых
+        const minIndex = indicesToReset.size > 0 ? Math.min(...indicesToReset) : 0;
+
+        // Формируем обновления
+        const update: Record<string, unknown> = {
+            status: 'processing',
+            currentJobIndex: minIndex,
+        };
+
+        // Сбрасываем указанные jobs
+        for (const i of indicesToReset) {
+            if (i >= doc.jobs.length) continue;
+
+            update[`jobs.${i}.status`] = 'pending';
+            update[`jobs.${i}.artifact`] = undefined;
+            update[`jobs.${i}.errors`] = [];
+            update[`jobs.${i}.startedAt`] = undefined;
+            update[`jobs.${i}.finishedAt`] = undefined;
+            update[`jobs.${i}.retryCount`] = undefined;
+            update[`jobs.${i}.maxRetries`] = undefined;
+        }
+
+        // Новые jobOptions полностью заменяют существующие
+        if (jobOptions) {
+            update.jobOptions = sanitizeForMongo(jobOptions);
+        }
+
+        await this.pipelineModel.updateOne({ pipelineId }, { $set: update }).exec();
+    }
 }
 

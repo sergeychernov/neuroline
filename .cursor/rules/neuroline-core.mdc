@@ -116,6 +116,41 @@ await manager.timeoutStaleJobs();
 - Метод `findAndTimeoutStaleJobs()` в `PipelineStorage` — находит и таймаутит зависшие джобы
 - Watchdog использует `setInterval` с `unref()` — не блокирует завершение процесса
 
+### Restart Pipeline
+
+Перезапуск pipeline с указанной job (для исправления ошибок или повторного выполнения):
+
+```typescript
+// Перезапуск с job "transform" с новыми опциями
+const result = await manager.restartPipelineFromJob(pipelineId, 'transform', {
+    jobOptions: { transform: { format: 'csv' } },
+    onExecutionStart: (promise) => waitUntil(promise),
+});
+
+console.log(result.fromJobName);   // 'transform'
+console.log(result.jobsToRerun);   // количество jobs для перезапуска
+```
+
+- Перезапускается только указанная job и все последующие stages
+- Другие jobs того же stage (если они `done`) сохраняют артефакты и не перезапускаются
+- Артефакты сохранённых jobs доступны через `synapses`
+- Retry счётчик и errors сбрасываются для перезапускаемых jobs
+- Новые `jobOptions` полностью заменяют существующие
+- Pipeline не может быть перезапущен если он в статусе `processing`
+
+**Client API:**
+
+```typescript
+// Перезапуск с polling
+const polling = await client.restartAndPoll(
+    pipelineId,
+    'jobName',
+    { jobOptions },
+    onUpdate,
+    onError,
+);
+```
+
 ## Правила
 
 1. **Job должна быть чистой функцией** — не обращаться к глобальному состоянию

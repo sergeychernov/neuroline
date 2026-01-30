@@ -14,6 +14,8 @@ export interface JobNodeProps {
   job: JobDisplayInfo;
   isSelected?: boolean;
   onClick?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку retry */
+  onRetry?: (job: JobDisplayInfo) => void;
 }
 
 const pulse = keyframes`
@@ -64,6 +66,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
   job,
   isSelected = false,
   onClick,
+  onRetry,
 }) => {
   const colors = statusColors[job.status];
   const isProcessing = job.status === 'processing';
@@ -171,34 +174,84 @@ export const JobNode: React.FC<JobNodeProps> = ({
             {duration}
           </Typography>
         )}
-        {/* Retry counter - show only if retries happened */}
-        {(job.retryCount ?? 0) > 0 && job.maxRetries !== undefined && (
-          <Tooltip
-            title={`Retry ${job.retryCount} of ${job.maxRetries}`}
-            arrow
-          >
-            <Chip
-              icon={<ReplayIcon sx={{ fontSize: 14 }} />}
-              label={`${job.retryCount}/${job.maxRetries}`}
-              size="small"
-              sx={{
-                height: 20,
-                fontSize: '0.7rem',
-                backgroundColor: 'rgba(255, 152, 0, 0.2)',
-                color: '#ff9800',
-                border: '1px solid rgba(255, 152, 0, 0.4)',
-                '& .MuiChip-icon': {
-                  color: 'inherit',
-                  marginLeft: '4px',
-                },
-                '& .MuiChip-label': {
-                  paddingLeft: '4px',
-                  paddingRight: '6px',
-                },
-              }}
-            />
-          </Tooltip>
-        )}
+        {/* Retry button - show if onRetry provided OR retries configured/happened */}
+        {(onRetry || (job.retryCount ?? 0) > 0 || job.maxRetries !== undefined) && (() => {
+          const isDisabled = job.status === 'processing' || job.status === 'pending';
+          const canRetry = onRetry && !isDisabled;
+          const hasRetryInfo = (job.retryCount ?? 0) > 0 || job.maxRetries !== undefined;
+          const showLabel = hasRetryInfo;
+
+          return (
+            <Tooltip
+              title={
+                job.status === 'pending'
+                  ? 'Not started yet'
+                  : job.status === 'processing'
+                    ? hasRetryInfo
+                      ? `Retry ${job.retryCount ?? 0} of ${job.maxRetries ?? 0} (in progress)`
+                      : 'In progress'
+                    : canRetry
+                      ? hasRetryInfo
+                        ? `Retry (${job.retryCount ?? 0}/${job.maxRetries ?? 0}) — click to restart`
+                        : 'Click to restart'
+                      : `Retry ${job.retryCount ?? 0} of ${job.maxRetries ?? 0}`
+              }
+              arrow
+            >
+              <Chip
+                icon={<ReplayIcon sx={{ fontSize: 14 }} />}
+                label={showLabel ? `${job.retryCount ?? 0}/${job.maxRetries ?? 0}` : undefined}
+                size="small"
+                disabled={isDisabled}
+                onClick={
+                  canRetry
+                    ? (e) => {
+                      e.stopPropagation();
+                      onRetry(job);
+                    }
+                    : undefined
+                }
+                sx={{
+                  height: 20,
+                  fontSize: '0.7rem',
+                  backgroundColor: 'rgba(255, 152, 0, 0.2)',
+                  color: '#ff9800',
+                  border: '1px solid rgba(255, 152, 0, 0.4)',
+                  cursor: canRetry ? 'pointer' : 'default',
+                  transition: 'all 0.2s ease',
+                  // Если нет label — компактный вид
+                  ...(!showLabel && {
+                    minWidth: 24,
+                    '& .MuiChip-label': {
+                      display: 'none',
+                    },
+                    '& .MuiChip-icon': {
+                      margin: 0,
+                    },
+                  }),
+                  '&.Mui-disabled': {
+                    opacity: 0.5,
+                    color: '#ff9800',
+                  },
+                  '&:hover': canRetry
+                    ? {
+                      backgroundColor: 'rgba(255, 152, 0, 0.35)',
+                      borderColor: 'rgba(255, 152, 0, 0.7)',
+                    }
+                    : {},
+                  '& .MuiChip-icon': {
+                    color: 'inherit',
+                    marginLeft: '4px',
+                  },
+                  '& .MuiChip-label': {
+                    paddingLeft: '4px',
+                    paddingRight: '6px',
+                  },
+                }}
+              />
+            </Tooltip>
+          );
+        })()}
       </Box>
 
       {/* Decorative connectors like a neuron */}

@@ -6,6 +6,8 @@ import { JobNode } from './JobNode';
 export interface StageColumnProps {
   stage: StageDisplayInfo;
   onJobClick?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку retry job */
+  onJobRetry?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
 }
 
@@ -15,6 +17,7 @@ export interface StageColumnProps {
 export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
   onJobClick,
+  onJobRetry,
   selectedJobName,
 }) => {
   const isParallel = stage.jobs.length > 1;
@@ -113,6 +116,7 @@ export const StageColumn: React.FC<StageColumnProps> = ({
             job={job}
             isSelected={job.name === selectedJobName}
             onClick={onJobClick}
+            onRetry={onJobRetry}
           />
         ))}
       </Box>

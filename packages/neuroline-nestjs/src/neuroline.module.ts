@@ -148,6 +148,12 @@ interface StartWithOptionsBody {
 	jobOptions?: Record<string, unknown>;
 }
 
+/** Body для перезапуска pipeline (action=retry) */
+interface RetryBody {
+	jobName: string;
+	jobOptions?: Record<string, unknown>;
+}
+
 /** Query параметры для GET запросов */
 interface GetQueryParams {
 	action?: string;
@@ -273,14 +279,44 @@ function createDynamicController(
 		 * 
 		 * Базовый режим: body = TInput напрямую, jobOptions получаются через getJobOptions
 		 * Admin режим (?action=startWithOptions): body = { input, jobOptions }
+		 * Retry режим (?action=retry&id=xxx): body = { jobName, jobOptions? }
 		 */
 		@Post()
 		async start(
 			@Body() body: unknown,
 			@Query('action') action: string | undefined,
+			@Query('id') id: string | undefined,
 			@Req() request: any,
 		): Promise<ApiResponse> {
 			try {
+				// Retry режим: action=retry
+				if (action === 'retry') {
+					await this.checkAdminGuards(request);
+
+					if (!id) {
+						throw new HttpException(
+							{ success: false, error: 'id query parameter is required' },
+							HttpStatus.BAD_REQUEST,
+						);
+					}
+
+					const retryBody = body as RetryBody;
+					if (!retryBody.jobName) {
+						throw new HttpException(
+							{ success: false, error: 'jobName is required' },
+							HttpStatus.BAD_REQUEST,
+						);
+					}
+
+					const result = await this.manager.restartPipelineFromJob(
+						id,
+						retryBody.jobName,
+						{ jobOptions: retryBody.jobOptions },
+					);
+
+					return { success: true, data: result };
+				}
+
 				// Admin режим: action=startWithOptions
 				if (action === 'startWithOptions') {
 					await this.checkAdminGuards(request);

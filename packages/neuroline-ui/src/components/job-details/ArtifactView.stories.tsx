@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ArtifactView } from './ArtifactView';
 
 const meta: Meta<typeof ArtifactView> = {

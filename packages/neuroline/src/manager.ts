@@ -15,6 +15,8 @@ import type {
     JobError,
     StartPipelineResponse,
     StartPipelineOptions,
+    RestartPipelineOptions,
+    RestartPipelineResponse,
     PipelineStatusResponse,
     PipelineResultResponse,
     PipelineState,
@@ -87,6 +89,54 @@ const computeConfigHash = (stages: PipelineStage[]): string => {
     return crypto.createHash('sha256').update(jobNames.join(',')).digest('hex').slice(0, 16);
 };
 
+/** Результат фильтрации jobs stage */
+interface FilteredStageJobs {
+    /** Jobs которые нужно выполнить */
+    jobsToExecute: Array<{
+        jobInPipeline: JobInPipeline;
+        indexInStage: number;
+        jobIndex: number;
+    }>;
+    /** Артефакты из уже выполненных jobs (name -> artifact) */
+    loadedArtifacts: Map<string, unknown>;
+}
+
+/**
+ * Фильтрует jobs stage: определяет какие нужно выполнить, какие уже готовы
+ * 
+ * @param stageJobs - jobs из конфигурации stage
+ * @param stageJobIndices - индексы jobs в плоском списке pipeline
+ * @param pipelineJobs - состояние jobs из storage
+ * @returns jobsToExecute и loadedArtifacts
+ */
+const filterStageJobs = (
+    stageJobs: JobInPipeline[],
+    stageJobIndices: number[],
+    pipelineJobs: JobState[],
+): FilteredStageJobs => {
+    const jobsToExecute: FilteredStageJobs['jobsToExecute'] = [];
+    const loadedArtifacts = new Map<string, unknown>();
+
+    for (let i = 0; i < stageJobs.length; i++) {
+        const jobIndex = stageJobIndices[i];
+        const jobState = pipelineJobs[jobIndex];
+
+        if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+            // Job уже выполнена — загружаем артефакт для synapses
+            loadedArtifacts.set(stageJobs[i].job.name, jobState.artifact);
+        } else {
+            // Job нужно выполнить
+            jobsToExecute.push({
+                jobInPipeline: stageJobs[i],
+                indexInStage: i,
+                jobIndex,
+            });
+        }
+    }
+
+    return { jobsToExecute, loadedArtifacts };
+};
+
 // ============================================================================
 // Pipeline Manager Options
 // ============================================================================
@@ -155,8 +205,8 @@ export class PipelineManager {
     /**
      * Регистрирует конфигурацию пайплайна
      */
-    registerPipeline(config: PipelineConfig): void {
-        this.pipelineConfigs.set(config.name, config);
+    registerPipeline<TInput = unknown>(config: PipelineConfig<TInput>): void {
+        this.pipelineConfigs.set(config.name, config as PipelineConfig);
         const totalJobs = flattenStages(config.stages).length;
         this.logger.info(`Pipeline registered: ${config.name}`, {
             stagesCount: config.stages.length,
@@ -267,9 +317,21 @@ export class PipelineManager {
 
     /**
      * Выполняет пайплайн: stages последовательно, jobs внутри stage — параллельно
+     * 
+     * При перезапуске выполняются только jobs со статусом 'pending'.
+     * Jobs со статусом 'done' пропускаются, их артефакты загружаются из storage.
+     * 
+     * @param pipelineId - ID пайплайна
+     * @param pipelineType - тип пайплайна
+     * @param startFromStageIndex - индекс stage, с которого начать выполнение (для перезапуска)
      */
-    private async executePipeline(pipelineId: string, pipelineType: string): Promise<void> {
+    private async executePipeline(
+        pipelineId: string,
+        pipelineType: string,
+        startFromStageIndex = 0,
+    ): Promise<void> {
         const config = this.getPipelineConfig(pipelineType);
+        // Перечитываем pipeline из storage чтобы получить актуальные статусы jobs
         const pipeline = await this.storage.findById(pipelineId);
 
         if (!pipeline) {
@@ -298,26 +360,76 @@ export class PipelineManager {
             const stage = config.stages[stageIndex];
             const stageJobs = normalizeStage(stage);
 
-            this.logger.info(`Executing stage ${stageIndex + 1}/${config.stages.length}`, {
-                pipelineId,
-                jobsInStage: stageJobs.length,
-                parallel: stageJobs.length > 1,
-            });
+            // Если это stage до точки перезапуска — загружаем артефакты из storage и пропускаем
+            if (stageIndex < startFromStageIndex) {
+                for (let i = 0; i < stageJobs.length; i++) {
+                    const jobInPipeline = stageJobs[i];
+                    const jobState = pipeline.jobs[flatJobIndex + i];
+
+                    // Загружаем артефакт из уже выполненной job для synapses
+                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                        artifacts.set(jobInPipeline.job.name, jobState.artifact);
+                    }
+                }
+
+                // Обновляем defaultInput если в stage была одна job
+                if (stageJobs.length === 1) {
+                    const jobState = pipeline.jobs[flatJobIndex];
+                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                        defaultInput = jobState.artifact;
+                    }
+                }
+
+                flatJobIndex += stageJobs.length;
+                continue;
+            }
 
             // Сохраняем начальные индексы jobs этого stage
             const stageJobIndices = stageJobs.map((_, i) => flatJobIndex + i);
 
-            // Обновляем статус всех jobs stage на processing
+            // Фильтруем: выполняем только jobs со статусом pending
+            // Jobs со статусом done пропускаем (используем их артефакты)
+            const { jobsToExecute, loadedArtifacts } = filterStageJobs(
+                stageJobs,
+                stageJobIndices,
+                pipeline.jobs,
+            );
+
+            // Добавляем загруженные артефакты в общую карту
+            for (const [name, artifact] of loadedArtifacts) {
+                artifacts.set(name, artifact);
+            }
+
+            // Если все jobs в stage уже выполнены — пропускаем
+            if (jobsToExecute.length === 0) {
+                // Обновляем defaultInput если в stage была одна job
+                if (stageJobs.length === 1) {
+                    const jobState = pipeline.jobs[flatJobIndex];
+                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                        defaultInput = jobState.artifact;
+                    }
+                }
+                flatJobIndex += stageJobs.length;
+                continue;
+            }
+
+            this.logger.info(`Executing stage ${stageIndex + 1}/${config.stages.length}`, {
+                pipelineId,
+                jobsInStage: stageJobs.length,
+                jobsToExecute: jobsToExecute.length,
+                parallel: jobsToExecute.length > 1,
+            });
+
+            // Обновляем статус только тех jobs, которые будем выполнять
             await Promise.all(
-                stageJobIndices.map((jobIndex) =>
+                jobsToExecute.map(({ jobIndex }) =>
                     this.storage.updateJobStatus(pipelineId, jobIndex, 'processing', new Date()),
                 ),
             );
 
-            // Выполняем все jobs stage параллельно
-            const jobPromises = stageJobs.map(async (jobInPipeline, indexInStage) => {
+            // Выполняем только pending jobs параллельно
+            const jobPromises = jobsToExecute.map(async ({ jobInPipeline, jobIndex }) => {
                 const { job: jobDef, synapses, retries = 0, retryDelay = 1000 } = jobInPipeline;
-                const jobIndex = stageJobIndices[indexInStage];
 
                 // Подготавливаем input через synapses или используем дефолтный
                 const jobInput = synapses ? synapses(mapperContext) : defaultInput;
@@ -545,6 +657,115 @@ export class PipelineManager {
             jobName: job.name,
             status: job.status,
             artifact: job.status === 'done' ? (job.artifact ?? null) : undefined,
+        };
+    }
+
+    /**
+     * Перезапускает пайплайн начиная с указанной job
+     * 
+     * Сбрасывает состояние выбранной job и всех последующих, затем запускает выполнение.
+     * Артефакты jobs до точки перезапуска сохраняются и доступны через synapses.
+     * 
+     * @param pipelineId - ID пайплайна
+     * @param fromJobName - имя job, с которой начать перезапуск
+     * @param options - опции перезапуска (новые jobOptions, onExecutionStart)
+     * 
+     * @example
+     * ```typescript
+     * // Перезапуск с job "transform" с новыми опциями
+     * const result = await manager.restartPipelineFromJob(pipelineId, 'transform', {
+     *     jobOptions: { transform: { format: 'csv' } },
+     *     onExecutionStart: (promise) => waitUntil(promise),
+     * });
+     * ```
+     */
+    async restartPipelineFromJob(
+        pipelineId: string,
+        fromJobName: string,
+        options?: RestartPipelineOptions,
+    ): Promise<RestartPipelineResponse> {
+        const pipeline = await this.storage.findById(pipelineId);
+
+        if (!pipeline) {
+            throw new Error(`Pipeline ${pipelineId} not found`);
+        }
+
+        // Проверяем, что pipeline не в процессе выполнения
+        if (pipeline.status === 'processing') {
+            throw new Error(`Pipeline ${pipelineId} is currently processing, cannot restart`);
+        }
+
+        const config = this.getPipelineConfig(pipeline.pipelineType);
+        const flat = flattenStages(config.stages);
+
+        // Находим индекс job по имени
+        const jobIndex = pipeline.jobs.findIndex((j) => j.name === fromJobName);
+        if (jobIndex === -1) {
+            throw new Error(`Job "${fromJobName}" not found in pipeline ${pipelineId}`);
+        }
+
+        // Находим stageIndex для этой job (для передачи в executePipeline)
+        const stageIndex = flat[jobIndex].stageIndex;
+
+        // Собираем индексы jobs для сброса:
+        // - указанная job
+        // - все jobs следующих stages
+        // НЕ сбрасываем другие done jobs того же stage
+        const resetJobIndices = new Set<number>();
+        for (let i = 0; i < flat.length; i++) {
+            if (i === jobIndex) {
+                // Указанная job — всегда сбрасываем
+                resetJobIndices.add(i);
+            } else if (flat[i].stageIndex > stageIndex) {
+                // Job из следующего stage — сбрасываем
+                resetJobIndices.add(i);
+            } else if (flat[i].stageIndex === stageIndex) {
+                // Другая job того же stage — сбрасываем только если не done
+                const jobState = pipeline.jobs[i];
+                if (jobState?.status !== 'done') {
+                    resetJobIndices.add(i);
+                }
+            }
+            // Jobs предыдущих stages не трогаем
+        }
+
+        // Сбрасываем только нужные jobs
+        await this.storage.resetJobs({
+            pipelineId,
+            resetJobIndices,
+            jobOptions: options?.jobOptions,
+        });
+
+        const jobsToRerun = resetJobIndices.size;
+
+        this.logger.info('Restarting pipeline from job', {
+            pipelineId,
+            fromJobName,
+            fromJobIndex: jobIndex,
+            stageIndex,
+            jobsToRerun,
+        });
+
+        // Создаём promise выполнения с указанием startFromStageIndex
+        // executePipeline пропустит jobs со статусом done (они сохранят артефакты)
+        const executionPromise = this.executePipeline(
+            pipelineId,
+            pipeline.pipelineType,
+            stageIndex,
+        ).catch((error) => {
+            this.logger.error('Pipeline restart execution failed', { pipelineId, error });
+        });
+
+        // Вызываем callback если передан (для waitUntil в serverless)
+        if (options?.onExecutionStart) {
+            options.onExecutionStart(executionPromise);
+        }
+
+        return {
+            pipelineId,
+            fromJobName,
+            fromJobIndex: jobIndex,
+            jobsToRerun,
         };
     }
 

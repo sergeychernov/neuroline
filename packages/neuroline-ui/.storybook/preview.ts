@@ -1,4 +1,4 @@
-import type { Preview } from '@storybook/react';
+import type { Preview } from '@storybook/react-vite';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import React from 'react';
 
@@ -22,6 +22,7 @@ const theme = createTheme({
 });
 
 const preview: Preview = {
+  tags: ['autodocs'],
   parameters: {
     controls: {
       matchers: {
@@ -36,6 +37,11 @@ const preview: Preview = {
         { name: 'light', value: '#ffffff' },
       ],
     },
+    docs: {
+      canvas: {
+        background: '#0a0a0f',
+      },
+    },
   },
   decorators: [
     (Story) =>
@@ -43,7 +49,11 @@ const preview: Preview = {
         ThemeProvider,
         { theme },
         React.createElement(CssBaseline),
-        React.createElement(Story)
+        React.createElement(
+          'div',
+          { style: { backgroundColor: '#0a0a0f', padding: '20px', minHeight: '100px' } },
+          React.createElement(Story)
+        )
       ),
   ],
 };

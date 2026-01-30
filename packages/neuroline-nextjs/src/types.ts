@@ -4,6 +4,16 @@ import type { JobDetailsResponse, StartWithOptionsBody } from 'neuroline';
 export type { StartWithOptionsBody };
 
 /**
+ * Body для перезапуска pipeline (action=retry)
+ */
+export interface RetryBody {
+	/** Имя job, с которой начать перезапуск */
+	jobName: string;
+	/** Новые опции для jobs (опционально) */
+	jobOptions?: Record<string, unknown>;
+}
+
+/**
  * Query параметры для статуса
  */
 export interface StatusQuery {

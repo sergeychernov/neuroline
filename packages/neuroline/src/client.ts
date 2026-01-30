@@ -10,6 +10,7 @@
 import type {
 	JobStatus,
 	StartPipelineResponse,
+	RestartPipelineResponse,
 	PipelineStatusResponse,
 	PipelineResultResponse,
 	JobDetailsResponse,
@@ -210,6 +211,61 @@ export class PipelineClient {
 		}
 
 		return data.data as JobDetailsResponse;
+	}
+
+	/**
+	 * Перезапускает pipeline с указанной job (admin режим)
+	 * 
+	 * Требует enableDebugEndpoints: true на сервере (Next.js) 
+	 * или adminGuards на сервере (NestJS).
+	 * 
+	 * @param pipelineId - ID pipeline
+	 * @param jobName - имя job, с которой начать перезапуск
+	 * @param jobOptions - новые опции для jobs (опционально)
+	 */
+	async restart(
+		pipelineId: string,
+		jobName: string,
+		jobOptions?: Record<string, unknown>,
+	): Promise<RestartPipelineResponse> {
+		const url = `${this.config.baseUrl}?action=retry&id=${encodeURIComponent(pipelineId)}`;
+		const response = await this.config.fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ jobName, jobOptions }),
+		});
+
+		const data: ApiResponse<RestartPipelineResponse> = await response.json();
+
+		if (!data.success || !data.data) {
+			throw new Error(data.error ?? 'Failed to restart pipeline');
+		}
+
+		return data.data;
+	}
+
+	/**
+	 * Перезапускает pipeline с указанной job и сразу начинает polling
+	 * 
+	 * @param pipelineId - ID pipeline
+	 * @param jobName - имя job, с которой начать перезапуск
+	 * @param jobOptions - новые опции для jobs (опционально)
+	 */
+	async restartAndPoll(
+		pipelineId: string,
+		jobName: string,
+		jobOptions?: Record<string, unknown>,
+		onUpdate?: PipelineUpdateCallback,
+		onError?: PipelineErrorCallback,
+	): Promise<PollingResult & { pipelineId: string }> {
+		await this.restart(pipelineId, jobName, jobOptions);
+
+		const polling = this.poll(pipelineId, onUpdate, onError);
+
+		return {
+			...polling,
+			pipelineId,
+		};
 	}
 
 	/**

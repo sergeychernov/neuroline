@@ -13,7 +13,7 @@ React компоненты для визуализации pipelines: стату
 
 - React 18 (функциональные компоненты)
 - MUI 5 (Material UI)
-- Storybook 8 для разработки
+- Storybook 10 для разработки
 
 ## Структура
 
@@ -65,9 +65,24 @@ src/
 
 ### JobNode и Retry
 
-`JobNode` отображает счётчик ретраев если `retryCount > 0`:
+`JobNode` отображает кнопку retry с возможностью перезапуска:
+
+```tsx
+<JobNode
+    job={job}
+    onClick={(job) => console.log('clicked', job)}
+    onRetry={(job) => restartPipeline(job.name)}  // callback для перезапуска
+/>
+```
 
 ```typescript
+interface JobNodeProps {
+    job: JobDisplayInfo;
+    isSelected?: boolean;
+    onClick?: (job: JobDisplayInfo) => void;
+    onRetry?: (job: JobDisplayInfo) => void;  // callback при клике на кнопку retry
+}
+
 interface JobDisplayInfo {
     // ... другие поля
     retryCount?: number;   // Количество выполненных ретраев
@@ -75,8 +90,23 @@ interface JobDisplayInfo {
 }
 ```
 
-- Badge показывается только если были ретраи (`retryCount > 0`)
-- Формат: `1/2` = 1 ретрай выполнен из максимум 2
+- Кнопка retry видна если передан `onRetry` или настроены retries (`retryCount`/`maxRetries`)
+- Если нет информации о retries — показывается только иконка без label
+- Кнопка disabled при статусе `pending` или `processing`
+- При клике вызывает `onRetry(job)` с `stopPropagation()` (не триггерит `onClick` карточки)
+
+### PipelineViewer с retry
+
+`PipelineViewer` прокидывает `onJobRetry` в каждую `JobNode`:
+
+```tsx
+<PipelineViewer
+    pipeline={pipeline}
+    onJobClick={(job) => showDetails(job)}
+    onJobRetry={(job) => restartPipeline(job.name)}  // прокидывается в JobNode.onRetry
+    selectedJobName={selectedJob?.name}
+/>
+```
 
 ### Storybook
 

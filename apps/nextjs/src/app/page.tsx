@@ -186,6 +186,43 @@ export default function HomePage() {
     setIsRunning(false);
   }, []);
 
+  const handleJobRetry = useCallback(
+    async (job: JobDisplayInfo) => {
+      const pipelineId = currentPipelineIdRef.current;
+      const client = currentClientRef.current;
+
+      if (!pipelineId || !client) {
+        console.error('No pipeline or client available for retry');
+        return;
+      }
+
+      // Нельзя перезапустить если pipeline ещё выполняется
+      if (isRunning) {
+        console.warn('Cannot retry while pipeline is running');
+        return;
+      }
+
+      try {
+        setIsRunning(true);
+        stopRef.current?.();
+
+        const polling = await client.restartAndPoll(
+          pipelineId,
+          job.name,
+          undefined, // jobOptions
+          handleUpdate,
+          handleError,
+        );
+
+        stopRef.current = polling.stop;
+      } catch (e) {
+        console.error('Failed to restart pipeline:', e);
+        setIsRunning(false);
+      }
+    },
+    [isRunning, handleUpdate, handleError],
+  );
+
   const startPipeline = useCallback(
     async (
       client: PipelineClient,
@@ -436,6 +473,7 @@ export default function HomePage() {
           <PipelineViewer
             pipeline={pipeline}
             onJobClick={handleJobClick}
+            onJobRetry={handleJobRetry}
             selectedJobName={selectedJob?.name}
           />
         ) : (

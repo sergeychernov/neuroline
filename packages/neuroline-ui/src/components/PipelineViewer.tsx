@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
 import { Box, Typography, Paper, Chip } from '@mui/material';
+import flatMap from 'lodash/flatMap';
+import countBy from 'lodash/countBy';
 import type { PipelineDisplayData, JobDisplayInfo } from '../types';
 import { StageColumn } from './StageColumn';
 import { StatusBadge } from './StatusBadge';
@@ -7,6 +9,8 @@ import { StatusBadge } from './StatusBadge';
 export interface PipelineViewerProps {
   pipeline: PipelineDisplayData;
   onJobClick?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку retry job */
+  onJobRetry?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
 }
 
@@ -17,17 +21,19 @@ export interface PipelineViewerProps {
 export const PipelineViewer: React.FC<PipelineViewerProps> = ({
   pipeline,
   onJobClick,
+  onJobRetry,
   selectedJobName,
 }) => {
   // Compute stats
   const stats = useMemo(() => {
-    const allJobs = pipeline.stages.flatMap((s) => s.jobs);
+    const allJobs = flatMap(pipeline.stages, (s: { jobs: JobDisplayInfo[] }) => s.jobs);
+    const counts = countBy(allJobs, 'status');
     return {
       total: allJobs.length,
-      done: allJobs.filter((j) => j.status === 'done').length,
-      processing: allJobs.filter((j) => j.status === 'processing').length,
-      error: allJobs.filter((j) => j.status === 'error').length,
-      pending: allJobs.filter((j) => j.status === 'pending').length,
+      done: counts.done ?? 0,
+      processing: counts.processing ?? 0,
+      error: counts.error ?? 0,
+      pending: counts.pending ?? 0,
     };
   }, [pipeline.stages]);
 
@@ -137,6 +143,7 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
             <StageColumn
               stage={stage}
               onJobClick={onJobClick}
+              onJobRetry={onJobRetry}
               selectedJobName={selectedJobName}
             />
 

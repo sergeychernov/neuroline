@@ -1,6 +1,7 @@
 import type { PipelineManager, PipelineStorage, PipelineConfig } from 'neuroline';
 import {
 	handleStartPipeline,
+	handleRestartPipeline,
 	handleGetStatus,
 	handleGetResult,
 	handleGetList,
@@ -98,6 +99,7 @@ export interface PipelineRouteHandlers {
  * Debug endpoints (требуют enableDebugEndpoints: true):
  * - GET /api/pipeline/success?action=job&id=xxx&jobName=yyy - данные job
  * - GET /api/pipeline/success?action=pipeline&id=xxx - полные данные pipeline
+ * - POST /api/pipeline/success?action=retry&id=xxx - перезапуск pipeline (body: { jobName, jobOptions? })
  */
 export function createPipelineRouteHandler<TInput = unknown>(
 	options: PipelineRouteHandlerOptions<TInput>,
@@ -111,6 +113,23 @@ export function createPipelineRouteHandler<TInput = unknown>(
 
 	return {
 		POST: async (request: Request) => {
+			const { searchParams } = new URL(request.url);
+			const action = searchParams.get('action');
+
+			// Retry режим: action=retry
+			if (action === 'retry') {
+				if (!enableDebugEndpoints) {
+					return new Response(
+						JSON.stringify({
+							success: false,
+							error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+						}),
+						{ status: 403, headers: { 'Content-Type': 'application/json' } },
+					);
+				}
+				return handleRestartPipeline(request, manager, { waitUntil });
+			}
+
 			return handleStartPipeline(request, manager, pipelineType, {
 				waitUntil,
 				enableAdminStart: enableDebugEndpoints,
