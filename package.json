@@ -1,30 +1,48 @@
 {
-	"name": "neuroline-monorepo",
-	"private": true,
-	"workspaces": [
-		"packages/*",
-		"apps/*"
-	],
-	"scripts": {
-		"dev": "yarn workspace @neuroline/nextjs dev",
-		"dev:nestjs": "yarn workspace @neuroline/nestjs-example dev",
-		"build": "yarn workspaces foreach -Apt run build",
-		"build:packages": "yarn workspace neuroline build && yarn workspace demo-pipelines build && yarn workspace neuroline-ui build && yarn workspace neuroline-nextjs build && yarn workspace neuroline-nestjs build",
-		"lint": "yarn workspaces foreach -Ap run lint",
-		"test": "yarn workspaces foreach -Ap run test",
-		"storybook": "yarn workspace neuroline-ui storybook",
-		"build-storybook": "yarn workspace neuroline-ui build-storybook",
-		"build-storybook:nextjs": "STORYBOOK_BASE_PATH=/packages/neuroline-ui/storybook/ yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/",
-		"docs": "yarn workspace @neuroline/docs start",
-		"build-docs": "yarn workspace @neuroline/docs build",
-		"build-docs:nextjs": "yarn workspace @neuroline/docs build --out-dir ../nextjs/public/docs",
-		"vercel-build": "yarn build:packages && yarn build-storybook:nextjs && yarn build-docs:nextjs && yarn workspace @neuroline/nextjs build"
-	},
-	"devDependencies": {
-		"typescript": "^5.9.3"
-	},
-	"packageManager": "yarn@4.12.0",
-	"engines": {
-		"node": ">=20.0.0"
-	}
+  "name": "neuroline-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "yarn workspace @neuroline/nextjs dev",
+    "dev:nestjs": "yarn workspace @neuroline/nestjs-example dev",
+    "build": "yarn workspaces foreach -Apt run build",
+    "build:packages": "yarn workspace neuroline build && yarn workspace demo-pipelines build && yarn workspace neuroline-ui build && yarn workspace neuroline-nextjs build && yarn workspace neuroline-nestjs build",
+    "lint": "yarn workspaces foreach -Ap run lint",
+    "test": "yarn workspaces foreach -Ap run test",
+    "storybook": "yarn workspace neuroline-ui storybook",
+    "build-storybook": "yarn workspace neuroline-ui build-storybook",
+    "build-storybook:nextjs": "STORYBOOK_BASE_PATH=/packages/neuroline-ui/storybook/ yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/",
+    "docs": "yarn workspace @neuroline/docs start",
+    "build-docs": "yarn workspace @neuroline/docs build",
+    "build-docs:nextjs": "yarn workspace @neuroline/docs build --out-dir ../nextjs/public/docs",
+    "vercel-build": "yarn build:packages && yarn build-storybook:nextjs && yarn build-docs:nextjs && yarn workspace @neuroline/nextjs build",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
+    "eslint": "^9.39.2",
+    "globals": "^17.2.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.54.0"
+  },
+  "packageManager": "yarn@4.12.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
 }
