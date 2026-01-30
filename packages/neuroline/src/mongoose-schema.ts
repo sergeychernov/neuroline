@@ -111,3 +111,24 @@ export const PipelineSchema = new MongooseSchema<MongoPipelineDocument>(
 // Составной индекс для быстрого поиска по типу и статусу
 PipelineSchema.index({ pipelineType: 1, status: 1 });
 
+// Индекс для сортировки по дате создания (используется в findAll)
+PipelineSchema.index({ createdAt: -1 });
+
+// Составной индекс для фильтрации по статусу с сортировкой по дате
+// Оптимизирует запросы типа: find({ status: 'processing' }).sort({ createdAt: -1 })
+PipelineSchema.index({ status: 1, createdAt: -1 });
+
+// Критичный индекс для watchdog запросов (findAndTimeoutStaleJobs)
+// Ускоряет поиск зависших jobs в активных пайплайнах
+PipelineSchema.index({ status: 1, 'jobs.status': 1, 'jobs.startedAt': 1 });
+
+// Partial index для оптимизации watchdog - индексирует только активные пайплайны
+// Экономит ~60% места в индексе, так как большинство пайплайнов уже завершены
+PipelineSchema.index(
+    { 'jobs.status': 1, 'jobs.startedAt': 1 },
+    {
+        partialFilterExpression: { status: 'processing' },
+        name: 'processing_jobs_watchdog',
+    },
+);
+
