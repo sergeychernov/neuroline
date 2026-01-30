@@ -14,7 +14,7 @@
 		"test": "yarn workspaces foreach -Ap run test",
 		"storybook": "yarn workspace neuroline-ui storybook",
 		"build-storybook": "yarn workspace neuroline-ui build-storybook",
-		"build-storybook:nextjs": "yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/",
+		"build-storybook:nextjs": "STORYBOOK_BASE_PATH=/packages/neuroline-ui/storybook/ yarn workspace neuroline-ui build-storybook --output-dir ../../apps/nextjs/public/packages/neuroline-ui/storybook && node scripts/patch-storybook-base.mjs apps/nextjs/public/packages/neuroline-ui/storybook /packages/neuroline-ui/storybook/",
 		"docs": "yarn workspace @neuroline/docs start",
 		"build-docs": "yarn workspace @neuroline/docs build",
 		"build-docs:nextjs": "yarn workspace @neuroline/docs build --out-dir ../nextjs/public/docs",
