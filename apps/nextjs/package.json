@@ -9,28 +9,28 @@
 		"lint": "next lint"
 	},
 	"dependencies": {
-		"@emotion/cache": "^11.11.0",
-		"@emotion/react": "^11.11.3",
-		"@emotion/styled": "^11.11.0",
-		"@mui/icons-material": "^5.15.4",
-		"@mui/material": "^5.15.4",
-		"@mui/material-nextjs": "^5.15.4",
-		"@vercel/functions": "^1.0.0",
+		"@emotion/cache": "^11.14.0",
+		"@emotion/react": "^11.14.0",
+		"@emotion/styled": "^11.14.1",
+		"@mui/icons-material": "^5",
+		"@mui/material": "^5",
+		"@mui/material-nextjs": "^5",
+		"@vercel/functions": "^3.4.0",
 		"demo-pipelines": "workspace:*",
-		"mongoose": "^8.0.0",
+		"mongoose": "^8",
 		"neuroline": "workspace:*",
 		"neuroline-nextjs": "workspace:*",
 		"neuroline-ui": "workspace:*",
-		"next": "14.1.0",
-		"react": "^18.2.0",
-		"react-dom": "^18.2.0"
+		"next": "14.2.15",
+		"react": "^18",
+		"react-dom": "^18"
 	},
 	"devDependencies": {
-		"@types/node": "^20.11.5",
-		"@types/react": "^18.2.48",
-		"@types/react-dom": "^18.2.18",
-		"eslint": "^8.56.0",
-		"eslint-config-next": "14.1.0",
-		"typescript": "^5.3.3"
+		"@types/node": "^25.1.0",
+		"@types/react": "^18",
+		"@types/react-dom": "^18",
+		"eslint": "^8",
+		"eslint-config-next": "14.2.15",
+		"typescript": "^5.9.3"
 	}
 }
