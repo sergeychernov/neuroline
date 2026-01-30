@@ -81,11 +81,11 @@
 		"@mui/icons-material": "^5",
 		"@mui/material": "^5",
 		"@types/react": "^18",
-		"@vitest/coverage-v8": "^1",
+		"@vitest/coverage-v8": "^4",
 		"mongoose": "^8",
 		"react": "^18",
 		"tsup": "^8.5.1",
 		"typescript": "^5.9.3",
-		"vitest": "^1"
+		"vitest": "^4"
 	}
 }
