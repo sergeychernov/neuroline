@@ -32,11 +32,7 @@ npm install neuroline neuroline-nestjs
 ```typescript
 import { Module } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
-import {
-  NeurolineModule,
-  MongoPipelineStorage,
-  PipelineSchema,
-} from 'neuroline-nestjs';
+import { NeurolineModule, MongoPipelineStorage, PipelineSchema } from 'neuroline-nestjs';
 import { myPipeline } from './pipelines';
 import { AuthGuard } from './guards';
 
@@ -53,7 +49,7 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/my-pipeline',
           pipeline: myPipeline,
-          guards: [AuthGuard],       // guards for entire controller
+          guards: [AuthGuard], // guards for entire controller
           adminGuards: [AdminGuard], // guards for admin endpoints
           // Get jobOptions from request context
           getJobOptions: async (input, request) => {
@@ -102,7 +98,7 @@ import type { PipelineManager, PipelineStorage } from 'neuroline';
 export class MyService {
   constructor(
     @Inject(NEUROLINE_MANAGER) private readonly manager: PipelineManager,
-    @Inject(NEUROLINE_STORAGE) private readonly storage: PipelineStorage,
+    @Inject(NEUROLINE_STORAGE) private readonly storage: PipelineStorage
   ) {}
 }
 ```
@@ -116,6 +112,7 @@ The generated controllers expose the following endpoints:
 Start a new pipeline. Request body = `TInput` directly.
 
 **Request:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/my-pipeline \
   -H "Content-Type: application/json" \
@@ -125,6 +122,7 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 `jobOptions` are obtained on the server via `getJobOptions(input, request)`.
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -140,6 +138,7 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 Admin endpoint: start pipeline with explicit `jobOptions`. Requires `adminGuards`.
 
 **Request:**
+
 ```bash
 curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" \
   -H "Content-Type: application/json" \
@@ -167,22 +166,39 @@ List pipelines with pagination.
 
 These endpoints return full pipeline/job data (input, options, artifacts) or allow passing `jobOptions` directly. They are **disabled by default**. Enable with `adminGuards`.
 
-| Endpoint | Description |
-|----------|-------------|
-| `POST ?action=startWithOptions` | Start pipeline with explicit jobOptions |
-| `GET ?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact) |
-| `GET ?action=pipeline&id=xxx` | Full pipeline state |
+| Endpoint                             | Description                             |
+| ------------------------------------ | --------------------------------------- |
+| `POST ?action=startWithOptions`      | Start pipeline with explicit jobOptions |
+| `GET ?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact)  |
+| `GET ?action=pipeline&id=xxx`        | Full pipeline state                     |
 
 ```typescript
 // Admin доступен только авторизованным
-adminGuards: [AdminGuard]
+adminGuards: [AdminGuard];
 
 // Admin доступен всем (открытый доступ)
-adminGuards: []
+adminGuards: [];
 
 // Admin отключён (по умолчанию)
 // просто не указывайте adminGuards
 ```
+
+## Serverless / Vercel
+
+In serverless environments (Vercel, AWS Lambda), the Node.js process terminates immediately after sending the HTTP response. Since `PipelineManager.startPipeline` launches execution asynchronously after responding, the execution promise gets killed before completion.
+
+Use the `onExecutionStart` option to bind the execution promise to the serverless function lifecycle:
+
+```typescript
+import { waitUntil } from '@vercel/functions';
+
+NeurolineModule.forRootAsync({
+  onExecutionStart: process.env.VERCEL ? (promise) => waitUntil(promise) : undefined,
+  // ...other options
+});
+```
+
+The callback is applied globally to all pipelines in the module — both `startPipeline` and `restartPipelineFromJob` calls.
 
 ## Multiple Pipelines
 
@@ -202,21 +218,21 @@ NeurolineModule.forRootAsync({
       guards: [AdminGuard],
     },
   ],
-})
+});
 ```
 
 ## Exports
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `NeurolineModule` | Class | Dynamic module with `forRootAsync()` |
-| `NeurolineService` | Class | Service for accessing manager/storage |
-| `NEUROLINE_MANAGER` | Token | DI token for PipelineManager |
-| `NEUROLINE_STORAGE` | Token | DI token for PipelineStorage |
-| `MongoPipelineStorage` | Class | MongoDB storage (re-export) |
-| `PipelineSchema` | Schema | Mongoose schema (re-export) |
-| `PipelineControllerOptions` | Type | Controller configuration |
-| `NeurolineModuleAsyncOptions` | Type | Module configuration |
+| Export                        | Type   | Description                           |
+| ----------------------------- | ------ | ------------------------------------- |
+| `NeurolineModule`             | Class  | Dynamic module with `forRootAsync()`  |
+| `NeurolineService`            | Class  | Service for accessing manager/storage |
+| `NEUROLINE_MANAGER`           | Token  | DI token for PipelineManager          |
+| `NEUROLINE_STORAGE`           | Token  | DI token for PipelineStorage          |
+| `MongoPipelineStorage`        | Class  | MongoDB storage (re-export)           |
+| `PipelineSchema`              | Schema | Mongoose schema (re-export)           |
+| `PipelineControllerOptions`   | Type   | Controller configuration              |
+| `NeurolineModuleAsyncOptions` | Type   | Module configuration                  |
 
 ## License
 
@@ -254,11 +270,7 @@ npm install neuroline neuroline-nestjs
 ```typescript
 import { Module } from '@nestjs/common';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
-import {
-  NeurolineModule,
-  MongoPipelineStorage,
-  PipelineSchema,
-} from 'neuroline-nestjs';
+import { NeurolineModule, MongoPipelineStorage, PipelineSchema } from 'neuroline-nestjs';
 import { myPipeline } from './pipelines';
 import { AuthGuard } from './guards';
 
@@ -275,7 +287,7 @@ import { AuthGuard } from './guards';
         {
           path: 'api/v1/my-pipeline',
           pipeline: myPipeline,
-          guards: [AuthGuard],       // guards для всего контроллера
+          guards: [AuthGuard], // guards для всего контроллера
           adminGuards: [AdminGuard], // guards для admin-эндпоинтов
           // Получение jobOptions из контекста запроса
           getJobOptions: async (input, request) => {
@@ -324,7 +336,7 @@ import type { PipelineManager, PipelineStorage } from 'neuroline';
 export class MyService {
   constructor(
     @Inject(NEUROLINE_MANAGER) private readonly manager: PipelineManager,
-    @Inject(NEUROLINE_STORAGE) private readonly storage: PipelineStorage,
+    @Inject(NEUROLINE_STORAGE) private readonly storage: PipelineStorage
   ) {}
 }
 ```
@@ -338,6 +350,7 @@ export class MyService {
 Запустить новый pipeline. Тело запроса = `TInput` напрямую.
 
 **Запрос:**
+
 ```bash
 curl -X POST http://localhost:3000/api/v1/my-pipeline \
   -H "Content-Type: application/json" \
@@ -347,6 +360,7 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 `jobOptions` получаются на сервере через `getJobOptions(input, request)`.
 
 **Ответ:**
+
 ```json
 {
   "success": true,
@@ -362,6 +376,7 @@ curl -X POST http://localhost:3000/api/v1/my-pipeline \
 Admin-эндпоинт: запуск pipeline с явными `jobOptions`. Требует `adminGuards`.
 
 **Запрос:**
+
 ```bash
 curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" \
   -H "Content-Type: application/json" \
@@ -389,22 +404,39 @@ curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" 
 
 Эти эндпоинты возвращают полные данные pipeline/job (input, options, artifacts) или позволяют передавать `jobOptions` напрямую. **Отключены по умолчанию**. Включите через `adminGuards`.
 
-| Эндпоинт | Описание |
-|----------|----------|
-| `POST ?action=startWithOptions` | Запуск pipeline с явными jobOptions |
+| Эндпоинт                             | Описание                              |
+| ------------------------------------ | ------------------------------------- |
+| `POST ?action=startWithOptions`      | Запуск pipeline с явными jobOptions   |
 | `GET ?action=job&id=xxx&jobName=yyy` | Детали job (input, options, artifact) |
-| `GET ?action=pipeline&id=xxx` | Полное состояние pipeline |
+| `GET ?action=pipeline&id=xxx`        | Полное состояние pipeline             |
 
 ```typescript
 // Admin доступен только авторизованным
-adminGuards: [AdminGuard]
+adminGuards: [AdminGuard];
 
 // Admin доступен всем (открытый доступ)
-adminGuards: []
+adminGuards: [];
 
 // Admin отключён (по умолчанию)
 // просто не указывайте adminGuards
 ```
+
+## Serverless / Vercel
+
+В serverless окружениях (Vercel, AWS Lambda) процесс Node.js завершается сразу после отправки HTTP ответа. Поскольку `PipelineManager.startPipeline` запускает выполнение асинхронно после ответа клиенту, promise выполнения убивается до завершения.
+
+Используйте опцию `onExecutionStart`, чтобы привязать promise выполнения к жизненному циклу serverless функции:
+
+```typescript
+import { waitUntil } from '@vercel/functions';
+
+NeurolineModule.forRootAsync({
+  onExecutionStart: process.env.VERCEL ? (promise) => waitUntil(promise) : undefined,
+  // ...остальные опции
+});
+```
+
+Callback применяется глобально ко всем pipeline в модуле — и к `startPipeline`, и к `restartPipelineFromJob`.
 
 ## Несколько Pipelines
 
@@ -424,21 +456,21 @@ NeurolineModule.forRootAsync({
       guards: [AdminGuard],
     },
   ],
-})
+});
 ```
 
 ## Экспорты
 
-| Экспорт | Тип | Описание |
-|---------|-----|----------|
-| `NeurolineModule` | Class | Динамический модуль с `forRootAsync()` |
-| `NeurolineService` | Class | Сервис для доступа к manager/storage |
-| `NEUROLINE_MANAGER` | Token | DI токен для PipelineManager |
-| `NEUROLINE_STORAGE` | Token | DI токен для PipelineStorage |
-| `MongoPipelineStorage` | Class | MongoDB storage (реэкспорт) |
-| `PipelineSchema` | Schema | Mongoose схема (реэкспорт) |
-| `PipelineControllerOptions` | Type | Конфигурация контроллера |
-| `NeurolineModuleAsyncOptions` | Type | Конфигурация модуля |
+| Экспорт                       | Тип    | Описание                               |
+| ----------------------------- | ------ | -------------------------------------- |
+| `NeurolineModule`             | Class  | Динамический модуль с `forRootAsync()` |
+| `NeurolineService`            | Class  | Сервис для доступа к manager/storage   |
+| `NEUROLINE_MANAGER`           | Token  | DI токен для PipelineManager           |
+| `NEUROLINE_STORAGE`           | Token  | DI токен для PipelineStorage           |
+| `MongoPipelineStorage`        | Class  | MongoDB storage (реэкспорт)            |
+| `PipelineSchema`              | Schema | Mongoose схема (реэкспорт)             |
+| `PipelineControllerOptions`   | Type   | Конфигурация контроллера               |
+| `NeurolineModuleAsyncOptions` | Type   | Конфигурация модуля                    |
 
 ## Лицензия
 

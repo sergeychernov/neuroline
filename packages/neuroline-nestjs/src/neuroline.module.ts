@@ -140,6 +140,26 @@ export interface NeurolineModuleAsyncOptions {
 	 * ```
 	 */
 	staleJobsWatchdog?: StaleJobsWatchdogOptions;
+	/**
+	 * Callback, вызываемый при старте выполнения pipeline.
+	 * 
+	 * В serverless окружениях (Vercel, AWS Lambda) процесс завершается сразу после
+	 * отправки HTTP ответа. Этот callback позволяет "привязать" promise выполнения
+	 * pipeline к жизненному циклу serverless функции.
+	 * 
+	 * Применяется глобально ко всем pipeline в модуле.
+	 * 
+	 * @example
+	 * ```typescript
+	 * import { waitUntil } from '@vercel/functions';
+	 * 
+	 * NeurolineModule.forRootAsync({
+	 *     onExecutionStart: (promise) => waitUntil(promise),
+	 *     // ...
+	 * })
+	 * ```
+	 */
+	onExecutionStart?: (promise: Promise<void>) => void;
 }
 
 /** Body для admin-запуска pipeline (action=startWithOptions) */
@@ -182,6 +202,7 @@ interface ApiResponse<T = unknown> {
 function createDynamicController(
 	controllerOptions: PipelineControllerOptions,
 	adminGuardTypes: Type[] | undefined,
+	onExecutionStart?: (promise: Promise<void>) => void,
 ): Type<unknown> {
 	const { path, pipeline, getJobOptions } = controllerOptions;
 	const pipelineType = pipeline.name;
@@ -311,7 +332,7 @@ function createDynamicController(
 					const result = await this.manager.restartPipelineFromJob(
 						id,
 						retryBody.jobName,
-						{ jobOptions: retryBody.jobOptions },
+						{ jobOptions: retryBody.jobOptions, onExecutionStart },
 					);
 
 					return { success: true, data: result };
@@ -332,7 +353,7 @@ function createDynamicController(
 					const result = await this.manager.startPipeline(pipelineType, {
 						data: adminBody.input,
 						jobOptions: adminBody.jobOptions,
-					});
+					}, { onExecutionStart });
 
 					return { success: true, data: result };
 				}
@@ -348,7 +369,7 @@ function createDynamicController(
 				const result = await this.manager.startPipeline(pipelineType, {
 					data: input,
 					jobOptions,
-				});
+				}, { onExecutionStart });
 
 				return { success: true, data: result };
 			} catch (error) {
@@ -651,7 +672,7 @@ export class NeurolineModule implements OnModuleDestroy {
 
 		// Динамически генерируем контроллеры
 		const dynamicControllers = options.controllers.map((controllerOptions) =>
-			createDynamicController(controllerOptions, controllerOptions.adminGuards),
+			createDynamicController(controllerOptions, controllerOptions.adminGuards, options.onExecutionStart),
 		);
 
 		return {

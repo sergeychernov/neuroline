@@ -120,6 +120,7 @@ API совместим с `neuroline/client` (query-параметр `action`):
 | `controllers` | Массив конфигураций контроллеров |
 | `logger` | Логгер для PipelineManager |
 | `staleJobsWatchdog` | Опции для фонового watchdog зависших джоб |
+| `onExecutionStart` | Callback `(promise) => void` для serverless (Vercel `waitUntil`) |
 
 ### PipelineControllerOptions
 
