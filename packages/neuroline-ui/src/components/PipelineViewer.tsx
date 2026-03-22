@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Box, Typography, Paper, Chip } from '@mui/material';
 import flatMap from 'lodash/flatMap';
 import countBy from 'lodash/countBy';
-import type { PipelineDisplayData, JobDisplayInfo } from '../types';
+import type { PipelineDisplayData, JobDisplayInfo, JobNodeDisplayMode } from '../types';
 import { StageColumn } from './StageColumn';
 import { StatusBadge } from './StatusBadge';
 
@@ -11,7 +11,11 @@ export interface PipelineViewerProps {
   onJobClick?: (job: JobDisplayInfo) => void;
   /** Callback при клике на кнопку retry job */
   onJobRetry?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку run для manual job */
+  onJobRunManual?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
+  /** Режим отображения карточек job */
+  jobDisplay?: JobNodeDisplayMode;
 }
 
 /**
@@ -22,7 +26,9 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
   pipeline,
   onJobClick,
   onJobRetry,
+  onJobRunManual,
   selectedJobName,
+  jobDisplay,
 }) => {
   // Compute stats
   const stats = useMemo(() => {
@@ -144,7 +150,9 @@ export const PipelineViewer: React.FC<PipelineViewerProps> = ({
               stage={stage}
               onJobClick={onJobClick}
               onJobRetry={onJobRetry}
+              onJobRunManual={onJobRunManual}
               selectedJobName={selectedJobName}
+              jobDisplay={jobDisplay}
             />
 
             {/* Connector between stages */}

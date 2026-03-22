@@ -22,7 +22,7 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 ## Features
 
 - **PipelineViewer** - visual representation of pipeline execution flow
-- **JobNode** - individual job status display with timing information
+- **JobNode** - individual job status display with optional compact / one-line layouts (`jobDisplay`)
 - **JobDetailsPanel** - detailed job information with tabs for artefact, input, options, error
 - **StageColumn** - stage grouping with parallel job visualization
 - **StatusBadge** - color-coded status indicators
@@ -126,11 +126,28 @@ import { PipelineViewer } from 'neuroline-ui';
 
 **Props:**
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `pipeline` | `PipelineDisplayData` | Required | Pipeline data with stages |
-| `onJobClick` | `(job: JobDisplayInfo) => void` | - | Click handler for job nodes |
-| `selectedJobName` | `string` | - | Name of currently selected job |
+| Prop              | Type                            | Default     | Description                                               |
+| ----------------- | ------------------------------- | ----------- | --------------------------------------------------------- |
+| `pipeline`        | `PipelineDisplayData`           | Required    | Pipeline data with stages                                 |
+| `onJobClick`      | `(job: JobDisplayInfo) => void` | -           | Click handler for job nodes                               |
+| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -           | Retry callback for failed jobs                            |
+| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -           | Run callback for manual jobs                              |
+| `selectedJobName` | `string`                        | -           | Name of currently selected job                            |
+| `jobDisplay`      | `JobNodeDisplayMode`            | `'details'` | How each job card is rendered (passed to every `JobNode`) |
+
+#### Job display modes (`jobDisplay`)
+
+Type: `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
+
+| Value      | Title                              | Duration                      | Layout                                                |
+| ---------- | ---------------------------------- | ----------------------------- | ----------------------------------------------------- |
+| `details`  | Full `job.name`                    | Shown when `startedAt` is set | Default multi-line card                               |
+| `compact`  | Abbreviation from name (see below) | Hidden                        | Narrower card; full name in tooltip                   |
+| `one-line` | Abbreviation                       | Shown when available          | Title, status, chips in one row; full name in tooltip |
+
+Set `jobDisplay` on **`PipelineViewer`**, **`StageColumn`**, or **`JobNode`**. The viewer forwards the same mode to all nodes.
+
+**Abbreviation:** export **`jobNameToAbbreviation`** from `neuroline-ui`. It splits on `-`, `_`, `.`, `/`, spaces, and camelCase boundaries, then takes the first letter or digit of each segment (uppercase). Example: `very-long-job-name-that-might-need-wrapping` → `VLJNTMNW`. For a single segment, only the first alphanumeric character is used.
 
 ### JobDetailsPanel
 
@@ -156,11 +173,11 @@ import { JobDetailsPanel } from 'neuroline-ui';
 
 **Props:**
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `job` | `JobDisplayInfo` | Required | Job to display |
-| `onInputEditClick` | `(job: JobDisplayInfo) => void` | - | Edit input callback |
-| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | - | Edit options callback |
+| Prop                 | Type                            | Default  | Description           |
+| -------------------- | ------------------------------- | -------- | --------------------- |
+| `job`                | `JobDisplayInfo`                | Required | Job to display        |
+| `onInputEditClick`   | `(job: JobDisplayInfo) => void` | -        | Edit input callback   |
+| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | -        | Edit options callback |
 
 ### JobNode
 
@@ -184,11 +201,14 @@ import { JobNode } from 'neuroline-ui';
 
 **Props:**
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `job` | `JobDisplayInfo` | Required | Job data |
-| `isSelected` | `boolean` | `false` | Highlight as selected |
-| `onClick` | `(job: JobDisplayInfo) => void` | - | Click handler |
+| Prop          | Type                            | Default     | Description                                                                                               |
+| ------------- | ------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `job`         | `JobDisplayInfo`                | Required    | Job data                                                                                                  |
+| `isSelected`  | `boolean`                       | `false`     | Highlight as selected                                                                                     |
+| `onClick`     | `(job: JobDisplayInfo) => void` | -           | Click handler                                                                                             |
+| `onRetry`     | `(job: JobDisplayInfo) => void` | -           | Retry callback (shown for failed/done jobs)                                                               |
+| `onRunManual` | `(job: JobDisplayInfo) => void` | -           | Run callback (shown for `awaiting_manual` jobs)                                                           |
+| `jobDisplay`  | `JobNodeDisplayMode`            | `'details'` | Card layout: `details`, `compact`, or `one-line` (see [Job display modes](#job-display-modes-jobdisplay)) |
 
 ### StageColumn
 
@@ -207,8 +227,11 @@ import { StageColumn } from 'neuroline-ui';
   }}
   selectedJobName="job1"
   onJobClick={(job) => console.log(job)}
+  jobDisplay="compact"
 />
 ```
+
+Optional prop **`jobDisplay`** — same as on `JobNode` / `PipelineViewer` ([Job display modes](#job-display-modes-jobdisplay)).
 
 ### StatusBadge
 
@@ -221,7 +244,9 @@ import { StatusBadge } from 'neuroline-ui';
 ```
 
 **Status colors:**
+
 - `pending` - Gray
+- `awaiting_manual` - Orange
 - `processing` - Cyan (animated)
 - `done` - Green
 - `error` - Red
@@ -291,7 +316,8 @@ import type {
 ```typescript
 interface JobDisplayInfo {
   name: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
+  status: 'pending' | 'awaiting_manual' | 'processing' | 'done' | 'error';
+  manual?: boolean;
   startedAt?: Date;
   finishedAt?: Date;
   errors: JobError[];
@@ -316,7 +342,7 @@ interface StageDisplayInfo {
 interface PipelineDisplayData {
   pipelineId: string;
   pipelineType: string;
-  status: 'processing' | 'done' | 'error';
+  status: 'processing' | 'awaiting_manual' | 'done' | 'error';
   stages: StageDisplayInfo[];
   input?: SerializableValue;
   error?: { message: string; jobName?: string };
@@ -455,7 +481,7 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 ## Возможности
 
 - **PipelineViewer** - визуальное представление процесса выполнения pipeline
-- **JobNode** - отображение статуса отдельной job с информацией о времени
+- **JobNode** - отображение статуса отдельной job; опционально компактный или однострочный вид (`jobDisplay`)
 - **JobDetailsPanel** - детальная информация о job с табами для artefact, input, options, error
 - **StageColumn** - группировка stage с визуализацией параллельных jobs
 - **StatusBadge** - цветные индикаторы статуса
@@ -559,11 +585,28 @@ import { PipelineViewer } from 'neuroline-ui';
 
 **Пропсы:**
 
-| Проп | Тип | По умолчанию | Описание |
-|------|-----|--------------|----------|
-| `pipeline` | `PipelineDisplayData` | Обязательно | Данные pipeline со stages |
-| `onJobClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика по job |
-| `selectedJobName` | `string` | - | Имя выбранной job |
+| Проп              | Тип                             | По умолчанию | Описание                                                           |
+| ----------------- | ------------------------------- | ------------ | ------------------------------------------------------------------ |
+| `pipeline`        | `PipelineDisplayData`           | Обязательно  | Данные pipeline со stages                                          |
+| `onJobClick`      | `(job: JobDisplayInfo) => void` | -            | Обработчик клика по job                                            |
+| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -            | Callback retry для упавших jobs                                    |
+| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -            | Callback запуска для manual jobs                                   |
+| `selectedJobName` | `string`                        | -            | Имя выбранной job                                                  |
+| `jobDisplay`      | `JobNodeDisplayMode`            | `'details'`  | Как рисуется каждая карточка job (пробрасывается во все `JobNode`) |
+
+#### Режимы отображения job (`jobDisplay`)
+
+Тип: `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
+
+| Значение   | Заголовок                     | Длительность                         | Вёрстка                                                  |
+| ---------- | ----------------------------- | ------------------------------------ | -------------------------------------------------------- |
+| `details`  | Полное `job.name`             | Показывается, если задан `startedAt` | Карточка по умолчанию, несколько строк                   |
+| `compact`  | Аббревиатура имени (см. ниже) | Скрыта                               | Уже карточка; полное имя в tooltip                       |
+| `one-line` | Аббревиатура                  | Показывается при наличии             | Имя, статус и кнопки в одну строку; полное имя в tooltip |
+
+Задаётся на **`PipelineViewer`**, **`StageColumn`** или **`JobNode`**. Viewer передаёт один и тот же режим всем нодам.
+
+**Аббревиатура:** из пакета экспортируется **`jobNameToAbbreviation`**. Имя делится по `-`, `_`, `.`, `/`, пробелам и границам camelCase; из каждого сегмента берётся первая буква или цифра (в верхнем регистре). Пример: `very-long-job-name-that-might-need-wrapping` → `VLJNTMNW`. Если сегмент один — используется первая буква/цифра слова.
 
 ### JobDetailsPanel
 
@@ -589,11 +632,11 @@ import { JobDetailsPanel } from 'neuroline-ui';
 
 **Пропсы:**
 
-| Проп | Тип | По умолчанию | Описание |
-|------|-----|--------------|----------|
-| `job` | `JobDisplayInfo` | Обязательно | Job для отображения |
-| `onInputEditClick` | `(job: JobDisplayInfo) => void` | - | Callback редактирования input |
-| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | - | Callback редактирования options |
+| Проп                 | Тип                             | По умолчанию | Описание                        |
+| -------------------- | ------------------------------- | ------------ | ------------------------------- |
+| `job`                | `JobDisplayInfo`                | Обязательно  | Job для отображения             |
+| `onInputEditClick`   | `(job: JobDisplayInfo) => void` | -            | Callback редактирования input   |
+| `onOptionsEditClick` | `(job: JobDisplayInfo) => void` | -            | Callback редактирования options |
 
 ### JobNode
 
@@ -617,11 +660,14 @@ import { JobNode } from 'neuroline-ui';
 
 **Пропсы:**
 
-| Проп | Тип | По умолчанию | Описание |
-|------|-----|--------------|----------|
-| `job` | `JobDisplayInfo` | Обязательно | Данные job |
-| `isSelected` | `boolean` | `false` | Подсветить как выбранную |
-| `onClick` | `(job: JobDisplayInfo) => void` | - | Обработчик клика |
+| Проп          | Тип                             | По умолчанию | Описание                                                                                                             |
+| ------------- | ------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `job`         | `JobDisplayInfo`                | Обязательно  | Данные job                                                                                                           |
+| `isSelected`  | `boolean`                       | `false`      | Подсветить как выбранную                                                                                             |
+| `onClick`     | `(job: JobDisplayInfo) => void` | -            | Обработчик клика                                                                                                     |
+| `onRetry`     | `(job: JobDisplayInfo) => void` | -            | Callback retry (для упавших/завершённых jobs)                                                                        |
+| `onRunManual` | `(job: JobDisplayInfo) => void` | -            | Callback запуска (для `awaiting_manual` jobs)                                                                        |
+| `jobDisplay`  | `JobNodeDisplayMode`            | `'details'`  | Вид карточки: `details`, `compact` или `one-line` (см. [Режимы отображения job](#режимы-отображения-job-jobdisplay)) |
 
 ### StageColumn
 
@@ -640,8 +686,11 @@ import { StageColumn } from 'neuroline-ui';
   }}
   selectedJobName="job1"
   onJobClick={(job) => console.log(job)}
+  jobDisplay="compact"
 />
 ```
+
+Опциональный проп **`jobDisplay`** — как у `JobNode` / `PipelineViewer` ([Режимы отображения job](#режимы-отображения-job-jobdisplay)).
 
 ### StatusBadge
 
@@ -654,7 +703,9 @@ import { StatusBadge } from 'neuroline-ui';
 ```
 
 **Цвета статусов:**
+
 - `pending` - Серый
+- `awaiting_manual` - Оранжевый
 - `processing` - Бирюзовый (анимированный)
 - `done` - Зелёный
 - `error` - Красный
@@ -724,7 +775,8 @@ import type {
 ```typescript
 interface JobDisplayInfo {
   name: string;
-  status: 'pending' | 'processing' | 'done' | 'error';
+  status: 'pending' | 'awaiting_manual' | 'processing' | 'done' | 'error';
+  manual?: boolean;
   startedAt?: Date;
   finishedAt?: Date;
   errors: JobError[];
@@ -749,7 +801,7 @@ interface StageDisplayInfo {
 interface PipelineDisplayData {
   pipelineId: string;
   pipelineType: string;
-  status: 'processing' | 'done' | 'error';
+  status: 'processing' | 'awaiting_manual' | 'done' | 'error';
   stages: StageDisplayInfo[];
   input?: SerializableValue;
   error?: { message: string; jobName?: string };

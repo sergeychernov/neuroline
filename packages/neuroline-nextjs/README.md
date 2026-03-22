@@ -46,18 +46,18 @@ import { manager, storage } from '@/lib/neuroline';
 import { myPipelineConfig } from '@/pipelines';
 
 const handlers = createPipelineRouteHandler({
-    manager,
-    storage,
-    pipeline: myPipelineConfig, // One pipeline per route
-    // Get jobOptions from request context (headers, cookies, etc.)
-    getJobOptions: async (input, request) => {
-        const authHeader = request.headers.get('Authorization');
-        return {
-            myJob: { token: authHeader, apiKey: process.env.API_KEY },
-        };
-    },
-    // Enable admin endpoints for development
-    enableDebugEndpoints: process.env.NODE_ENV === 'development',
+  manager,
+  storage,
+  pipeline: myPipelineConfig, // One pipeline per route
+  // Get jobOptions from request context (headers, cookies, etc.)
+  getJobOptions: async (input, request) => {
+    const authHeader = request.headers.get('Authorization');
+    return {
+      myJob: { token: authHeader, apiKey: process.env.API_KEY },
+    };
+  },
+  // Enable admin endpoints for development
+  enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 
 export const GET = handlers.GET;
@@ -86,6 +86,7 @@ Start a new pipeline or return existing one.
 `jobOptions` are obtained on the server via `getJobOptions(input, request)`.
 
 **Example:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline', {
   method: 'POST',
@@ -105,6 +106,7 @@ const result = await response.json();
 Admin endpoint: start pipeline with explicit `jobOptions`. Requires `enableDebugEndpoints: true`.
 
 **Request body:**
+
 ```typescript
 {
   input: unknown;        // Input data
@@ -117,6 +119,7 @@ Admin endpoint: start pipeline with explicit `jobOptions`. Requires `enableDebug
 Get current pipeline status.
 
 **Example:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=status&id=abc123');
 const { data } = await response.json();
@@ -128,6 +131,7 @@ const { data } = await response.json();
 Get a job result (artifact). If `jobName` is not provided, returns the last job result.
 
 **Example:**
+
 ```typescript
 // Last job result
 const response = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123');
@@ -135,9 +139,34 @@ const { data } = await response.json();
 // { pipelineId: "abc123", jobName: "save-result", status: "done", artifact: {...} }
 
 // Result by job name
-const response2 = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data');
+const response2 = await fetch(
+  '/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data'
+);
 const { data: jobResult } = await response2.json();
 // { pipelineId: "abc123", jobName: "fetch-data", status: "done", artifact: {...} }
+```
+
+### POST `/api/pipeline/my-pipeline?action=runManualJob&id=:id`
+
+Trigger a manual job. Requires `enableDebugEndpoints: true`.
+
+**Request body:**
+
+```typescript
+{
+  jobName: string; // Name of the manual job to trigger
+}
+```
+
+**Example:**
+
+```typescript
+await fetch('/api/pipeline/my-pipeline?action=runManualJob&id=abc123', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ jobName: 'approval' }),
+});
+// { success: true }
 ```
 
 ### Debug Endpoints
@@ -151,6 +180,7 @@ The following endpoints return sensitive data (input, options, artifacts) and ar
 Get detailed job data including input and options.
 
 **Example:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=job&id=abc123&jobName=fetch-data');
 const { data } = await response.json();
@@ -162,6 +192,7 @@ const { data } = await response.json();
 Get full pipeline state.
 
 **Example:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=pipeline&id=abc123');
 const { data } = await response.json();
@@ -173,10 +204,12 @@ const { data } = await response.json();
 Get paginated list of pipelines of this type.
 
 **Query parameters:**
+
 - `page` - Page number (default: 1)
 - `limit` - Items per page (default: 10, max: 100)
 
 **Example:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=list&page=1&limit=10');
 const { data } = await response.json();
@@ -224,7 +257,7 @@ export function PipelineDemo() {
 
   const handleStart = useCallback(async () => {
     setIsRunning(true);
-    
+
     const { pipelineId, stop, completed } = await client.startAndPoll(
       {
         input: { url: 'https://api.example.com/data' },
@@ -257,10 +290,10 @@ export function PipelineDemo() {
 
 ```typescript
 createPipelineRouteHandler({
-  manager: PipelineManager,     // Required - pipeline manager instance
-  storage: PipelineStorage,     // Required - storage for job details and list
-  pipeline: PipelineConfig,     // Required - pipeline config for this route
-  enableDebugEndpoints: false,  // Optional - enable action=job and action=pipeline (default: false)
+  manager: PipelineManager, // Required - pipeline manager instance
+  storage: PipelineStorage, // Required - storage for job details and list
+  pipeline: PipelineConfig, // Required - pipeline config for this route
+  enableDebugEndpoints: false, // Optional - enable action=job and action=pipeline (default: false)
 });
 ```
 
@@ -312,11 +345,13 @@ const manager = new PipelineManager({ storage });
 Creates GET and POST handlers for Next.js App Router.
 
 **Parameters:**
+
 - `manager: PipelineManager` - Required. The pipeline manager instance.
 - `storage: PipelineStorage` - Required. Storage for job details and list operations.
 - `pipeline: PipelineConfig` - Required. Pipeline config for this route.
 
 **Returns:**
+
 ```typescript
 {
   GET: (request: NextRequest) => Promise<Response>,
@@ -352,6 +387,7 @@ import {
   handleGetJob,
   handleGetPipeline,
   handleGetList,
+  handleRunManualJob,
 } from 'neuroline-nextjs';
 ```
 
@@ -405,18 +441,18 @@ import { manager, storage } from '@/lib/neuroline';
 import { myPipelineConfig } from '@/pipelines';
 
 const handlers = createPipelineRouteHandler({
-    manager,
-    storage,
-    pipeline: myPipelineConfig, // Один pipeline на route
-    // Получение jobOptions из контекста запроса (headers, cookies и т.д.)
-    getJobOptions: async (input, request) => {
-        const authHeader = request.headers.get('Authorization');
-        return {
-            myJob: { token: authHeader, apiKey: process.env.API_KEY },
-        };
-    },
-    // Включить admin-эндпоинты для разработки
-    enableDebugEndpoints: process.env.NODE_ENV === 'development',
+  manager,
+  storage,
+  pipeline: myPipelineConfig, // Один pipeline на route
+  // Получение jobOptions из контекста запроса (headers, cookies и т.д.)
+  getJobOptions: async (input, request) => {
+    const authHeader = request.headers.get('Authorization');
+    return {
+      myJob: { token: authHeader, apiKey: process.env.API_KEY },
+    };
+  },
+  // Включить admin-эндпоинты для разработки
+  enableDebugEndpoints: process.env.NODE_ENV === 'development',
 });
 
 export const GET = handlers.GET;
@@ -445,6 +481,7 @@ export const POST = handlers.POST;
 `jobOptions` получаются на сервере через `getJobOptions(input, request)`.
 
 **Пример:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline', {
   method: 'POST',
@@ -461,6 +498,7 @@ const response = await fetch('/api/pipeline/my-pipeline', {
 Admin-эндпоинт: запуск pipeline с явными `jobOptions`. Требует `enableDebugEndpoints: true`.
 
 **Тело запроса:**
+
 ```typescript
 {
   input: unknown;        // Входные данные
@@ -469,6 +507,7 @@ Admin-эндпоинт: запуск pipeline с явными `jobOptions`. Тр
 ```
 
 **Пример (устаревший формат для совместимости):**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=startWithOptions', {
   method: 'POST',
@@ -493,6 +532,7 @@ const result = await response.json();
 Получить текущий статус pipeline.
 
 **Пример:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=status&id=abc123');
 const { data } = await response.json();
@@ -504,6 +544,7 @@ const { data } = await response.json();
 Получить результат (артефакт) job. Если `jobName` не передан, возвращается результат последней job.
 
 **Пример:**
+
 ```typescript
 // Результат последней job
 const response = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123');
@@ -511,9 +552,34 @@ const { data } = await response.json();
 // { pipelineId: "abc123", jobName: "save-result", status: "done", artifact: {...} }
 
 // Результат по имени job
-const response2 = await fetch('/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data');
+const response2 = await fetch(
+  '/api/pipeline/my-pipeline?action=result&id=abc123&jobName=fetch-data'
+);
 const { data: jobResult } = await response2.json();
 // { pipelineId: "abc123", jobName: "fetch-data", status: "done", artifact: {...} }
+```
+
+### POST `/api/pipeline/my-pipeline?action=runManualJob&id=:id`
+
+Запуск manual job. Требует `enableDebugEndpoints: true`.
+
+**Тело запроса:**
+
+```typescript
+{
+  jobName: string; // Имя manual job для запуска
+}
+```
+
+**Пример:**
+
+```typescript
+await fetch('/api/pipeline/my-pipeline?action=runManualJob&id=abc123', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ jobName: 'approval' }),
+});
+// { success: true }
 ```
 
 ### Debug-эндпоинты
@@ -527,6 +593,7 @@ const { data: jobResult } = await response2.json();
 Получить детальные данные job включая input и options.
 
 **Пример:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=job&id=abc123&jobName=fetch-data');
 const { data } = await response.json();
@@ -538,6 +605,7 @@ const { data } = await response.json();
 Получить полное состояние pipeline.
 
 **Пример:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=pipeline&id=abc123');
 const { data } = await response.json();
@@ -549,10 +617,12 @@ const { data } = await response.json();
 Получить пагинированный список pipelines этого типа.
 
 **Query-параметры:**
+
 - `page` - Номер страницы (по умолчанию: 1)
 - `limit` - Элементов на странице (по умолчанию: 10, макс: 100)
 
 **Пример:**
+
 ```typescript
 const response = await fetch('/api/pipeline/my-pipeline?action=list&page=1&limit=10');
 const { data } = await response.json();
@@ -600,7 +670,7 @@ export function PipelineDemo() {
 
   const handleStart = useCallback(async () => {
     setIsRunning(true);
-    
+
     const { pipelineId, stop, completed } = await client.startAndPoll(
       {
         input: { url: 'https://api.example.com/data' },
@@ -633,10 +703,10 @@ export function PipelineDemo() {
 
 ```typescript
 createPipelineRouteHandler({
-  manager: PipelineManager,     // Обязательно - экземпляр pipeline manager
-  storage: PipelineStorage,     // Обязательно - хранилище для деталей job и списка
-  pipeline: PipelineConfig,     // Обязательно - конфиг pipeline для этого route
-  enableDebugEndpoints: false,  // Опционально - включить action=job и action=pipeline (по умолчанию: false)
+  manager: PipelineManager, // Обязательно - экземпляр pipeline manager
+  storage: PipelineStorage, // Обязательно - хранилище для деталей job и списка
+  pipeline: PipelineConfig, // Обязательно - конфиг pipeline для этого route
+  enableDebugEndpoints: false, // Опционально - включить action=job и action=pipeline (по умолчанию: false)
 });
 ```
 
@@ -688,11 +758,13 @@ const manager = new PipelineManager({ storage });
 Создаёт GET и POST обработчики для Next.js App Router.
 
 **Параметры:**
+
 - `manager: PipelineManager` - Обязательно. Экземпляр pipeline manager.
 - `storage: PipelineStorage` - Обязательно. Хранилище для деталей job и операций списка.
 - `pipeline: PipelineConfig` - Обязательно. Конфиг pipeline для этого route.
 
 **Возвращает:**
+
 ```typescript
 {
   GET: (request: NextRequest) => Promise<Response>,
@@ -728,9 +800,10 @@ import {
   handleGetJob,
   handleGetPipeline,
   handleGetList,
+  handleRunManualJob,
 } from 'neuroline-nextjs';
 ```
 
-## License
+## Лицензия
 
 UNLICENSED

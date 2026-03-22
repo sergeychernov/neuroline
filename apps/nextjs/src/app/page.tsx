@@ -89,8 +89,13 @@ export default function HomePage() {
 
   // Клиенты для разных API
   const nextjsClient = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/demo' }), []);
+  const nextjsManualClient = useMemo(() => new PipelineClient({ baseUrl: '/api/pipeline/manual-demo' }), []);
   const nestjsClient = useMemo(
     () => new PipelineClient({ baseUrl: 'http://localhost:3003/api/pipeline/demo' }),
+    [],
+  );
+  const nestjsManualClient = useMemo(
+    () => new PipelineClient({ baseUrl: 'http://localhost:3003/api/pipeline/manual-demo' }),
     [],
   );
 
@@ -126,7 +131,7 @@ export default function HomePage() {
           setCoverageStatus('unavailable');
           setCoverageMessage(data?.message ?? 'Нет данных');
         }
-      } catch (error) {
+      } catch {
         if (!isActive) return;
         setCoverage(null);
         setCoverageStatus('error');
@@ -215,12 +220,44 @@ export default function HomePage() {
         );
 
         stopRef.current = polling.stop;
+        polling.completed.catch(() => {});
       } catch (e) {
         console.error('Failed to restart pipeline:', e);
         setIsRunning(false);
       }
     },
     [isRunning, handleUpdate, handleError],
+  );
+
+  const handleRunManualJob = useCallback(
+    async (job: JobDisplayInfo) => {
+      const pipelineId = currentPipelineIdRef.current;
+      const client = currentClientRef.current;
+
+      if (!pipelineId || !client) {
+        console.error('No pipeline or client available for manual run');
+        return;
+      }
+
+      try {
+        setIsRunning(true);
+        stopRef.current?.();
+
+        const polling = await client.runManualJobAndPoll(
+          pipelineId,
+          job.name,
+          handleUpdate,
+          handleError,
+        );
+
+        stopRef.current = polling.stop;
+        polling.completed.catch(() => {});
+      } catch (e) {
+        console.error('Failed to run manual job:', e);
+        setIsRunning(false);
+      }
+    },
+    [handleUpdate, handleError],
   );
 
   const startPipeline = useCallback(
@@ -264,6 +301,7 @@ export default function HomePage() {
 
         currentPipelineIdRef.current = polling.pipelineId;
         stopRef.current = polling.stop;
+        polling.completed.catch(() => {});
       } catch (e) {
         console.error('Failed to start pipeline', e);
         setIsRunning(false);
@@ -310,6 +348,7 @@ export default function HomePage() {
 
         currentPipelineIdRef.current = polling.pipelineId;
         stopRef.current = polling.stop;
+        polling.completed.catch(() => {});
       } catch (e) {
         console.error('Failed to start pipeline', e);
         setIsRunning(false);
@@ -339,6 +378,11 @@ export default function HomePage() {
     [nextjsClient, startPipeline],
   );
 
+  const handleNextjsManual = useCallback(
+    () => startPipeline(nextjsManualClient, 'nextjs-manual'),
+    [nextjsManualClient, startPipeline],
+  );
+
   // NestJS handlers
   const handleNestjsSuccess = useCallback(
     () => startPipeline(nestjsClient, 'nestjs-success', { fail: false }),
@@ -358,6 +402,11 @@ export default function HomePage() {
   const handleNestjsRetry = useCallback(
     () => startPipeline(nestjsClient, 'nestjs-retry', { unstableFailCount: 1 }),
     [nestjsClient, startPipeline],
+  );
+
+  const handleNestjsManual = useCallback(
+    () => startPipeline(nestjsManualClient, 'nestjs-manual'),
+    [nestjsManualClient, startPipeline],
   );
 
   const coverageText = useMemo(() => {
@@ -460,10 +509,12 @@ export default function HomePage() {
           onNextjsSuccessBasic={handleNextjsSuccessBasic}
           onNextjsError={handleNextjsError}
           onNextjsRetry={handleNextjsRetry}
+          onNextjsManual={handleNextjsManual}
           onNestjsSuccess={handleNestjsSuccess}
           onNestjsSuccessBasic={handleNestjsSuccessBasic}
           onNestjsError={handleNestjsError}
           onNestjsRetry={handleNestjsRetry}
+          onNestjsManual={handleNestjsManual}
           isRunning={isRunning}
           currentPipelineType={currentPipelineType}
         />
@@ -474,6 +525,7 @@ export default function HomePage() {
             pipeline={pipeline}
             onJobClick={handleJobClick}
             onJobRetry={handleJobRetry}
+            onJobRunManual={handleRunManualJob}
             selectedJobName={selectedJob?.name}
           />
         ) : (

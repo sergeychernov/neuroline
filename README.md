@@ -13,6 +13,7 @@ Monorepo for Neuroline pipeline orchestration: core library, UI, and framework i
 - **Stages** — Sequential stages with parallel jobs inside
 - **Synapses** — Data transformation between jobs
 - **Retry** — Automatic retry with configurable delay
+- **Manual Jobs** — Pause pipelines at specific jobs, resume manually
 - **Restart** — Restart failed pipelines from any job
 - **Storage** — In-memory (tests) or MongoDB (production)
 - **Watchdog** — Background monitoring for stale jobs
@@ -57,6 +58,7 @@ UNLICENSED
 - **Stages** — Последовательные stages с параллельными jobs внутри
 - **Synapses** — Трансформация данных между jobs
 - **Retry** — Автоматический retry с настраиваемой задержкой
+- **Manual Jobs** — Пауза pipeline на указанных jobs с ручным запуском
 - **Restart** — Перезапуск упавших pipelines с любой job
 - **Storage** — In-memory (тесты) или MongoDB (продакшн)
 - **Watchdog** — Фоновый мониторинг зависших jobs

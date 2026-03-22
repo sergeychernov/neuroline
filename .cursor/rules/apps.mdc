@@ -19,9 +19,9 @@ apps/nextjs/
 │   ├── layout.tsx
 │   ├── page.tsx
 │   ├── providers.tsx
-│   └── api/
-│       └── network/
-│           └── route.ts
+│   └── api/pipeline/
+│       ├── demo/route.ts
+│       └── manual-demo/route.ts
 ├── next.config.js
 └── package.json
 ```

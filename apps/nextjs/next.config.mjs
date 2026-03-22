@@ -1,6 +1,8 @@
-/** @type {import('next').NextConfig} */
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const storybookIndexPath = path.join(
   __dirname,
@@ -15,6 +17,7 @@ const docsIndexPath = path.join(__dirname, 'public', 'docs', 'index.html');
 const hasEmbeddedStorybook = fs.existsSync(storybookIndexPath);
 const hasEmbeddedDocs = fs.existsSync(docsIndexPath);
 
+/** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['neuroline', 'neuroline-ui', 'neuroline-nextjs', 'demo-pipelines'],
   experimental: {
@@ -33,6 +36,9 @@ const nextConfig = {
 
         // Storybook 10: storybookiframe.html → iframe.html
         { source: '/packages/neuroline-ui/storybookiframe.html', destination: `${sbBase}/iframe.html` },
+
+        // Storybook 10: iframe запрашивается без сегмента /storybook/ (base path)
+        { source: '/packages/neuroline-ui/iframe.html', destination: `${sbBase}/iframe.html` },
 
         // Storybook 10: файлы, запрашиваемые из корня (проблема base path в iframe)
         { source: '/vite-inject-mocker-entry.js', destination: `${sbBase}/vite-inject-mocker-entry.js` },
@@ -79,4 +85,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+export default nextConfig;

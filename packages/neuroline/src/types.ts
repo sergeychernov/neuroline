@@ -7,11 +7,28 @@
 // Job Types
 // ============================================================================
 
+/** Допустимые статусы отдельной job (единый источник для типа и Mongoose enum) */
+export const JOB_STATUSES = [
+    'pending',
+    'awaiting_manual',
+    'processing',
+    'done',
+    'error',
+] as const;
+
 /** Статус отдельной job */
-export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+/** Допустимые статусы всего пайплайна */
+export const PIPELINE_STATUSES = [
+    'processing',
+    'awaiting_manual',
+    'done',
+    'error',
+] as const;
 
 /** Статус всего пайплайна */
-export type PipelineStatus = 'processing' | 'done' | 'error';
+export type PipelineStatus = (typeof PIPELINE_STATUSES)[number];
 
 /**
  * Логгер для job
@@ -90,6 +107,12 @@ export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = u
      * Задержка между ретраями в миллисекундах (по умолчанию 1000)
      */
     retryDelay?: number;
+    /**
+     * Job требует ручного запуска.
+     * При создании pipeline такая job получает статус 'awaiting_manual'.
+     * Для запуска используется метод PipelineManager.runManualJob().
+     */
+    manual?: boolean;
 }
 
 // ============================================================================

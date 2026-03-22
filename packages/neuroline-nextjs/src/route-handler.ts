@@ -2,6 +2,7 @@ import type { PipelineManager, PipelineStorage, PipelineConfig } from 'neuroline
 import {
 	handleStartPipeline,
 	handleRestartPipeline,
+	handleRunManualJob,
 	handleGetStatus,
 	handleGetResult,
 	handleGetList,
@@ -128,6 +129,20 @@ export function createPipelineRouteHandler<TInput = unknown>(
 					);
 				}
 				return handleRestartPipeline(request, manager, { waitUntil });
+			}
+
+			// Manual job режим: action=runManualJob
+			if (action === 'runManualJob') {
+				if (!enableDebugEndpoints) {
+					return new Response(
+						JSON.stringify({
+							success: false,
+							error: 'Debug endpoints are disabled. Set enableDebugEndpoints: true to enable.',
+						}),
+						{ status: 403, headers: { 'Content-Type': 'application/json' } },
+					);
+				}
+				return handleRunManualJob(request, manager, { waitUntil });
 			}
 
 			return handleStartPipeline(request, manager, pipelineType, {

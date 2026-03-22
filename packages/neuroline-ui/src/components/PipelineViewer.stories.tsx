@@ -242,3 +242,17 @@ export const Simple: Story = {
   },
 };
 
+export const CompactJobCards: Story = {
+  args: {
+    pipeline: processingPipeline,
+    jobDisplay: 'compact',
+  },
+};
+
+export const OneLineJobCards: Story = {
+  args: {
+    pipeline: processingPipeline,
+    jobDisplay: 'one-line',
+  },
+};
+

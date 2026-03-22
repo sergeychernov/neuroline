@@ -146,6 +146,8 @@ export interface PipelineStorage {
         pipelineId: string;
         /** Индексы jobs для сброса. Если не указано — сбрасываются все jobs */
         resetJobIndices?: Set<number>;
+        /** Индексы manual jobs — при сбросе получают статус 'awaiting_manual' вместо 'pending' */
+        manualJobIndices?: Set<number>;
         /** Новые опции для jobs (полностью заменяют существующие) */
         jobOptions?: Record<string, unknown>;
     }): Promise<void>;
@@ -357,9 +359,10 @@ export class InMemoryPipelineStorage implements PipelineStorage {
     async resetJobs(options: {
         pipelineId: string;
         resetJobIndices?: Set<number>;
+        manualJobIndices?: Set<number>;
         jobOptions?: Record<string, unknown>;
     }): Promise<void> {
-        const { pipelineId, resetJobIndices, jobOptions } = options;
+        const { pipelineId, resetJobIndices, manualJobIndices, jobOptions } = options;
         const pipeline = this.pipelines.get(pipelineId);
         if (!pipeline) return;
 
@@ -371,7 +374,7 @@ export class InMemoryPipelineStorage implements PipelineStorage {
             const job = pipeline.jobs[i];
             if (!job) continue;
 
-            job.status = 'pending';
+            job.status = manualJobIndices?.has(i) ? 'awaiting_manual' : 'pending';
             job.artifact = undefined;
             job.errors = [];
             job.startedAt = undefined;

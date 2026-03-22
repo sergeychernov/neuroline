@@ -45,3 +45,4 @@ export {
 // ============================================================================
 
 export { demoPipeline, type DemoPipelineInput } from './demo-pipeline';
+export { manualDemoPipeline } from './manual-demo-pipeline';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper } from '@mui/material';
-import type { StageDisplayInfo, JobDisplayInfo } from '../types';
+import type { StageDisplayInfo, JobDisplayInfo, JobNodeDisplayMode } from '../types';
 import { JobNode } from './JobNode';
 
 export interface StageColumnProps {
@@ -8,7 +8,11 @@ export interface StageColumnProps {
   onJobClick?: (job: JobDisplayInfo) => void;
   /** Callback при клике на кнопку retry job */
   onJobRetry?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку run для manual job */
+  onJobRunManual?: (job: JobDisplayInfo) => void;
   selectedJobName?: string;
+  /** Режим отображения карточек job */
+  jobDisplay?: JobNodeDisplayMode;
 }
 
 /**
@@ -18,7 +22,9 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   stage,
   onJobClick,
   onJobRetry,
+  onJobRunManual,
   selectedJobName,
+  jobDisplay,
 }) => {
   const isParallel = stage.jobs.length > 1;
 
@@ -26,12 +32,14 @@ export const StageColumn: React.FC<StageColumnProps> = ({
   const stageStatus = (() => {
     if (stage.jobs.some((j) => j.status === 'error')) return 'error';
     if (stage.jobs.some((j) => j.status === 'processing')) return 'processing';
+    if (stage.jobs.some((j) => j.status === 'awaiting_manual')) return 'awaiting_manual';
     if (stage.jobs.every((j) => j.status === 'done')) return 'done';
     return 'pending';
   })();
 
   const statusColors = {
     pending: '#a0a0a0',
+    awaiting_manual: '#ffab00',
     processing: '#00e5ff',
     done: '#00e676',
     error: '#ff1744',
@@ -117,6 +125,8 @@ export const StageColumn: React.FC<StageColumnProps> = ({
             isSelected={job.name === selectedJobName}
             onClick={onJobClick}
             onRetry={onJobRetry}
+            onRunManual={onJobRunManual}
+            jobDisplay={jobDisplay}
           />
         ))}
       </Box>

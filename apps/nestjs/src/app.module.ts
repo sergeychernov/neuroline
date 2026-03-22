@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { InMemoryPipelineStorage } from 'neuroline';
 import { NeurolineModule } from 'neuroline-nestjs';
-import { demoPipeline } from 'demo-pipelines';
+import { demoPipeline, manualDemoPipeline } from 'demo-pipelines';
 
 @Module({
 	imports: [
@@ -19,7 +19,7 @@ import { demoPipeline } from 'demo-pipelines';
 					adminGuards: [], // открытый доступ к admin-эндпоинтам
 					// Асинхронное получение jobOptions для базового POST
 					// В реальном приложении здесь можно получать данные из request.user, headers и т.д.
-					getJobOptions: async (input, request) => {
+					getJobOptions: async (_input, _request) => {
 						// Пример: те же опции, что передаются в админке через startWithOptions
 						return {
 							compute: {
@@ -28,6 +28,17 @@ import { demoPipeline } from 'demo-pipelines';
 							},
 						};
 					},
+				},
+				{
+					path: 'api/pipeline/manual-demo',
+					pipeline: manualDemoPipeline,
+					adminGuards: [],
+					getJobOptions: async () => ({
+						compute: {
+							multiplier: 2.0,
+							iterationDelayMs: 80,
+						},
+					}),
 				},
 			],
 			// Фоновый watchdog для отслеживания "зависших" джоб

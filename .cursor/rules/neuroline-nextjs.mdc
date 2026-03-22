@@ -69,6 +69,7 @@ export const GET = handlers.GET;
 |--------|------|------|----------|
 | POST | `/api/pipeline/<pipeline>?action=startWithOptions` | `{ input, jobOptions }` | Запуск с явными jobOptions |
 | POST | `/api/pipeline/<pipeline>?action=retry&id=<id>` | `{ jobName, jobOptions? }` | Перезапуск pipeline с указанной job |
+| POST | `/api/pipeline/<pipeline>?action=runManualJob&id=<id>` | `{ jobName }` | Запуск manual job |
 | GET | `/api/pipeline/<pipeline>?action=job&id=<id>&jobName=<job>` | — | Данные job (input/options/artifact) |
 | GET | `/api/pipeline/<pipeline>?action=pipeline&id=<id>` | — | Полные данные pipeline |
 

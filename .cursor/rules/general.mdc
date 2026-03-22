@@ -28,16 +28,17 @@ Neuroline — фреймворк-агностик библиотека для о
 
 ```
 neuroline/
-├── packages/           # Публикуемые пакеты
-│   ├── neuroline/      # Core: PipelineManager, Storage, Types
+├── packages/               # Публикуемые пакеты
+│   ├── neuroline/          # Core: PipelineManager, Storage, Types
 │   ├── neuroline-nestjs/   # NestJS интеграция
 │   ├── neuroline-nextjs/   # Next.js App Router handlers
-│   └── neuroline-ui/       # React компоненты визуализации
-├── apps/               # Примеры / демо приложения
-│   ├── nestjs/         # NestJS example app
-│   └── nextjs/         # Next.js example app
-├── package.json        # Корневой workspace config
-└── tsconfig.base.json  # Общие TS настройки
+│   ├── neuroline-ui/       # React компоненты визуализации
+│   └── demo-pipelines/     # Демо pipeline конфигурации
+├── apps/                   # Примеры / демо приложения
+│   ├── nestjs/             # NestJS example app
+│   └── nextjs/             # Next.js example app
+├── package.json            # Корневой workspace config
+└── tsconfig.base.json      # Общие TS настройки
 ```
 
 ## Соглашения по коду

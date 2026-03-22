@@ -13,10 +13,15 @@ const meta: Meta<typeof JobNode> = {
     isSelected: {
       control: 'boolean',
     },
+    jobDisplay: {
+      control: 'select',
+      options: ['details', 'compact', 'one-line'],
+    },
   },
   args: {
     onClick: fn(),
     onRetry: fn(),
+    onRunManual: fn(),
   },
 };
 
@@ -99,6 +104,20 @@ export const LongName: Story = {
   },
 };
 
+export const LongNameCompact: Story = {
+  args: {
+    ...LongName.args,
+    jobDisplay: 'compact',
+  },
+};
+
+export const LongNameOneLine: Story = {
+  args: {
+    ...LongName.args,
+    jobDisplay: 'one-line',
+  },
+};
+
 export const RetryButtonOnly: Story = {
   args: {
     job: {
@@ -112,6 +131,27 @@ export const RetryButtonOnly: Story = {
   },
 };
 
+export const AwaitingManual: Story = {
+  args: {
+    job: {
+      name: 'approval-step',
+      status: 'awaiting_manual',
+      errors: [],
+    },
+  },
+};
+
+export const AwaitingManualWithoutCallback: Story = {
+  args: {
+    job: {
+      name: 'approval-step',
+      status: 'awaiting_manual',
+      errors: [],
+    },
+    onRunManual: undefined,
+  },
+};
+
 export const WithoutOnRetry: Story = {
   args: {
     job: {
@@ -121,7 +161,7 @@ export const WithoutOnRetry: Story = {
       finishedAt: new Date(Date.now() - 1000),
       errors: [],
     },
-    onRetry: undefined, // Нет callback — нет кнопки retry
+    onRetry: undefined,
   },
 };
 

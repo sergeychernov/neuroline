@@ -338,6 +338,30 @@ function createDynamicController(
 					return { success: true, data: result };
 				}
 
+				// Manual job режим: action=runManualJob
+				if (action === 'runManualJob') {
+					await this.checkAdminGuards(request);
+
+					if (!id) {
+						throw new HttpException(
+							{ success: false, error: 'id query parameter is required' },
+							HttpStatus.BAD_REQUEST,
+						);
+					}
+
+					const manualBody = body as { jobName?: string };
+					if (!manualBody.jobName) {
+						throw new HttpException(
+							{ success: false, error: 'jobName is required' },
+							HttpStatus.BAD_REQUEST,
+						);
+					}
+
+					await this.manager.runManualJob(id, manualBody.jobName, { onExecutionStart });
+
+					return { success: true };
+				}
+
 				// Admin режим: action=startWithOptions
 				if (action === 'startWithOptions') {
 					await this.checkAdminGuards(request);
