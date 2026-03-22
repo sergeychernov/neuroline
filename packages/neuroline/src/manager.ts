@@ -461,7 +461,19 @@ export class PipelineManager {
             }
 
             if (hasAwaitingManual) {
-                await this.waitForManualJob(ctx.pipelineId, stageIndex);
+                let blockingManualJobIndex = Infinity;
+                for (let i = 0; i < stageJobs.length; i++) {
+                    const jobIndex = stageJobIndices[i];
+                    if (currentPipeline.jobs[jobIndex]?.status === 'awaiting_manual') {
+                        blockingManualJobIndex = Math.min(blockingManualJobIndex, jobIndex);
+                    }
+                }
+                if (blockingManualJobIndex === Infinity) {
+                    throw new Error(
+                        `Pipeline ${ctx.pipelineId}: awaiting_manual expected in stage ${stageIndex} but none found`,
+                    );
+                }
+                await this.waitForManualJob(ctx.pipelineId, stageIndex, blockingManualJobIndex);
                 continue;
             }
 
@@ -517,12 +529,20 @@ export class PipelineManager {
 
     /**
      * Ставит pipeline в awaiting_manual и ждёт пробуждения от runManualJob
+     *
+     * @param blockingJobIndex — flat-индекс первой manual job в stage, которую нужно запустить (для getStatus / currentJobName)
      */
-    private async waitForManualJob(pipelineId: string, stageIndex: number): Promise<void> {
+    private async waitForManualJob(
+        pipelineId: string,
+        stageIndex: number,
+        blockingJobIndex: number,
+    ): Promise<void> {
+        await this.storage.updateCurrentJobIndex(pipelineId, blockingJobIndex);
         await this.storage.updateStatus(pipelineId, 'awaiting_manual');
         this.logger.info('Pipeline awaiting manual job execution', {
             pipelineId,
             stageIndex: stageIndex + 1,
+            blockingJobIndex,
         });
 
         await new Promise<void>((resolve) => {

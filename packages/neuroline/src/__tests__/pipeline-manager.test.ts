@@ -217,6 +217,10 @@ describe('PipelineManager', () => {
 			expect(pipeline?.jobs[0].status).toBe('done');
 			expect(pipeline?.jobs[0].artifact).toBe(6); // 5 + 1
 			expect(pipeline?.jobs[1].status).toBe('awaiting_manual');
+			expect(pipeline?.currentJobIndex).toBe(1);
+
+			const statusWhilePaused = await manager.getStatus(response.pipelineId);
+			expect(statusWhilePaused.currentJobName).toBe('manual-job');
 
 			// Запускаем manual job
 			await manager.runManualJob(response.pipelineId, 'manual-job');
@@ -269,6 +273,10 @@ describe('PipelineManager', () => {
 			expect(pipeline?.jobs[0].status).toBe('done');
 			expect(pipeline?.jobs[0].artifact).toBe(11);
 			expect(pipeline?.jobs[1].status).toBe('awaiting_manual');
+			expect(pipeline?.currentJobIndex).toBe(1);
+
+			const statusWhilePaused = await manager.getStatus(response.pipelineId);
+			expect(statusWhilePaused.currentJobName).toBe('manual-in-stage');
 
 			// Запускаем manual job
 			await manager.runManualJob(response.pipelineId, 'manual-in-stage');
