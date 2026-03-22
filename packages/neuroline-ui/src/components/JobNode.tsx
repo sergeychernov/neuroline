@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes } from '@mui/material';
-import type { JobDisplayInfo } from '../types';
+import type { JobDisplayInfo, JobNodeDisplayMode } from '../types';
 import { StatusBadge } from './StatusBadge';
 
 /** Replay icon (inline to avoid tree-shaking issues) */
@@ -10,12 +10,53 @@ const ReplayIcon: React.FC<{ sx?: object }> = ({ sx }) => (
   </SvgIcon>
 );
 
+/** Play icon — green triangle for manual job run */
+const PlayIcon: React.FC<{ sx?: object }> = ({ sx }) => (
+  <SvgIcon sx={sx}>
+    <path d="M8 5v14l11-7z" />
+  </SvgIcon>
+);
+
 export interface JobNodeProps {
   job: JobDisplayInfo;
   isSelected?: boolean;
   onClick?: (job: JobDisplayInfo) => void;
   /** Callback при клике на кнопку retry */
   onRetry?: (job: JobDisplayInfo) => void;
+  /** Callback при клике на кнопку run для manual job (awaiting_manual) */
+  onRunManual?: (job: JobDisplayInfo) => void;
+  /**
+   * Режим отображения: details — полное имя и длительность;
+   * compact — аббревиатура имени, без времени;
+   * one-line — аббревиатура, всё в одну строку (время показывается при наличии).
+   */
+  jobDisplay?: JobNodeDisplayMode;
+}
+
+/**
+ * Аббревиатура из имён вида very-long-job-name → VLJN (первая буква/цифра каждого сегмента).
+ * Учитывает kebab-case, snake_case, точки и границы camelCase.
+ */
+export function jobNameToAbbreviation(name: string): string {
+  const spaced = name
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .replace(/[\s_\-./]+/g, ' ')
+    .trim();
+  const parts = spaced.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return name.slice(0, 8).toUpperCase();
+  }
+  if (parts.length === 1) {
+    const w = parts[0].replace(/[^a-zA-Z0-9]/g, '');
+    if (!w) return name.slice(0, 8).toUpperCase();
+    return w[0].toUpperCase();
+  }
+  return parts
+    .map((p) => {
+      const m = p.match(/[a-zA-Z0-9]/);
+      return m ? m[0].toUpperCase() : '';
+    })
+    .join('');
 }
 
 const pulse = keyframes`
@@ -42,6 +83,11 @@ const statusColors = {
     bg: 'rgba(19, 19, 26, 0.8)',
     glow: 'transparent',
   },
+  awaiting_manual: {
+    border: 'rgba(255, 171, 0, 0.5)',
+    bg: 'rgba(255, 171, 0, 0.08)',
+    glow: 'rgba(255, 171, 0, 0.25)',
+  },
   processing: {
     border: 'rgba(0, 229, 255, 0.5)',
     bg: 'rgba(0, 229, 255, 0.08)',
@@ -67,9 +113,16 @@ export const JobNode: React.FC<JobNodeProps> = ({
   isSelected = false,
   onClick,
   onRetry,
+  onRunManual,
+  jobDisplay = 'details',
 }) => {
   const colors = statusColors[job.status];
   const isProcessing = job.status === 'processing';
+  const isOneLine = jobDisplay === 'one-line';
+  const isCompact = jobDisplay === 'compact';
+  const useAbbrev = isCompact || isOneLine;
+  const titleLabel = useAbbrev ? jobNameToAbbreviation(job.name) : job.name;
+  const showDuration = !isCompact;
 
   const formatDuration = () => {
     if (!job.startedAt) return null;
@@ -93,12 +146,12 @@ export const JobNode: React.FC<JobNodeProps> = ({
       elevation={0}
       onClick={() => onClick?.(job)}
       sx={{
-        p: 2,
-        minWidth: 180,
-        maxWidth: 220,
+        p: isOneLine ? 0.5 : isCompact ? 0.35 : 0.3,
+        minWidth: isOneLine ? 'auto' : isCompact ? 96 : 120,
+        maxWidth: isOneLine ? 520 : isCompact ? 168 : 220,
         backgroundColor: colors.bg,
-        border: `2px solid ${colors.border}`,
-        borderRadius: 3,
+        border: `0.5px solid ${colors.border}`,
+        borderRadius: 0,
         cursor: onClick ? 'pointer' : 'default',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
@@ -127,31 +180,84 @@ export const JobNode: React.FC<JobNodeProps> = ({
               ? 'linear-gradient(90deg, #00e676, #00e5ff)'
               : job.status === 'processing'
                 ? 'linear-gradient(90deg, #00e5ff, #7c4dff, #00e5ff)'
-                : job.status === 'error'
-                  ? 'linear-gradient(90deg, #ff1744, #ff5722)'
-                  : 'transparent',
+                : job.status === 'awaiting_manual'
+                  ? 'linear-gradient(90deg, #ffab00, #ffc107)'
+                  : job.status === 'error'
+                    ? 'linear-gradient(90deg, #ff1744, #ff5722)'
+                    : 'transparent',
           backgroundSize: isProcessing ? '200% 100%' : '100% 100%',
           animation: isProcessing ? `${glow} 1.5s linear infinite` : undefined,
         },
       }}
     >
-      {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
-        <Typography
-          variant="body1"
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: isOneLine ? 'row' : 'column',
+          alignItems: isOneLine ? 'center' : 'stretch',
+          gap: isOneLine ? 1 : 0,
+          width: '100%',
+          minWidth: 0,
+        }}
+      >
+        {/* Header */}
+        <Box
           sx={{
-            fontWeight: 700,
-            color: '#fff',
-            wordBreak: 'break-word',
-            lineHeight: 1.3,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            mb: isOneLine ? 0 : isCompact ? 0.75 : 1.5,
+            flexShrink: isOneLine ? 0 : undefined,
           }}
         >
-          {job.name}
-        </Typography>
-      </Box>
+          {useAbbrev ? (
+            <Tooltip title={job.name} arrow placement="top">
+              <Typography
+                variant="body1"
+                component="span"
+                noWrap={isOneLine}
+                sx={{
+                  fontWeight: 700,
+                  color: '#fff',
+                  lineHeight: 1.3,
+                  letterSpacing: '0.06em',
+                  cursor: 'inherit',
+                  display: 'inline-block',
+                  maxWidth: isOneLine ? 120 : '100%',
+                }}
+                fontSize={isCompact ? 10 : 12}
+              >
+                {titleLabel}
+              </Typography>
+            </Tooltip>
+          ) : (
+            <Typography
+              variant="body1"
+              sx={{
+                fontWeight: 700,
+                color: '#fff',
+                wordBreak: 'break-word',
+                lineHeight: 1.3,
+              }}
+              fontSize={12}
+            >
+              {job.name}
+            </Typography>
+          )}
+        </Box>
 
-      {/* Status */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, flexWrap: 'wrap' }}>
+        {/* Status */}
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: isOneLine ? 0.5 : 1,
+            mb: isOneLine ? 0 : isCompact ? 0.5 : 1,
+            flexWrap: isOneLine ? 'nowrap' : 'wrap',
+            flex: isOneLine ? '1 1 auto' : undefined,
+            minWidth: 0,
+          }}
+        >
         {job.errors.length > 0 ? (
           <Tooltip
             title={
@@ -163,19 +269,67 @@ export const JobNode: React.FC<JobNodeProps> = ({
             arrow
           >
             <Box component="span">
-              <StatusBadge status={job.status} size="small" />
+              <StatusBadge
+                status={job.status}
+                size="small"
+                variant={useAbbrev ? 'icon' : 'default'}
+              />
             </Box>
           </Tooltip>
         ) : (
-          <StatusBadge status={job.status} size="small" />
+          <StatusBadge
+            status={job.status}
+            size="small"
+            variant={useAbbrev ? 'icon' : 'default'}
+          />
         )}
-        {duration && (
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+        {showDuration && duration && (
+          <Typography
+            variant="caption"
+            noWrap={isOneLine}
+            sx={{ color: 'text.secondary', flexShrink: isOneLine ? 0 : undefined }}
+          >
             {duration}
           </Typography>
         )}
-        {/* Retry button - show if onRetry provided OR retries configured/happened */}
-        {(onRetry || (job.retryCount ?? 0) > 0 || job.maxRetries !== undefined) && (() => {
+        {/* Run manual button - show for awaiting_manual if onRunManual provided */}
+        {job.status === 'awaiting_manual' && onRunManual && (
+          <Tooltip title="Click to run" arrow>
+            <Chip
+              icon={<PlayIcon sx={{ fontSize: 14 }} />}
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRunManual(job);
+              }}
+              sx={{
+                height: 20,
+                fontSize: '0.7rem',
+                backgroundColor: 'rgba(0, 230, 118, 0.2)',
+                color: '#00e676',
+                border: '1px solid rgba(0, 230, 118, 0.4)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                minWidth: 24,
+                '& .MuiChip-label': {
+                  display: 'none',
+                },
+                '& .MuiChip-icon': {
+                  margin: 0,
+                  color: 'inherit',
+                },
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 230, 118, 0.35)',
+                  borderColor: 'rgba(0, 230, 118, 0.7)',
+                },
+              }}
+            />
+          </Tooltip>
+        )}
+        {/* Retry button — не показываем при awaiting_manual (там только run manual по доке) */}
+        {job.status !== 'awaiting_manual' &&
+          (onRetry || (job.retryCount ?? 0) > 0 || job.maxRetries !== undefined) &&
+          (() => {
           const isDisabled = job.status === 'processing' || job.status === 'pending';
           const canRetry = onRetry && !isDisabled;
           const hasRetryInfo = (job.retryCount ?? 0) > 0 || job.maxRetries !== undefined;
@@ -252,6 +406,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
             </Tooltip>
           );
         })()}
+        </Box>
       </Box>
 
       {/* Decorative connectors like a neuron */}

@@ -8,6 +8,7 @@ Framework-agnostic pipeline orchestration library with typed jobs and pluggable 
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Framework-agnostic pipeline orchestration library with support for:
+
 - Sequential and parallel job execution
 - Persistent state storage (MongoDB, in-memory, or custom)
 - Type-safe jobs with synapses for data transformation
@@ -20,6 +21,7 @@ yarn add neuroline
 ```
 
 For MongoDB storage:
+
 ```bash
 yarn add neuroline mongoose
 ```
@@ -34,35 +36,35 @@ A Job is a pure function with a defined interface:
 import type { JobDefinition, JobContext } from 'neuroline';
 
 interface MyJobInput {
-    url: string;
+  url: string;
 }
 
 interface MyJobOutput {
-    data: string;
-    fetchedAt: Date;
+  data: string;
+  fetchedAt: Date;
 }
 
 interface MyJobOptions {
-    timeout?: number;
+  timeout?: number;
 }
 
 export const fetchDataJob: JobDefinition<MyJobInput, MyJobOutput, MyJobOptions> = {
-    name: 'fetch-data',
+  name: 'fetch-data',
 
-    async execute(input, options, ctx) {
-        ctx.logger.info('Fetching data', { url: input.url });
+  async execute(input, options, ctx) {
+    ctx.logger.info('Fetching data', { url: input.url });
 
-        const timeout = options?.timeout ?? 5000;
-        const response = await fetch(input.url, { signal: AbortSignal.timeout(timeout) });
-        const data = await response.text();
+    const timeout = options?.timeout ?? 5000;
+    const response = await fetch(input.url, { signal: AbortSignal.timeout(timeout) });
+    const data = await response.text();
 
-        ctx.logger.info('Data fetched', { length: data.length });
+    ctx.logger.info('Data fetched', { length: data.length });
 
-        return {
-            data,
-            fetchedAt: new Date(),
-        };
-    },
+    return {
+      data,
+      fetchedAt: new Date(),
+    };
+  },
 };
 ```
 
@@ -73,48 +75,48 @@ import type { PipelineConfig, SynapseContext } from 'neuroline';
 import { fetchDataJob, processDataJob, saveResultJob } from './jobs';
 
 interface PipelineInput {
-    url: string;
-    userId: string;
+  url: string;
+  userId: string;
 }
 
 export const myPipelineConfig: PipelineConfig<PipelineInput> = {
-    name: 'my-neuroline',
+  name: 'my-neuroline',
 
-    stages: [
-        // Stage 1: single job
-        fetchDataJob,
+  stages: [
+    // Stage 1: single job
+    fetchDataJob,
 
-        // Stage 2: two jobs execute in parallel
-        [
-            {
-                job: processDataJob,
-                // synapses transform data for the job
-                synapses: (ctx: SynapseContext<PipelineInput>) => ({
-                    rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
-                    userId: ctx.pipelineInput.userId,
-                }),
-            },
-            {
-                job: notifyJob,
-                synapses: (ctx) => ({
-                    userId: ctx.pipelineInput.userId,
-                    message: 'Processing started',
-                }),
-            },
-        ],
-
-        // Stage 3: final job
-        {
-            job: saveResultJob,
-            synapses: (ctx) => ({
-                processedData: ctx.getArtifact('process-data'),
-                userId: ctx.pipelineInput.userId,
-            }),
-        },
+    // Stage 2: two jobs execute in parallel
+    [
+      {
+        job: processDataJob,
+        // synapses transform data for the job
+        synapses: (ctx: SynapseContext<PipelineInput>) => ({
+          rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
+          userId: ctx.pipelineInput.userId,
+        }),
+      },
+      {
+        job: notifyJob,
+        synapses: (ctx) => ({
+          userId: ctx.pipelineInput.userId,
+          message: 'Processing started',
+        }),
+      },
     ],
 
-    // Optional: custom hash function
-    computeInputHash: (input) => `${input.userId}-${input.url}`,
+    // Stage 3: final job
+    {
+      job: saveResultJob,
+      synapses: (ctx) => ({
+        processedData: ctx.getArtifact('process-data'),
+        userId: ctx.pipelineInput.userId,
+      }),
+    },
+  ],
+
+  // Optional: custom hash function
+  computeInputHash: (input) => `${input.userId}-${input.url}`,
 };
 ```
 
@@ -128,8 +130,8 @@ import { myPipelineConfig } from './pipelines';
 
 const storage = new InMemoryPipelineStorage();
 const manager = new PipelineManager({
-    storage,
-    logger: console, // or your logger
+  storage,
+  logger: console, // or your logger
 });
 
 // Register pipeline
@@ -137,10 +139,10 @@ manager.registerPipeline(myPipelineConfig);
 
 // Start pipeline
 const { pipelineId, isNew } = await manager.startPipeline('my-neuroline', {
-    data: { url: 'https://api.example.com/data', userId: 'user-123' },
-    jobOptions: {
-        'fetch-data': { timeout: 10000 },
-    },
+  data: { url: 'https://api.example.com/data', userId: 'user-123' },
+  jobOptions: {
+    'fetch-data': { timeout: 10000 },
+  },
 });
 
 // Poll status
@@ -184,8 +186,8 @@ manager.registerPipeline(myPipelineConfig);
 
 ```typescript
 interface PipelineManagerOptions {
-    storage: PipelineStorage;  // Required
-    logger?: JobLogger;        // Optional
+  storage: PipelineStorage; // Required
+  logger?: JobLogger; // Optional
 }
 ```
 
@@ -199,13 +201,13 @@ Starts a pipeline or returns existing one (if found by input data hash).
 
 ```typescript
 interface PipelineInput<TData> {
-    data: TData;                              // Input data
-    jobOptions?: Record<string, unknown>;     // Options for jobs (key = job name)
+  data: TData; // Input data
+  jobOptions?: Record<string, unknown>; // Options for jobs (key = job name)
 }
 
 interface StartPipelineResponse {
-    pipelineId: string;  // ID for polling
-    isNew: boolean;      // true if created, false if already existed
+  pipelineId: string; // ID for polling
+  isNew: boolean; // true if created, false if already existed
 }
 ```
 
@@ -215,13 +217,17 @@ Returns current pipeline status.
 
 ```typescript
 interface PipelineStatusResponse {
-    status: 'processing' | 'done' | 'error';
-    currentJobIndex: number;
-    totalJobs: number;
-    currentJobName?: string;
-    error?: { message: string; jobName?: string };
+  status: 'processing' | 'awaiting_manual' | 'done' | 'error';
+  currentJobIndex: number;
+  totalJobs: number;
+  currentJobName?: string;
+  error?: { message: string; jobName?: string };
 }
 ```
+
+#### `runManualJob(pipelineId: string, jobName: string, options?: StartPipelineOptions): Promise<void>`
+
+Triggers a manual job (changes status from `awaiting_manual` to `pending` and resumes pipeline execution).
 
 #### `getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse>`
 
@@ -229,10 +235,10 @@ Returns result (artifact) for a single job. If `jobName` is not provided, return
 
 ```typescript
 interface PipelineResultResponse {
-    pipelineId: string;
-    jobName: string;
-    status: 'pending' | 'processing' | 'done' | 'error';
-    artifact: unknown | null | undefined; // undefined = not yet executed, null = executed but no result
+  pipelineId: string;
+  jobName: string;
+  status: 'pending' | 'awaiting_manual' | 'processing' | 'done' | 'error';
+  artifact: unknown | null | undefined; // undefined = not yet executed, null = executed but no result
 }
 ```
 
@@ -244,12 +250,12 @@ Returns full pipeline state (for debugging).
 
 ```typescript
 interface JobDefinition<TInput, TOutput, TOptions> {
-    name: string;
-    execute: (
-        input: TInput,
-        options: TOptions | undefined,
-        context: JobContext
-    ) => Promise<TOutput | null>;
+  name: string;
+  execute: (
+    input: TInput,
+    options: TOptions | undefined,
+    context: JobContext
+  ) => Promise<TOutput | null>;
 }
 ```
 
@@ -257,13 +263,13 @@ interface JobDefinition<TInput, TOutput, TOptions> {
 
 ```typescript
 interface JobContext {
-    pipelineId: string;
-    jobIndex: number;
-    logger: {
-        info: (msg: string, data?: Record<string, unknown>) => void;
-        error: (msg: string, data?: Record<string, unknown>) => void;
-        warn: (msg: string, data?: Record<string, unknown>) => void;
-    };
+  pipelineId: string;
+  jobIndex: number;
+  logger: {
+    info: (msg: string, data?: Record<string, unknown>) => void;
+    error: (msg: string, data?: Record<string, unknown>) => void;
+    warn: (msg: string, data?: Record<string, unknown>) => void;
+  };
 }
 ```
 
@@ -271,9 +277,9 @@ interface JobContext {
 
 ```typescript
 interface PipelineConfig<TInput> {
-    name: string;
-    stages: PipelineStage[];
-    computeInputHash?: (input: TInput) => string;
+  name: string;
+  stages: PipelineStage[];
+  computeInputHash?: (input: TInput) => string;
 }
 
 // Stage: single job or array of jobs (parallel)
@@ -283,10 +289,11 @@ type PipelineStage = StageItem | StageItem[];
 type StageItem = JobDefinition | JobInPipeline;
 
 interface JobInPipeline<TInput, TOutput, TOptions> {
-    job: JobDefinition<TInput, TOutput, TOptions>;
-    synapses?: (ctx: SynapseContext) => TInput;
-    retries?: number;      // Количество ретраев при ошибке (по умолчанию: 0)
-    retryDelay?: number;   // Задержка между ретраями в мс (по умолчанию: 1000)
+  job: JobDefinition<TInput, TOutput, TOptions>;
+  synapses?: (ctx: SynapseContext) => TInput;
+  retries?: number; // Количество ретраев при ошибке (по умолчанию: 0)
+  retryDelay?: number; // Задержка между ретраями в мс (по умолчанию: 1000)
+  manual?: boolean; // Job requires manual trigger (status: awaiting_manual)
 }
 ```
 
@@ -296,8 +303,8 @@ Context for `synapses` function:
 
 ```typescript
 interface SynapseContext<TPipelineInput> {
-    pipelineInput: TPipelineInput;
-    getArtifact: <T>(jobName: string) => T | undefined;
+  pipelineInput: TPipelineInput;
+  getArtifact: <T>(jobName: string) => T | undefined;
 }
 ```
 
@@ -313,8 +320,8 @@ import { InMemoryPipelineStorage } from 'neuroline';
 const storage = new InMemoryPipelineStorage();
 
 // For testing
-storage.clear();           // Clear all data
-storage.getAll();          // Get all pipelines
+storage.clear(); // Clear all data
+storage.getAll(); // Get all pipelines
 ```
 
 ### MongoPipelineStorage
@@ -362,33 +369,29 @@ import { PipelineManager } from 'neuroline';
 import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 @Module({
-    imports: [
-        MongooseModule.forFeature([
-            { name: 'Pipeline', schema: PipelineSchema },
-        ]),
-    ],
+  imports: [MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }])],
 })
 export class PipelineModule implements OnModuleInit {
-    private manager: PipelineManager;
+  private manager: PipelineManager;
 
-    constructor(
-        @InjectModel('Pipeline') private pipelineModel: Model<any>,
-        private logger: Logger,
-    ) {
-        const storage = new MongoPipelineStorage(this.pipelineModel);
-        this.manager = new PipelineManager({
-            storage,
-            logger: {
-                info: (msg, data) => this.logger.log({ msg, ...data }),
-                error: (msg, data) => this.logger.error({ msg, ...data }),
-                warn: (msg, data) => this.logger.warn({ msg, ...data }),
-            },
-        });
-    }
+  constructor(
+    @InjectModel('Pipeline') private pipelineModel: Model<any>,
+    private logger: Logger
+  ) {
+    const storage = new MongoPipelineStorage(this.pipelineModel);
+    this.manager = new PipelineManager({
+      storage,
+      logger: {
+        info: (msg, data) => this.logger.log({ msg, ...data }),
+        error: (msg, data) => this.logger.error({ msg, ...data }),
+        warn: (msg, data) => this.logger.warn({ msg, ...data }),
+      },
+    });
+  }
 
-    onModuleInit() {
-        this.manager.registerPipeline(myPipelineConfig);
-    }
+  onModuleInit() {
+    this.manager.registerPipeline(myPipelineConfig);
+  }
 }
 ```
 
@@ -431,6 +434,43 @@ const config: PipelineConfig = {
 - `retryDelay`: Delay in milliseconds before each retry (default: 1000)
 - `retryCount` and `maxRetries` are tracked in job state for monitoring
 
+## Manual Jobs
+
+Jobs can be marked as `manual` to pause pipeline execution until triggered:
+
+```typescript
+const config: PipelineConfig = {
+  name: 'my-pipeline',
+  stages: [initJob, { job: approvalJob, synapses: toApproval, manual: true }, finalizeJob],
+};
+```
+
+When a stage with manual jobs is reached, automatic jobs execute normally. Once only manual jobs remain, the pipeline transitions to `awaiting_manual` status.
+
+```typescript
+// Trigger a manual job
+await manager.runManualJob(pipelineId, 'approval');
+
+// Manual jobs can also be promoted before their stage is reached
+// They will execute automatically when the stage starts
+await manager.runManualJob(pipelineId, 'approval');
+```
+
+- `manual: true` in `JobInPipeline` — job starts with `awaiting_manual` status
+- Mixed stages (manual + automatic jobs) are supported
+- Pipeline status becomes `awaiting_manual` when waiting for manual trigger
+- Stale jobs watchdog ignores `awaiting_manual` pipelines and jobs
+
+**Client API:**
+
+```typescript
+// Run manual job and resume polling
+await client.runManualJob(pipelineId, 'approval');
+
+// Or with polling in one call
+const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
+```
+
 ## Stale Jobs Watchdog
 
 When a process crashes during job execution, the job may remain in `processing` status forever ("stale job"). The watchdog monitors and automatically times out such jobs.
@@ -440,9 +480,9 @@ const manager = new PipelineManager({ storage, logger });
 
 // Start watchdog (checks every minute, times out jobs after 20 minutes)
 manager.startStaleJobsWatchdog({
-    checkIntervalMs: 60_000,     // Check every 1 minute
-    jobTimeoutMs: 20 * 60_000,   // Timeout after 20 minutes
-    onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
+  checkIntervalMs: 60_000, // Check every 1 minute
+  jobTimeoutMs: 20 * 60_000, // Timeout after 20 minutes
+  onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
 });
 
 // Stop watchdog on shutdown
@@ -459,9 +499,9 @@ const timedOutCount = await manager.timeoutStaleJobs();
 
 ```typescript
 interface StaleJobsWatchdogOptions {
-    checkIntervalMs?: number;  // Default: 60000 (1 minute)
-    jobTimeoutMs?: number;     // Default: 1200000 (20 minutes)
-    onStaleJobsFound?: (count: number) => void;
+  checkIntervalMs?: number; // Default: 60000 (1 minute)
+  jobTimeoutMs?: number; // Default: 1200000 (20 minutes)
+  onStaleJobsFound?: (count: number) => void;
 }
 ```
 
@@ -471,11 +511,15 @@ Pipelines are identified by input data hash:
 
 ```typescript
 // First call — creates pipeline
-const { pipelineId, isNew } = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+const { pipelineId, isNew } = await manager.startPipeline('my-pipeline', {
+  data: { url: 'https://example.com' },
+});
 // isNew = true
 
 // Repeated call with same data — returns existing pipeline
-const result2 = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+const result2 = await manager.startPipeline('my-pipeline', {
+  data: { url: 'https://example.com' },
+});
 // result2.pipelineId === pipelineId
 // result2.isNew = false
 ```
@@ -497,8 +541,8 @@ When the pipeline structure changes (adding/removing/renaming jobs), old records
 ```typescript
 // Version 1: pipeline with two jobs
 const configV1: PipelineConfig = {
-    name: 'my-pipeline',
-    stages: [jobA, jobB],
+  name: 'my-pipeline',
+  stages: [jobA, jobB],
 };
 manager.registerPipeline(configV1);
 
@@ -508,8 +552,8 @@ await manager.startPipeline('my-pipeline', { data: { id: 1 } });
 
 // Version 2: added jobC
 const configV2: PipelineConfig = {
-    name: 'my-pipeline',
-    stages: [jobA, jobB, jobC],
+  name: 'my-pipeline',
+  stages: [jobA, jobB, jobC],
 };
 manager.registerPipeline(configV2);
 
@@ -519,6 +563,7 @@ await manager.startPipeline('my-pipeline', { data: { id: 1 } });
 ```
 
 This is useful when:
+
 - Adding new jobs to pipeline
 - Removing obsolete jobs
 - Changing execution order
@@ -530,46 +575,43 @@ All types are available for import:
 
 ```typescript
 import type {
-    // Job
-    JobDefinition,
-    JobContext,
-    JobLogger,
-    JobStatus,
-    JobState,          // JobState<TInput, TOutput, TOptions> with generics
+  // Job
+  JobDefinition,
+  JobContext,
+  JobLogger,
+  JobStatus,
+  JobState, // JobState<TInput, TOutput, TOptions> with generics
 
-    // Pipeline
-    PipelineConfig,
-    PipelineStage,
-    PipelineInput,
-    PipelineStatus,
-    PipelineState,
-    JobError,
-    JobError,
+  // Pipeline
+  PipelineConfig,
+  PipelineStage,
+  PipelineInput,
+  PipelineStatus,
+  PipelineState,
+  JobError,
+  JobError,
 
-    // Synapse
-    SynapseContext,
-    JobInPipeline,
-    StageItem,
+  // Synapse
+  SynapseContext,
+  JobInPipeline,
+  StageItem,
 
-    // Responses
-    StartPipelineResponse,
-    PipelineStatusResponse,
-    PipelineResultResponse,
+  // Responses
+  StartPipelineResponse,
+  PipelineStatusResponse,
+  PipelineResultResponse,
 
-    // Storage
-    PipelineStorage,
-    PaginatedResult,
-    PaginationParams,
+  // Storage
+  PipelineStorage,
+  PaginatedResult,
+  PaginationParams,
 
-    // Watchdog
-    StaleJobsWatchdogOptions,
+  // Watchdog
+  StaleJobsWatchdogOptions,
 } from 'neuroline';
 
 // MongoDB types (separate import)
-import type {
-    MongoPipelineDocument,
-    MongoPipelineJobState,
-} from 'neuroline/mongo';
+import type { MongoPipelineDocument, MongoPipelineJobState } from 'neuroline/mongo';
 ```
 
 ### JobState with Generics
@@ -578,22 +620,22 @@ import type {
 
 ```typescript
 interface JobError {
-    message: string;
-    stack?: string;
-    attempt?: number;
-    logs?: string[];
-    data?: unknown;
+  message: string;
+  stack?: string;
+  attempt?: number;
+  logs?: string[];
+  data?: unknown;
 }
 
 interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
-    name: string;
-    status: JobStatus;
-    input?: TInput;      // Input data (computed by synapses)
-    options?: TOptions;  // Job options (from jobOptions)
-    artifact?: TOutput;  // Output data (result of execute)
-    errors: JobError[];  // Error history (empty array when no errors)
-    startedAt?: Date;
-    finishedAt?: Date;
+  name: string;
+  status: JobStatus;
+  input?: TInput; // Input data (computed by synapses)
+  options?: TOptions; // Job options (from jobOptions)
+  artifact?: TOutput; // Output data (result of execute)
+  errors: JobError[]; // Error history (empty array when no errors)
+  startedAt?: Date;
+  finishedAt?: Date;
 }
 ```
 
@@ -625,6 +667,12 @@ const result = await client.getResult(pipelineId);
 
 // Get job details (input, options, artifact)
 const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
+
+// Trigger a manual job
+await client.runManualJob(pipelineId, 'approval');
+
+// Trigger a manual job and poll until pipeline completes
+const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
 ```
 
 ### Polling
@@ -694,11 +742,11 @@ function MyComponent() {
 
 ## Exports
 
-| Import path | Contents |
-|-------------|----------|
-| `neuroline` | Core: types, `PipelineManager`, `InMemoryPipelineStorage` |
-| `neuroline/mongo` | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, document types |
-| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, types |
+| Import path        | Contents                                                          |
+| ------------------ | ----------------------------------------------------------------- |
+| `neuroline`        | Core: types, `PipelineManager`, `InMemoryPipelineStorage`         |
+| `neuroline/mongo`  | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, document types |
+| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, types          |
 
 ## License
 
@@ -712,6 +760,7 @@ UNLICENSED
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Фреймворк-агностик библиотека для оркестрации пайплайнов с поддержкой:
+
 - Последовательного и параллельного выполнения jobs
 - Персистентного хранения состояния (MongoDB, in-memory, или кастомное)
 - Типобезопасных jobs с synapses для трансформации данных
@@ -724,6 +773,7 @@ yarn add neuroline
 ```
 
 Для MongoDB хранилища:
+
 ```bash
 yarn add neuroline mongoose
 ```
@@ -738,35 +788,35 @@ Job — это чистая функция с определённым инте�
 import type { JobDefinition, JobContext } from 'neuroline';
 
 interface MyJobInput {
-    url: string;
+  url: string;
 }
 
 interface MyJobOutput {
-    data: string;
-    fetchedAt: Date;
+  data: string;
+  fetchedAt: Date;
 }
 
 interface MyJobOptions {
-    timeout?: number;
+  timeout?: number;
 }
 
 export const fetchDataJob: JobDefinition<MyJobInput, MyJobOutput, MyJobOptions> = {
-    name: 'fetch-data',
+  name: 'fetch-data',
 
-    async execute(input, options, ctx) {
-        ctx.logger.info('Fetching data', { url: input.url });
+  async execute(input, options, ctx) {
+    ctx.logger.info('Fetching data', { url: input.url });
 
-        const timeout = options?.timeout ?? 5000;
-        const response = await fetch(input.url, { signal: AbortSignal.timeout(timeout) });
-        const data = await response.text();
+    const timeout = options?.timeout ?? 5000;
+    const response = await fetch(input.url, { signal: AbortSignal.timeout(timeout) });
+    const data = await response.text();
 
-        ctx.logger.info('Data fetched', { length: data.length });
+    ctx.logger.info('Data fetched', { length: data.length });
 
-        return {
-            data,
-            fetchedAt: new Date(),
-        };
-    },
+    return {
+      data,
+      fetchedAt: new Date(),
+    };
+  },
 };
 ```
 
@@ -777,48 +827,48 @@ import type { PipelineConfig, SynapseContext } from 'neuroline';
 import { fetchDataJob, processDataJob, saveResultJob } from './jobs';
 
 interface PipelineInput {
-    url: string;
-    userId: string;
+  url: string;
+  userId: string;
 }
 
 export const myPipelineConfig: PipelineConfig<PipelineInput> = {
-    name: 'my-neuroline',
+  name: 'my-neuroline',
 
-    stages: [
-        // Stage 1: одна job
-        fetchDataJob,
+  stages: [
+    // Stage 1: одна job
+    fetchDataJob,
 
-        // Stage 2: две jobs выполняются параллельно
-        [
-            {
-                job: processDataJob,
-                // synapses трансформирует данные для job
-                synapses: (ctx: SynapseContext<PipelineInput>) => ({
-                    rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
-                    userId: ctx.pipelineInput.userId,
-                }),
-            },
-            {
-                job: notifyJob,
-                synapses: (ctx) => ({
-                    userId: ctx.pipelineInput.userId,
-                    message: 'Processing started',
-                }),
-            },
-        ],
-
-        // Stage 3: финальная job
-        {
-            job: saveResultJob,
-            synapses: (ctx) => ({
-                processedData: ctx.getArtifact('process-data'),
-                userId: ctx.pipelineInput.userId,
-            }),
-        },
+    // Stage 2: две jobs выполняются параллельно
+    [
+      {
+        job: processDataJob,
+        // synapses трансформирует данные для job
+        synapses: (ctx: SynapseContext<PipelineInput>) => ({
+          rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
+          userId: ctx.pipelineInput.userId,
+        }),
+      },
+      {
+        job: notifyJob,
+        synapses: (ctx) => ({
+          userId: ctx.pipelineInput.userId,
+          message: 'Processing started',
+        }),
+      },
     ],
 
-    // Опционально: кастомная функция хеширования
-    computeInputHash: (input) => `${input.userId}-${input.url}`,
+    // Stage 3: финальная job
+    {
+      job: saveResultJob,
+      synapses: (ctx) => ({
+        processedData: ctx.getArtifact('process-data'),
+        userId: ctx.pipelineInput.userId,
+      }),
+    },
+  ],
+
+  // Опционально: кастомная функция хеширования
+  computeInputHash: (input) => `${input.userId}-${input.url}`,
 };
 ```
 
@@ -832,8 +882,8 @@ import { myPipelineConfig } from './pipelines';
 
 const storage = new InMemoryPipelineStorage();
 const manager = new PipelineManager({
-    storage,
-    logger: console, // или ваш логгер
+  storage,
+  logger: console, // или ваш логгер
 });
 
 // Регистрация pipeline
@@ -841,10 +891,10 @@ manager.registerPipeline(myPipelineConfig);
 
 // Запуск pipeline
 const { pipelineId, isNew } = await manager.startPipeline('my-neuroline', {
-    data: { url: 'https://api.example.com/data', userId: 'user-123' },
-    jobOptions: {
-        'fetch-data': { timeout: 10000 },
-    },
+  data: { url: 'https://api.example.com/data', userId: 'user-123' },
+  jobOptions: {
+    'fetch-data': { timeout: 10000 },
+  },
 });
 
 // Polling статуса
@@ -888,8 +938,8 @@ manager.registerPipeline(myPipelineConfig);
 
 ```typescript
 interface PipelineManagerOptions {
-    storage: PipelineStorage;  // Обязательно
-    logger?: JobLogger;        // Опционально
+  storage: PipelineStorage; // Обязательно
+  logger?: JobLogger; // Опционально
 }
 ```
 
@@ -903,13 +953,13 @@ interface PipelineManagerOptions {
 
 ```typescript
 interface PipelineInput<TData> {
-    data: TData;                              // Входные данные
-    jobOptions?: Record<string, unknown>;     // Опции для jobs (ключ = имя job)
+  data: TData; // Входные данные
+  jobOptions?: Record<string, unknown>; // Опции для jobs (ключ = имя job)
 }
 
 interface StartPipelineResponse {
-    pipelineId: string;  // ID для polling
-    isNew: boolean;      // true если создан, false если уже существовал
+  pipelineId: string; // ID для polling
+  isNew: boolean; // true если создан, false если уже существовал
 }
 ```
 
@@ -919,13 +969,17 @@ interface StartPipelineResponse {
 
 ```typescript
 interface PipelineStatusResponse {
-    status: 'processing' | 'done' | 'error';
-    currentJobIndex: number;
-    totalJobs: number;
-    currentJobName?: string;
-    error?: { message: string; jobName?: string };
+  status: 'processing' | 'awaiting_manual' | 'done' | 'error';
+  currentJobIndex: number;
+  totalJobs: number;
+  currentJobName?: string;
+  error?: { message: string; jobName?: string };
 }
 ```
+
+#### `runManualJob(pipelineId: string, jobName: string, options?: StartPipelineOptions): Promise<void>`
+
+Запускает manual job (меняет статус с `awaiting_manual` на `pending` и возобновляет выполнение pipeline).
 
 #### `getResult(pipelineId: string, jobName?: string): Promise<PipelineResultResponse>`
 
@@ -933,10 +987,10 @@ interface PipelineStatusResponse {
 
 ```typescript
 interface PipelineResultResponse {
-    pipelineId: string;
-    jobName: string;
-    status: 'pending' | 'processing' | 'done' | 'error';
-    artifact: unknown | null | undefined; // undefined = ещё не выполнена, null = выполнена без результата
+  pipelineId: string;
+  jobName: string;
+  status: 'pending' | 'awaiting_manual' | 'processing' | 'done' | 'error';
+  artifact: unknown | null | undefined; // undefined = ещё не выполнена, null = выполнена без результата
 }
 ```
 
@@ -948,12 +1002,12 @@ interface PipelineResultResponse {
 
 ```typescript
 interface JobDefinition<TInput, TOutput, TOptions> {
-    name: string;
-    execute: (
-        input: TInput,
-        options: TOptions | undefined,
-        context: JobContext
-    ) => Promise<TOutput | null>;
+  name: string;
+  execute: (
+    input: TInput,
+    options: TOptions | undefined,
+    context: JobContext
+  ) => Promise<TOutput | null>;
 }
 ```
 
@@ -961,13 +1015,13 @@ interface JobDefinition<TInput, TOutput, TOptions> {
 
 ```typescript
 interface JobContext {
-    pipelineId: string;
-    jobIndex: number;
-    logger: {
-        info: (msg: string, data?: Record<string, unknown>) => void;
-        error: (msg: string, data?: Record<string, unknown>) => void;
-        warn: (msg: string, data?: Record<string, unknown>) => void;
-    };
+  pipelineId: string;
+  jobIndex: number;
+  logger: {
+    info: (msg: string, data?: Record<string, unknown>) => void;
+    error: (msg: string, data?: Record<string, unknown>) => void;
+    warn: (msg: string, data?: Record<string, unknown>) => void;
+  };
 }
 ```
 
@@ -975,9 +1029,9 @@ interface JobContext {
 
 ```typescript
 interface PipelineConfig<TInput> {
-    name: string;
-    stages: PipelineStage[];
-    computeInputHash?: (input: TInput) => string;
+  name: string;
+  stages: PipelineStage[];
+  computeInputHash?: (input: TInput) => string;
 }
 
 // Stage: одна job или массив jobs (параллельно)
@@ -987,10 +1041,11 @@ type PipelineStage = StageItem | StageItem[];
 type StageItem = JobDefinition | JobInPipeline;
 
 interface JobInPipeline<TInput, TOutput, TOptions> {
-    job: JobDefinition<TInput, TOutput, TOptions>;
-    synapses?: (ctx: SynapseContext) => TInput;
-    retries?: number;      // Количество ретраев при ошибке (по умолчанию: 0)
-    retryDelay?: number;   // Задержка между ретраями в мс (по умолчанию: 1000)
+  job: JobDefinition<TInput, TOutput, TOptions>;
+  synapses?: (ctx: SynapseContext) => TInput;
+  retries?: number; // Количество ретраев при ошибке (по умолчанию: 0)
+  retryDelay?: number; // Задержка между ретраями в мс (по умолчанию: 1000)
+  manual?: boolean; // Job требует ручного запуска (статус: awaiting_manual)
 }
 ```
 
@@ -1000,8 +1055,8 @@ interface JobInPipeline<TInput, TOutput, TOptions> {
 
 ```typescript
 interface SynapseContext<TPipelineInput> {
-    pipelineInput: TPipelineInput;
-    getArtifact: <T>(jobName: string) => T | undefined;
+  pipelineInput: TPipelineInput;
+  getArtifact: <T>(jobName: string) => T | undefined;
 }
 ```
 
@@ -1017,8 +1072,8 @@ import { InMemoryPipelineStorage } from 'neuroline';
 const storage = new InMemoryPipelineStorage();
 
 // Для тестов
-storage.clear();           // Очистить все данные
-storage.getAll();          // Получить все pipelines
+storage.clear(); // Очистить все данные
+storage.getAll(); // Получить все pipelines
 ```
 
 ### MongoPipelineStorage
@@ -1066,33 +1121,29 @@ import { PipelineManager } from 'neuroline';
 import { MongoPipelineStorage, PipelineSchema } from 'neuroline/mongo';
 
 @Module({
-    imports: [
-        MongooseModule.forFeature([
-            { name: 'Pipeline', schema: PipelineSchema },
-        ]),
-    ],
+  imports: [MongooseModule.forFeature([{ name: 'Pipeline', schema: PipelineSchema }])],
 })
 export class PipelineModule implements OnModuleInit {
-    private manager: PipelineManager;
+  private manager: PipelineManager;
 
-    constructor(
-        @InjectModel('Pipeline') private pipelineModel: Model<any>,
-        private logger: Logger,
-    ) {
-        const storage = new MongoPipelineStorage(this.pipelineModel);
-        this.manager = new PipelineManager({
-            storage,
-            logger: {
-                info: (msg, data) => this.logger.log({ msg, ...data }),
-                error: (msg, data) => this.logger.error({ msg, ...data }),
-                warn: (msg, data) => this.logger.warn({ msg, ...data }),
-            },
-        });
-    }
+  constructor(
+    @InjectModel('Pipeline') private pipelineModel: Model<any>,
+    private logger: Logger
+  ) {
+    const storage = new MongoPipelineStorage(this.pipelineModel);
+    this.manager = new PipelineManager({
+      storage,
+      logger: {
+        info: (msg, data) => this.logger.log({ msg, ...data }),
+        error: (msg, data) => this.logger.error({ msg, ...data }),
+        warn: (msg, data) => this.logger.warn({ msg, ...data }),
+      },
+    });
+  }
 
-    onModuleInit() {
-        this.manager.registerPipeline(myPipelineConfig);
-    }
+  onModuleInit() {
+    this.manager.registerPipeline(myPipelineConfig);
+  }
 }
 ```
 
@@ -1135,6 +1186,43 @@ const config: PipelineConfig = {
 - `retryDelay`: Задержка в миллисекундах перед каждым ретраем (по умолчанию: 1000)
 - `retryCount` и `maxRetries` отслеживаются в состоянии job для мониторинга
 
+## Manual Jobs
+
+Jobs можно пометить как `manual`, чтобы pipeline останавливался и ждал ручного запуска:
+
+```typescript
+const config: PipelineConfig = {
+  name: 'my-pipeline',
+  stages: [initJob, { job: approvalJob, synapses: toApproval, manual: true }, finalizeJob],
+};
+```
+
+Когда stage с manual jobs достигнут, автоматические jobs выполняются как обычно. Когда остаются только manual jobs, pipeline переходит в статус `awaiting_manual`.
+
+```typescript
+// Запуск manual job
+await manager.runManualJob(pipelineId, 'approval');
+
+// Manual job можно промоутить до достижения её stage —
+// тогда она выполнится автоматически при старте stage
+await manager.runManualJob(pipelineId, 'approval');
+```
+
+- `manual: true` в `JobInPipeline` — job создаётся со статусом `awaiting_manual`
+- Поддерживаются смешанные stage (manual + автоматические jobs)
+- Статус pipeline становится `awaiting_manual` при ожидании ручного запуска
+- Stale jobs watchdog игнорирует `awaiting_manual` pipeline и jobs
+
+**Client API:**
+
+```typescript
+// Запуск manual job и возобновление polling
+await client.runManualJob(pipelineId, 'approval');
+
+// Или с polling в одном вызове
+const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
+```
+
 ## Stale Jobs Watchdog
 
 Если процесс падает во время выполнения джобы, она может навсегда остаться в статусе `processing` ("зависшая джоба"). Watchdog отслеживает и автоматически таймаутит такие джобы.
@@ -1144,9 +1232,9 @@ const manager = new PipelineManager({ storage, logger });
 
 // Запуск watchdog (проверка раз в минуту, таймаут через 20 минут)
 manager.startStaleJobsWatchdog({
-    checkIntervalMs: 60_000,     // Проверка каждую минуту
-    jobTimeoutMs: 20 * 60_000,   // Таймаут через 20 минут
-    onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
+  checkIntervalMs: 60_000, // Проверка каждую минуту
+  jobTimeoutMs: 20 * 60_000, // Таймаут через 20 минут
+  onStaleJobsFound: (count) => console.log(`Timed out ${count} stale jobs`),
 });
 
 // Остановка watchdog при shutdown
@@ -1163,9 +1251,9 @@ const timedOutCount = await manager.timeoutStaleJobs();
 
 ```typescript
 interface StaleJobsWatchdogOptions {
-    checkIntervalMs?: number;  // По умолчанию: 60000 (1 минута)
-    jobTimeoutMs?: number;     // По умолчанию: 1200000 (20 минут)
-    onStaleJobsFound?: (count: number) => void;
+  checkIntervalMs?: number; // По умолчанию: 60000 (1 минута)
+  jobTimeoutMs?: number; // По умолчанию: 1200000 (20 минут)
+  onStaleJobsFound?: (count: number) => void;
 }
 ```
 
@@ -1175,11 +1263,15 @@ Pipeline идентифицируется по хешу входных данн�
 
 ```typescript
 // Первый вызов — создаёт pipeline
-const { pipelineId, isNew } = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+const { pipelineId, isNew } = await manager.startPipeline('my-pipeline', {
+  data: { url: 'https://example.com' },
+});
 // isNew = true
 
 // Повторный вызов с теми же данными — возвращает существующий
-const result2 = await manager.startPipeline('my-pipeline', { data: { url: 'https://example.com' } });
+const result2 = await manager.startPipeline('my-pipeline', {
+  data: { url: 'https://example.com' },
+});
 // result2.pipelineId === pipelineId
 // result2.isNew = false
 ```
@@ -1201,8 +1293,8 @@ const config: PipelineConfig<MyInput> = {
 ```typescript
 // Версия 1: pipeline с двумя jobs
 const configV1: PipelineConfig = {
-    name: 'my-pipeline',
-    stages: [jobA, jobB],
+  name: 'my-pipeline',
+  stages: [jobA, jobB],
 };
 manager.registerPipeline(configV1);
 
@@ -1212,8 +1304,8 @@ await manager.startPipeline('my-pipeline', { data: { id: 1 } });
 
 // Версия 2: добавили jobC
 const configV2: PipelineConfig = {
-    name: 'my-pipeline',
-    stages: [jobA, jobB, jobC],
+  name: 'my-pipeline',
+  stages: [jobA, jobB, jobC],
 };
 manager.registerPipeline(configV2);
 
@@ -1223,6 +1315,7 @@ await manager.startPipeline('my-pipeline', { data: { id: 1 } });
 ```
 
 Это полезно при:
+
 - Добавлении новых jobs в pipeline
 - Удалении устаревших jobs
 - Изменении порядка выполнения
@@ -1234,44 +1327,41 @@ await manager.startPipeline('my-pipeline', { data: { id: 1 } });
 
 ```typescript
 import type {
-    // Job
-    JobDefinition,
-    JobContext,
-    JobLogger,
-    JobStatus,
-    JobState,          // JobState<TInput, TOutput, TOptions> с generics
+  // Job
+  JobDefinition,
+  JobContext,
+  JobLogger,
+  JobStatus,
+  JobState, // JobState<TInput, TOutput, TOptions> с generics
 
-    // Pipeline
-    PipelineConfig,
-    PipelineStage,
-    PipelineInput,
-    PipelineStatus,
-    PipelineState,
+  // Pipeline
+  PipelineConfig,
+  PipelineStage,
+  PipelineInput,
+  PipelineStatus,
+  PipelineState,
 
-    // Synapse
-    SynapseContext,
-    JobInPipeline,
-    StageItem,
+  // Synapse
+  SynapseContext,
+  JobInPipeline,
+  StageItem,
 
-    // Responses
-    StartPipelineResponse,
-    PipelineStatusResponse,
-    PipelineResultResponse,
+  // Responses
+  StartPipelineResponse,
+  PipelineStatusResponse,
+  PipelineResultResponse,
 
-    // Storage
-    PipelineStorage,
-    PaginatedResult,
-    PaginationParams,
+  // Storage
+  PipelineStorage,
+  PaginatedResult,
+  PaginationParams,
 
-    // Watchdog
-    StaleJobsWatchdogOptions,
+  // Watchdog
+  StaleJobsWatchdogOptions,
 } from 'neuroline';
 
 // MongoDB типы (отдельный импорт)
-import type {
-    MongoPipelineDocument,
-    MongoPipelineJobState,
-} from 'neuroline/mongo';
+import type { MongoPipelineDocument, MongoPipelineJobState } from 'neuroline/mongo';
 ```
 
 ### JobState с Generics
@@ -1280,22 +1370,22 @@ import type {
 
 ```typescript
 interface JobError {
-    message: string;
-    stack?: string;
-    attempt?: number;
-    logs?: string[];
-    data?: unknown;
+  message: string;
+  stack?: string;
+  attempt?: number;
+  logs?: string[];
+  data?: unknown;
 }
 
 interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknown> {
-    name: string;
-    status: JobStatus;
-    input?: TInput;      // Входные данные (вычисленные synapses)
-    options?: TOptions;  // Опции job (из jobOptions)
-    artifact?: TOutput;  // Выходные данные (результат execute)
-    errors: JobError[];
-    startedAt?: Date;
-    finishedAt?: Date;
+  name: string;
+  status: JobStatus;
+  input?: TInput; // Входные данные (вычисленные synapses)
+  options?: TOptions; // Опции job (из jobOptions)
+  artifact?: TOutput; // Выходные данные (результат execute)
+  errors: JobError[];
+  startedAt?: Date;
+  finishedAt?: Date;
 }
 ```
 
@@ -1327,6 +1417,12 @@ const result = await client.getResult(pipelineId);
 
 // Получение деталей job (input, options, artifact)
 const jobDetails = await client.getJobDetails(pipelineId, 'fetch-data');
+
+// Запуск manual job
+await client.runManualJob(pipelineId, 'approval');
+
+// Запуск manual job с polling до завершения pipeline
+const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
 ```
 
 ### Polling
@@ -1396,11 +1492,11 @@ function MyComponent() {
 
 ## Exports
 
-| Import path | Содержимое |
-|-------------|------------|
-| `neuroline` | Core: типы, `PipelineManager`, `InMemoryPipelineStorage` |
-| `neuroline/mongo` | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, типы документов |
-| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, типы |
+| Import path        | Содержимое                                                         |
+| ------------------ | ------------------------------------------------------------------ |
+| `neuroline`        | Core: типы, `PipelineManager`, `InMemoryPipelineStorage`           |
+| `neuroline/mongo`  | MongoDB: `MongoPipelineStorage`, `PipelineSchema`, типы документов |
+| `neuroline/client` | Client: `PipelineClient`, `createUsePipelineHook`, типы            |
 
 ## License
 

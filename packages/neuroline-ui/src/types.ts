@@ -3,13 +3,12 @@
  * Базовые типы переиспользуем из neuroline
  */
 
-import type { JobError as CoreJobError } from 'neuroline';
+import type { JobError as CoreJobError, JobStatus, PipelineStatus } from 'neuroline';
 
-/** Статус отдельной job */
-export type JobStatus = 'pending' | 'processing' | 'done' | 'error';
+export type { JobStatus, PipelineStatus };
 
-/** Статус всего пайплайна */
-export type PipelineStatus = 'processing' | 'done' | 'error';
+/** Режим отображения ноды job (JobNode / PipelineViewer) */
+export type JobNodeDisplayMode = 'compact' | 'one-line' | 'details';
 
 /** Тип для сериализуемых данных */
 export type SerializableValue = Record<string, unknown> | string | number | boolean | null;

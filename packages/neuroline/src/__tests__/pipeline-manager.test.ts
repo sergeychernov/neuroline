@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { describe, it, expect } from 'vitest';
 
 import type { PipelineConfig, JobDefinition } from '../types';
@@ -173,6 +175,326 @@ describe('PipelineManager', () => {
 
 		expect(status.status).toBe('error');
 		expect(status.error?.jobName).toBe('fail-job');
+	});
+
+	describe('manual jobs', () => {
+		it('manual job получает статус awaiting_manual при создании pipeline', async () => {
+			const storage = new InMemoryPipelineStorage();
+			const manager = new PipelineManager({ storage });
+
+			const autoJob: JobDefinition<number, number> = {
+				name: 'auto-job',
+				execute: async (input) => input + 1,
+			};
+
+			const manualJob: JobDefinition<number, number> = {
+				name: 'manual-job',
+				execute: async (input) => input * 10,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'manual-pipeline',
+				stages: [
+					asStageJob(autoJob),
+					{ job: asStageJob(manualJob), manual: true },
+				],
+			};
+
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			const response = await manager.startPipeline(
+				'manual-pipeline',
+				{ data: 5 },
+				{ onExecutionStart: (p) => { executionPromise = p; } },
+			);
+
+			// Даём время auto-job завершиться
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			const pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('awaiting_manual');
+			expect(pipeline?.jobs[0].status).toBe('done');
+			expect(pipeline?.jobs[0].artifact).toBe(6); // 5 + 1
+			expect(pipeline?.jobs[1].status).toBe('awaiting_manual');
+			expect(pipeline?.currentJobIndex).toBe(1);
+
+			const statusWhilePaused = await manager.getStatus(response.pipelineId);
+			expect(statusWhilePaused.currentJobName).toBe('manual-job');
+
+			// Запускаем manual job
+			await manager.runManualJob(response.pipelineId, 'manual-job');
+			await executionPromise;
+
+			const finalPipeline = await storage.findById(response.pipelineId);
+			expect(finalPipeline?.status).toBe('done');
+			expect(finalPipeline?.jobs[1].status).toBe('done');
+			expect(finalPipeline?.jobs[1].artifact).toBe(60); // 6 * 10
+		});
+
+		it('mixed stage: auto jobs выполняются, manual ждёт', async () => {
+			const storage = new InMemoryPipelineStorage();
+			const manager = new PipelineManager({ storage });
+
+			const autoJob: JobDefinition<number, number> = {
+				name: 'auto-in-stage',
+				execute: async (input) => input + 1,
+			};
+
+			const manualJob: JobDefinition<number, number> = {
+				name: 'manual-in-stage',
+				execute: async (input) => input * 2,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'mixed-stage',
+				stages: [
+					[
+						asStageJob(autoJob),
+						{ job: asStageJob(manualJob), synapses: (ctx) => ctx.pipelineInput as number, manual: true },
+					],
+				],
+			};
+
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			const response = await manager.startPipeline(
+				'mixed-stage',
+				{ data: 10 },
+				{ onExecutionStart: (p) => { executionPromise = p; } },
+			);
+
+			// Даём время auto-job завершиться
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			let pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('awaiting_manual');
+			expect(pipeline?.jobs[0].status).toBe('done');
+			expect(pipeline?.jobs[0].artifact).toBe(11);
+			expect(pipeline?.jobs[1].status).toBe('awaiting_manual');
+			expect(pipeline?.currentJobIndex).toBe(1);
+
+			const statusWhilePaused = await manager.getStatus(response.pipelineId);
+			expect(statusWhilePaused.currentJobName).toBe('manual-in-stage');
+
+			// Запускаем manual job
+			await manager.runManualJob(response.pipelineId, 'manual-in-stage');
+			await executionPromise;
+
+			pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('done');
+			expect(pipeline?.jobs[1].status).toBe('done');
+			expect(pipeline?.jobs[1].artifact).toBe(20); // 10 * 2
+		});
+
+		it('runManualJob выбрасывает ошибку если job не в статусе awaiting_manual', async () => {
+			const storage = new InMemoryPipelineStorage();
+			const manager = new PipelineManager({ storage });
+
+			const autoJob: JobDefinition<void, void> = {
+				name: 'auto',
+				execute: async () => {},
+			};
+
+			manager.registerPipeline({
+				name: 'no-manual',
+				stages: [asStageJob(autoJob)],
+			});
+
+			const response = await runPipeline(manager, 'no-manual', undefined);
+
+			await expect(
+				manager.runManualJob(response.pipelineId, 'auto'),
+			).rejects.toThrow('not awaiting manual execution');
+		});
+
+		it('после «рестарта» runManualJob для поздней manual job начинает с первого незавершённого stage', async () => {
+			const storage = new InMemoryPipelineStorage();
+
+			const autoJob: JobDefinition<number, number> = {
+				name: 'auto-pre',
+				execute: async (input) => input + 1,
+			};
+
+			const manualA: JobDefinition<number, number> = {
+				name: 'manual-a',
+				execute: async (input) => input * 2,
+			};
+
+			const manualB: JobDefinition<{ v: number }, number> = {
+				name: 'manual-b',
+				execute: async (input) => input.v + 100,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'recover-manual-order',
+				stages: [
+					asStageJob(autoJob),
+					{ job: asStageJob(manualA), manual: true },
+					{
+						job: asStageJob(manualB),
+						manual: true,
+						synapses: (ctx) => ({
+							v: ctx.getArtifact<number>('manual-a') ?? 0,
+						}),
+					},
+				],
+			};
+
+			const configHash = crypto
+				.createHash('sha256')
+				.update('auto-pre,manual-a,manual-b')
+				.digest('hex')
+				.slice(0, 16);
+
+			await storage.create({
+				pipelineId: 'recover-manual-pid',
+				pipelineType: 'recover-manual-order',
+				status: 'awaiting_manual',
+				currentJobIndex: 1,
+				input: 3,
+				jobs: [
+					{ name: 'auto-pre', status: 'done', errors: [], artifact: 4 },
+					{ name: 'manual-a', status: 'awaiting_manual', errors: [] },
+					{ name: 'manual-b', status: 'awaiting_manual', errors: [] },
+				],
+				configHash,
+			});
+
+			const manager = new PipelineManager({ storage });
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			await manager.runManualJob('recover-manual-pid', 'manual-b', {
+				onExecutionStart: (p) => {
+					executionPromise = p;
+				},
+			});
+
+			expect(executionPromise).not.toBeNull();
+
+			// Цикл дошёл до первой незавершённой manual job и снова выставил awaiting_manual
+			for (let i = 0; i < 100; i++) {
+				const p = await storage.findById('recover-manual-pid');
+				if (p?.status === 'awaiting_manual') break;
+				await new Promise((r) => setTimeout(r, 20));
+			}
+
+			await manager.runManualJob('recover-manual-pid', 'manual-a');
+			await executionPromise;
+
+			const finalPipeline = await storage.findById('recover-manual-pid');
+			expect(finalPipeline?.status).toBe('done');
+			expect(finalPipeline?.jobs[1].artifact).toBe(8);
+			expect(finalPipeline?.jobs[2].artifact).toBe(108);
+		});
+
+		it('промоут manual job до достижения stage — job выполняется автоматически', async () => {
+			const storage = new InMemoryPipelineStorage();
+			const manager = new PipelineManager({ storage });
+
+			const gate = { resolve: null as (() => void) | null };
+
+			const slowJob: JobDefinition<number, number> = {
+				name: 'slow-job',
+				execute: async (input) => {
+					await new Promise<void>((resolve) => { gate.resolve = resolve; });
+					return input + 1;
+				},
+			};
+
+			const manualJob: JobDefinition<number, number> = {
+				name: 'future-manual',
+				execute: async (input) => input * 100,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'early-promote',
+				stages: [
+					asStageJob(slowJob),
+					{ job: asStageJob(manualJob), manual: true },
+				],
+			};
+
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			const response = await manager.startPipeline(
+				'early-promote',
+				{ data: 1 },
+				{ onExecutionStart: (p) => { executionPromise = p; } },
+			);
+
+			// Ждём пока slow-job начнёт выполняться
+			while (!gate.resolve) {
+				await new Promise((r) => setTimeout(r, 10));
+			}
+
+			// Pipeline processing, slow-job ещё идёт
+			// Промоутим manual job заранее
+			await manager.runManualJob(response.pipelineId, 'future-manual');
+
+			// Теперь разблокируем slow-job
+			gate.resolve();
+			await executionPromise;
+
+			const pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('done');
+			expect(pipeline?.jobs[0].status).toBe('done');
+			expect(pipeline?.jobs[1].status).toBe('done');
+			expect(pipeline?.jobs[1].artifact).toBe(200); // 2 * 100
+		});
+
+		it('manual job доступна через synapses для следующих jobs', async () => {
+			const storage = new InMemoryPipelineStorage();
+			const manager = new PipelineManager({ storage });
+
+			const manualJob: JobDefinition<number, { value: number }> = {
+				name: 'manual-first',
+				execute: async (input) => ({ value: input + 10 }),
+			};
+
+			const consumerJob: JobDefinition<{ fromManual: number }, number> = {
+				name: 'consumer',
+				execute: async (input) => input.fromManual * 3,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'manual-synapse',
+				stages: [
+					{ job: asStageJob(manualJob), manual: true },
+					{
+						job: asStageJob(consumerJob),
+						synapses: (ctx) => ({
+							fromManual: ctx.getArtifact<{ value: number }>('manual-first')?.value ?? 0,
+						}),
+					},
+				],
+			};
+
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			const response = await manager.startPipeline(
+				'manual-synapse',
+				{ data: 5 },
+				{ onExecutionStart: (p) => { executionPromise = p; } },
+			);
+
+			await new Promise((resolve) => setTimeout(resolve, 50));
+
+			let pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('awaiting_manual');
+
+			await manager.runManualJob(response.pipelineId, 'manual-first');
+			await executionPromise;
+
+			pipeline = await storage.findById(response.pipelineId);
+			expect(pipeline?.status).toBe('done');
+			expect(pipeline?.jobs[0].artifact).toEqual({ value: 15 });
+			expect(pipeline?.jobs[1].artifact).toBe(45); // 15 * 3
+		});
 	});
 
 	describe('restartPipelineFromJob', () => {

@@ -1,9 +1,14 @@
 'use client';
 
-import { Box, Button, Paper, Stack, CircularProgress, Typography, Divider } from '@mui/material';
+import { useMemo } from 'react';
+import { Box, Paper, Stack, Typography, Divider } from '@mui/material';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import ReplayIcon from '@mui/icons-material/Replay';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import type { SvgIconProps } from '@mui/material/SvgIcon';
+import type { ComponentType } from 'react';
+import { PipelineActionButton } from './PipelineActionButton';
 
 // ============================================================================
 // Types
@@ -18,6 +23,8 @@ export interface PipelineControlPanelProps {
 	onNextjsError: () => void;
 	/** Запуск Next.js pipeline с retry (unstableFailCount = 1) */
 	onNextjsRetry: () => void;
+	/** Запуск Next.js pipeline с manual job */
+	onNextjsManual: () => void;
 	/** Запуск NestJS success pipeline (admin endpoint с jobOptions) */
 	onNestjsSuccess: () => void;
 	/** Запуск NestJS success pipeline (базовый endpoint без jobOptions) */
@@ -26,11 +33,32 @@ export interface PipelineControlPanelProps {
 	onNestjsError: () => void;
 	/** Запуск NestJS pipeline с retry (unstableFailCount = 1) */
 	onNestjsRetry: () => void;
+	/** Запуск NestJS pipeline с manual job */
+	onNestjsManual: () => void;
 	/** Pipeline в процессе выполнения */
 	isRunning: boolean;
 	/** Текущий тип pipeline */
 	currentPipelineType?: string;
 }
+
+interface PipelineControlButtonDef {
+	slug: string;
+	label: string;
+	color: string;
+	icon: ComponentType<SvgIconProps>;
+}
+
+// ============================================================================
+// Конфиг кнопок (общий для Next.js и NestJS)
+// ============================================================================
+
+const PIPELINE_CONTROL_BUTTONS: PipelineControlButtonDef[] = [
+	{ slug: 'success', label: 'Success', color: '#00e676', icon: CheckCircleOutlineIcon },
+	{ slug: 'success-basic', label: 'Basic', color: '#00e676', icon: CheckCircleOutlineIcon },
+	{ slug: 'error', label: 'Error', color: '#ff1744', icon: ErrorOutlineIcon },
+	{ slug: 'retry', label: 'Retry', color: '#ff9800', icon: ReplayIcon },
+	{ slug: 'manual', label: 'Manual', color: '#7c4dff', icon: PlayArrowIcon },
+];
 
 // ============================================================================
 // Component
@@ -45,21 +73,48 @@ export function PipelineControlPanel({
 	onNextjsSuccessBasic,
 	onNextjsError,
 	onNextjsRetry,
+	onNextjsManual,
 	onNestjsSuccess,
 	onNestjsSuccessBasic,
 	onNestjsError,
 	onNestjsRetry,
+	onNestjsManual,
 	isRunning,
 	currentPipelineType,
 }: PipelineControlPanelProps) {
-	const isNextjsSuccessRunning = isRunning && currentPipelineType === 'nextjs-success';
-	const isNextjsSuccessBasicRunning = isRunning && currentPipelineType === 'nextjs-success-basic';
-	const isNextjsErrorRunning = isRunning && currentPipelineType === 'nextjs-error';
-	const isNextjsRetryRunning = isRunning && currentPipelineType === 'nextjs-retry';
-	const isNestjsSuccessRunning = isRunning && currentPipelineType === 'nestjs-success';
-	const isNestjsSuccessBasicRunning = isRunning && currentPipelineType === 'nestjs-success-basic';
-	const isNestjsErrorRunning = isRunning && currentPipelineType === 'nestjs-error';
-	const isNestjsRetryRunning = isRunning && currentPipelineType === 'nestjs-retry';
+	const nextHandlers = useMemo(
+		() => ({
+			success: onNextjsSuccess,
+			'success-basic': onNextjsSuccessBasic,
+			error: onNextjsError,
+			retry: onNextjsRetry,
+			manual: onNextjsManual,
+		}),
+		[
+			onNextjsSuccess,
+			onNextjsSuccessBasic,
+			onNextjsError,
+			onNextjsRetry,
+			onNextjsManual,
+		],
+	);
+
+	const nestHandlers = useMemo(
+		() => ({
+			success: onNestjsSuccess,
+			'success-basic': onNestjsSuccessBasic,
+			error: onNestjsError,
+			retry: onNestjsRetry,
+			manual: onNestjsManual,
+		}),
+		[
+			onNestjsSuccess,
+			onNestjsSuccessBasic,
+			onNestjsError,
+			onNestjsRetry,
+			onNestjsManual,
+		],
+	);
 
 	return (
 		<Paper
@@ -73,14 +128,12 @@ export function PipelineControlPanel({
 			}}
 		>
 			<Stack spacing={2}>
-				{/* Кнопки запуска */}
 				<Stack
 					direction={{ xs: 'column', md: 'row' }}
 					spacing={2}
 					alignItems={{ xs: 'stretch', md: 'center' }}
 					justifyContent="space-between"
 				>
-					{/* Next.js API */}
 					<Box>
 						<Typography
 							variant="caption"
@@ -95,124 +148,21 @@ export function PipelineControlPanel({
 							NEXT.JS API
 						</Typography>
 						<Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-							<Button
-								variant="contained"
-								size="small"
-								onClick={onNextjsSuccess}
-								disabled={isRunning}
-								startIcon={
-									isNextjsSuccessRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									background: 'linear-gradient(135deg, #00e676 0%, #00c853 100%)',
-									'&:hover': {
-										background: 'linear-gradient(135deg, #69f0ae 0%, #00e676 100%)',
-									},
-									'&:disabled': {
-										background: 'rgba(0, 230, 118, 0.3)',
-										color: 'rgba(255,255,255,0.5)',
-									},
-								}}
-							>
-								Success
-							</Button>
-							<Button
-								variant="outlined"
-								size="small"
-								onClick={onNextjsSuccessBasic}
-								disabled={isRunning}
-								startIcon={
-									isNextjsSuccessBasicRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									borderColor: '#00e676',
-									color: '#00e676',
-									'&:hover': {
-										borderColor: '#69f0ae',
-										backgroundColor: 'rgba(0, 230, 118, 0.1)',
-									},
-									'&:disabled': {
-										borderColor: 'rgba(0, 230, 118, 0.3)',
-										color: 'rgba(0, 230, 118, 0.5)',
-									},
-								}}
-							>
-								Basic
-							</Button>
-							<Button
-								variant="contained"
-								size="small"
-								onClick={onNextjsError}
-								disabled={isRunning}
-								startIcon={
-									isNextjsErrorRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<ErrorOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									background: 'linear-gradient(135deg, #ff1744 0%, #d50000 100%)',
-									'&:hover': {
-										background: 'linear-gradient(135deg, #ff5252 0%, #ff1744 100%)',
-									},
-									'&:disabled': {
-										background: 'rgba(255, 23, 68, 0.3)',
-										color: 'rgba(255,255,255,0.5)',
-									},
-								}}
-							>
-								Error
-							</Button>
-							<Button
-								variant="contained"
-								size="small"
-								onClick={onNextjsRetry}
-								disabled={isRunning}
-								startIcon={
-									isNextjsRetryRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<ReplayIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
-									'&:hover': {
-										background: 'linear-gradient(135deg, #ffb74d 0%, #ff9800 100%)',
-									},
-									'&:disabled': {
-										background: 'rgba(255, 152, 0, 0.3)',
-										color: 'rgba(255,255,255,0.5)',
-									},
-								}}
-							>
-								Retry
-							</Button>
+							{PIPELINE_CONTROL_BUTTONS.map((def) => (
+								<PipelineActionButton
+									key={`nextjs-${def.slug}`}
+									label={def.label}
+									onClick={nextHandlers[def.slug as keyof typeof nextHandlers]}
+									color={def.color}
+									variant="contained"
+									icon={def.icon}
+									loading={isRunning && currentPipelineType === `nextjs-${def.slug}`}
+									disabled={isRunning}
+								/>
+							))}
 						</Stack>
 					</Box>
 
-					{/* Разделитель */}
 					<Divider
 						orientation="vertical"
 						flexItem
@@ -222,7 +172,6 @@ export function PipelineControlPanel({
 						}}
 					/>
 
-					{/* NestJS API */}
 					<Box>
 						<Typography
 							variant="caption"
@@ -237,129 +186,20 @@ export function PipelineControlPanel({
 							NESTJS API (localhost:3003)
 						</Typography>
 						<Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-							<Button
-								variant="outlined"
-								size="small"
-								onClick={onNestjsSuccess}
-								disabled={isRunning}
-								startIcon={
-									isNestjsSuccessRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									borderColor: '#ffd54f',
-									color: '#ffd54f',
-									'&:hover': {
-										borderColor: '#ffee58',
-										backgroundColor: 'rgba(255, 213, 79, 0.1)',
-									},
-									'&:disabled': {
-										borderColor: 'rgba(255, 213, 79, 0.3)',
-										color: 'rgba(255, 213, 79, 0.5)',
-									},
-								}}
-							>
-								Success
-							</Button>
-							<Button
-								variant="outlined"
-								size="small"
-								onClick={onNestjsSuccessBasic}
-								disabled={isRunning}
-								startIcon={
-									isNestjsSuccessBasicRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<CheckCircleOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									borderColor: 'rgba(255, 213, 79, 0.6)',
-									color: 'rgba(255, 213, 79, 0.8)',
-									'&:hover': {
-										borderColor: '#ffd54f',
-										backgroundColor: 'rgba(255, 213, 79, 0.1)',
-									},
-									'&:disabled': {
-										borderColor: 'rgba(255, 213, 79, 0.3)',
-										color: 'rgba(255, 213, 79, 0.5)',
-									},
-								}}
-							>
-								Basic
-							</Button>
-							<Button
-								variant="outlined"
-								size="small"
-								onClick={onNestjsError}
-								disabled={isRunning}
-								startIcon={
-									isNestjsErrorRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<ErrorOutlineIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									borderColor: '#ffd54f',
-									color: '#ffd54f',
-									'&:hover': {
-										borderColor: '#ffee58',
-										backgroundColor: 'rgba(255, 213, 79, 0.1)',
-									},
-									'&:disabled': {
-										borderColor: 'rgba(255, 213, 79, 0.3)',
-										color: 'rgba(255, 213, 79, 0.5)',
-									},
-								}}
-							>
-								Error
-							</Button>
-							<Button
-								variant="outlined"
-								size="small"
-								onClick={onNestjsRetry}
-								disabled={isRunning}
-								startIcon={
-									isNestjsRetryRunning ? (
-										<CircularProgress size={14} color="inherit" />
-									) : (
-										<ReplayIcon sx={{ fontSize: 18 }} />
-									)
-								}
-								sx={{
-									px: 2,
-									py: 0.75,
-									fontSize: '0.8rem',
-									borderColor: '#ff9800',
-									color: '#ff9800',
-									'&:hover': {
-										borderColor: '#ffb74d',
-										backgroundColor: 'rgba(255, 152, 0, 0.1)',
-									},
-									'&:disabled': {
-										borderColor: 'rgba(255, 152, 0, 0.3)',
-										color: 'rgba(255, 152, 0, 0.5)',
-									},
-								}}
-							>
-								Retry
-							</Button>
+							{PIPELINE_CONTROL_BUTTONS.map((def) => (
+								<PipelineActionButton
+									key={`nestjs-${def.slug}`}
+									label={def.label}
+									onClick={nestHandlers[def.slug as keyof typeof nestHandlers]}
+									color={def.color}
+									variant="outlined"
+									icon={def.icon}
+									loading={isRunning && currentPipelineType === `nestjs-${def.slug}`}
+									disabled={isRunning}
+								/>
+							))}
 						</Stack>
 					</Box>
-
 				</Stack>
 			</Stack>
 		</Paper>

@@ -169,6 +169,7 @@ These endpoints return full pipeline/job data (input, options, artifacts) or all
 | Endpoint                             | Description                             |
 | ------------------------------------ | --------------------------------------- |
 | `POST ?action=startWithOptions`      | Start pipeline with explicit jobOptions |
+| `POST ?action=runManualJob&id=xxx`   | Trigger a manual job                    |
 | `GET ?action=job&id=xxx&jobName=yyy` | Job details (input, options, artifact)  |
 | `GET ?action=pipeline&id=xxx`        | Full pipeline state                     |
 
@@ -407,6 +408,7 @@ curl -X POST "http://localhost:3000/api/v1/my-pipeline?action=startWithOptions" 
 | Эндпоинт                             | Описание                              |
 | ------------------------------------ | ------------------------------------- |
 | `POST ?action=startWithOptions`      | Запуск pipeline с явными jobOptions   |
+| `POST ?action=runManualJob&id=xxx`   | Запуск manual job                     |
 | `GET ?action=job&id=xxx&jobName=yyy` | Детали job (input, options, artifact) |
 | `GET ?action=pipeline&id=xxx`        | Полное состояние pipeline             |
 

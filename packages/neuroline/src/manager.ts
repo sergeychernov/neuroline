@@ -72,6 +72,19 @@ const flattenStages = (stages: PipelineStage[]): { jobInPipeline: JobInPipeline;
 };
 
 /**
+ * Минимальный индекс stage, где есть job не в статусе done (для recovery после рестарта процесса)
+ */
+const getEarliestIncompleteStageIndex = (flat: { stageIndex: number }[], jobs: JobState[]): number => {
+    let min = Infinity;
+    for (let i = 0; i < flat.length; i++) {
+        if (jobs[i]?.status !== 'done') {
+            min = Math.min(min, flat[i].stageIndex);
+        }
+    }
+    return min === Infinity ? 0 : min;
+};
+
+/**
  * Вычисляет хеш от входных данных
  */
 const computeDefaultHash = (input: unknown): string => {
@@ -89,53 +102,18 @@ const computeConfigHash = (stages: PipelineStage[]): string => {
     return crypto.createHash('sha256').update(jobNames.join(',')).digest('hex').slice(0, 16);
 };
 
-/** Результат фильтрации jobs stage */
-interface FilteredStageJobs {
-    /** Jobs которые нужно выполнить */
-    jobsToExecute: Array<{
-        jobInPipeline: JobInPipeline;
-        indexInStage: number;
-        jobIndex: number;
-    }>;
-    /** Артефакты из уже выполненных jobs (name -> artifact) */
-    loadedArtifacts: Map<string, unknown>;
+// ============================================================================
+// Pipeline Execution Context
+// ============================================================================
+
+/** Разделяемое состояние между stage в процессе выполнения pipeline */
+interface PipelineExecutionContext {
+    readonly pipelineId: string;
+    readonly artifacts: Map<string, unknown>;
+    readonly mapperContext: SynapseContext;
+    readonly jobOptions: Record<string, unknown>;
+    defaultInput: unknown;
 }
-
-/**
- * Фильтрует jobs stage: определяет какие нужно выполнить, какие уже готовы
- * 
- * @param stageJobs - jobs из конфигурации stage
- * @param stageJobIndices - индексы jobs в плоском списке pipeline
- * @param pipelineJobs - состояние jobs из storage
- * @returns jobsToExecute и loadedArtifacts
- */
-const filterStageJobs = (
-    stageJobs: JobInPipeline[],
-    stageJobIndices: number[],
-    pipelineJobs: JobState[],
-): FilteredStageJobs => {
-    const jobsToExecute: FilteredStageJobs['jobsToExecute'] = [];
-    const loadedArtifacts = new Map<string, unknown>();
-
-    for (let i = 0; i < stageJobs.length; i++) {
-        const jobIndex = stageJobIndices[i];
-        const jobState = pipelineJobs[jobIndex];
-
-        if (jobState?.status === 'done' && jobState.artifact !== undefined) {
-            // Job уже выполнена — загружаем артефакт для synapses
-            loadedArtifacts.set(stageJobs[i].job.name, jobState.artifact);
-        } else {
-            // Job нужно выполнить
-            jobsToExecute.push({
-                jobInPipeline: stageJobs[i],
-                indexInStage: i,
-                jobIndex,
-            });
-        }
-    }
-
-    return { jobsToExecute, loadedArtifacts };
-};
 
 // ============================================================================
 // Pipeline Manager Options
@@ -192,6 +170,11 @@ export class PipelineManager {
     private watchdogTimer: ReturnType<typeof setInterval> | null = null;
     /** Опции watchdog */
     private watchdogOptions: StaleJobsWatchdogOptions | null = null;
+
+    /** Активные execution loops (для отслеживания живых процессов) */
+    private readonly activePipelines = new Set<string>();
+    /** Resolvers для пробуждения stage loop при ожидании manual jobs */
+    private readonly manualJobResolvers = new Map<string, () => void>();
 
     constructor(options: PipelineManagerOptions) {
         this.storage = options.storage;
@@ -282,7 +265,7 @@ export class PipelineManager {
         const flatJobs = flattenStages(config.stages);
         const jobs: JobState[] = flatJobs.map(({ jobInPipeline }) => ({
             name: jobInPipeline.job.name,
-            status: 'pending' as JobStatus,
+            status: (jobInPipeline.manual ? 'awaiting_manual' : 'pending') as JobStatus,
             errors: [],
         }));
 
@@ -330,8 +313,22 @@ export class PipelineManager {
         pipelineType: string,
         startFromStageIndex = 0,
     ): Promise<void> {
+        this.activePipelines.add(pipelineId);
+
+        try {
+            await this.executePipelineInner(pipelineId, pipelineType, startFromStageIndex);
+        } finally {
+            this.activePipelines.delete(pipelineId);
+            this.manualJobResolvers.delete(pipelineId);
+        }
+    }
+
+    private async executePipelineInner(
+        pipelineId: string,
+        pipelineType: string,
+        startFromStageIndex: number,
+    ): Promise<void> {
         const config = this.getPipelineConfig(pipelineType);
-        // Перечитываем pipeline из storage чтобы получить актуальные статусы jobs
         const pipeline = await this.storage.findById(pipelineId);
 
         if (!pipeline) {
@@ -339,216 +336,306 @@ export class PipelineManager {
         }
 
         const pipelineInput = pipeline.input;
-        let defaultInput: unknown = pipelineInput;
-        const jobOptions = pipeline.jobOptions ?? {};
-
-        // Храним артефакты для доступа через synapses
         const artifacts = new Map<string, unknown>();
 
-        // Контекст для synapses (доступ к данным пайплайна)
-        const mapperContext: SynapseContext = {
-            pipelineInput,
-            getArtifact: <T = unknown>(jobName: string): T | undefined => {
-                return artifacts.get(jobName) as T | undefined;
+        const ctx: PipelineExecutionContext = {
+            pipelineId,
+            artifacts,
+            mapperContext: {
+                pipelineInput,
+                getArtifact: <T = unknown>(jobName: string): T | undefined =>
+                    artifacts.get(jobName) as T | undefined,
             },
+            jobOptions: pipeline.jobOptions ?? {},
+            defaultInput: pipelineInput,
         };
 
-        // Индекс job в плоском списке (для обновления статуса)
         let flatJobIndex = 0;
 
         for (let stageIndex = 0; stageIndex < config.stages.length; stageIndex++) {
-            const stage = config.stages[stageIndex];
-            const stageJobs = normalizeStage(stage);
+            const stageJobs = normalizeStage(config.stages[stageIndex]);
 
-            // Если это stage до точки перезапуска — загружаем артефакты из storage и пропускаем
             if (stageIndex < startFromStageIndex) {
-                for (let i = 0; i < stageJobs.length; i++) {
-                    const jobInPipeline = stageJobs[i];
-                    const jobState = pipeline.jobs[flatJobIndex + i];
-
-                    // Загружаем артефакт из уже выполненной job для synapses
-                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
-                        artifacts.set(jobInPipeline.job.name, jobState.artifact);
-                    }
-                }
-
-                // Обновляем defaultInput если в stage была одна job
-                if (stageJobs.length === 1) {
-                    const jobState = pipeline.jobs[flatJobIndex];
-                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
-                        defaultInput = jobState.artifact;
-                    }
-                }
-
+                this.loadSkippedStageArtifacts(stageJobs, pipeline.jobs, flatJobIndex, ctx);
                 flatJobIndex += stageJobs.length;
                 continue;
             }
 
-            // Сохраняем начальные индексы jobs этого stage
             const stageJobIndices = stageJobs.map((_, i) => flatJobIndex + i);
+            const success = await this.executeStage(stageJobs, stageJobIndices, stageIndex, config.stages.length, ctx);
 
-            // Фильтруем: выполняем только jobs со статусом pending
-            // Jobs со статусом done пропускаем (используем их артефакты)
-            const { jobsToExecute, loadedArtifacts } = filterStageJobs(
-                stageJobs,
-                stageJobIndices,
-                pipeline.jobs,
-            );
+            if (!success) return;
 
-            // Добавляем загруженные артефакты в общую карту
-            for (const [name, artifact] of loadedArtifacts) {
-                artifacts.set(name, artifact);
-            }
-
-            // Если все jobs в stage уже выполнены — пропускаем
-            if (jobsToExecute.length === 0) {
-                // Обновляем defaultInput если в stage была одна job
-                if (stageJobs.length === 1) {
-                    const jobState = pipeline.jobs[flatJobIndex];
-                    if (jobState?.status === 'done' && jobState.artifact !== undefined) {
-                        defaultInput = jobState.artifact;
-                    }
-                }
-                flatJobIndex += stageJobs.length;
-                continue;
-            }
-
-            this.logger.info(`Executing stage ${stageIndex + 1}/${config.stages.length}`, {
-                pipelineId,
-                jobsInStage: stageJobs.length,
-                jobsToExecute: jobsToExecute.length,
-                parallel: jobsToExecute.length > 1,
-            });
-
-            // Обновляем статус только тех jobs, которые будем выполнять
-            await Promise.all(
-                jobsToExecute.map(({ jobIndex }) =>
-                    this.storage.updateJobStatus(pipelineId, jobIndex, 'processing', new Date()),
-                ),
-            );
-
-            // Выполняем только pending jobs параллельно
-            const jobPromises = jobsToExecute.map(async ({ jobInPipeline, jobIndex }) => {
-                const { job: jobDef, synapses, retries = 0, retryDelay = 1000 } = jobInPipeline;
-
-                // Подготавливаем input через synapses или используем дефолтный
-                const jobInput = synapses ? synapses(mapperContext) : defaultInput;
-                const options = jobOptions[jobDef.name];
-
-                // Сохраняем input и options в storage для отображения в UI
-                await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options);
-
-                // Сохраняем информацию о ретраях если они настроены
-                if (retries > 0) {
-                    await this.storage.updateJobRetryCount(pipelineId, jobIndex, 0, retries);
-                }
-
-                const context: JobContext = {
-                    pipelineId,
-                    jobIndex,
-                    logger: {
-                        info: (msg, data) =>
-                            this.logger.info(msg, { pipelineId, jobName: jobDef.name, ...data }),
-                        error: (msg, data) =>
-                            this.logger.error(msg, { pipelineId, jobName: jobDef.name, ...data }),
-                        warn: (msg, data) =>
-                            this.logger.warn(msg, { pipelineId, jobName: jobDef.name, ...data }),
-                    },
-                };
-
-                // Выполняем job с поддержкой retry
-                for (let attempt = 0; attempt <= retries; attempt++) {
-                    // Если это не первая попытка — ждём и обновляем счётчик
-                    if (attempt > 0) {
-                        this.logger.warn(`Retrying job (attempt ${attempt + 1}/${retries + 1})`, {
-                            pipelineId,
-                            jobName: jobDef.name,
-                            retryDelay,
-                        });
-
-                        await delay(retryDelay);
-                        await this.storage.updateJobRetryCount(pipelineId, jobIndex, attempt, retries);
-                        // Сбрасываем статус обратно на processing для UI (без обновления startedAt)
-                        await this.storage.updateJobStatus(pipelineId, jobIndex, 'processing');
-                    }
-
-                    try {
-                        const artifact = await jobDef.execute(jobInput, options, context);
-
-                        // Сохраняем артефакт
-                        await this.storage.updateJobArtifact(pipelineId, jobIndex, artifact, new Date());
-
-                        return { success: true as const, jobDef, artifact, jobIndex };
-                    } catch (error) {
-                        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-                        const errorStack = error instanceof Error ? error.stack : undefined;
-                        const isFinal = attempt >= retries;
-
-                        this.logger.error(`Job execution failed (attempt ${attempt + 1}/${retries + 1})`, {
-                            pipelineId,
-                            jobName: jobDef.name,
-                            error: errorMessage,
-                            hasRetries: !isFinal,
-                        });
-
-                        // Записываем ошибку в историю (isFinal определяет финальный статус)
-                        await this.storage.appendJobError(
-                            pipelineId,
-                            jobIndex,
-                            { message: errorMessage, stack: errorStack, attempt },
-                            isFinal,
-                            isFinal ? new Date() : undefined,
-                        );
-
-                        // Если ещё есть ретраи — продолжаем цикл
-                        if (!isFinal) {
-                            continue;
-                        }
-
-                        // Все попытки исчерпаны
-                        return { success: false as const, jobDef, error: errorMessage, jobIndex };
-                    }
-                }
-
-                // Этот код недостижим, но TypeScript требует return
-                return { success: false as const, jobDef, error: 'Unknown error', jobIndex };
-            });
-
-            const results = await Promise.all(jobPromises);
-
-            // Проверяем, есть ли ошибки
-            const failedJobs = results.filter((r) => !r.success);
-            if (failedJobs.length > 0) {
-                // Помечаем весь пайплайн как error
-                await this.storage.updateStatus(pipelineId, 'error');
-                return;
-            }
-
-            // Сохраняем артефакты в Map для доступа следующими jobs через synapses
-            for (const result of results) {
-                if (result.success && result.artifact !== null) {
-                    artifacts.set(result.jobDef.name, result.artifact);
-                }
-            }
-
-            // Обновляем defaultInput для следующего stage
-            // Если в stage одна job — её артефакт становится defaultInput
-            // Если несколько jobs — defaultInput не меняется (следующие jobs используют synapses)
+            // Обновляем defaultInput: если в stage одна job — её артефакт становится дефолтным
             if (stageJobs.length === 1) {
-                const result = results[0];
-                if (result.success && result.artifact !== null) {
-                    defaultInput = result.artifact;
+                const latestPipeline = await this.storage.findById(pipelineId);
+                const jobState = latestPipeline?.jobs[flatJobIndex];
+                if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                    ctx.defaultInput = jobState.artifact;
                 }
             }
 
-            // Увеличиваем индекс для следующего stage
             flatJobIndex += stageJobs.length;
         }
 
-        // Все stages выполнены успешно
         await this.storage.updateStatus(pipelineId, 'done');
-
         this.logger.info('Pipeline completed', { pipelineId, pipelineType });
+    }
+
+    // ============================================================================
+    // Stage Execution
+    // ============================================================================
+
+    /**
+     * Загружает артефакты из пропущенных stages (до точки перезапуска) в контекст
+     */
+    private loadSkippedStageArtifacts(
+        stageJobs: JobInPipeline[],
+        pipelineJobs: JobState[],
+        flatJobIndex: number,
+        ctx: PipelineExecutionContext,
+    ): void {
+        for (let i = 0; i < stageJobs.length; i++) {
+            const jobState = pipelineJobs[flatJobIndex + i];
+            if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                ctx.artifacts.set(stageJobs[i].job.name, jobState.artifact);
+            }
+        }
+
+        if (stageJobs.length === 1) {
+            const jobState = pipelineJobs[flatJobIndex];
+            if (jobState?.status === 'done' && jobState.artifact !== undefined) {
+                ctx.defaultInput = jobState.artifact;
+            }
+        }
+    }
+
+    /**
+     * Выполняет один stage: pending jobs волнами, awaiting_manual — с ожиданием
+     *
+     * @returns true если stage завершён успешно, false если произошла ошибка
+     */
+    private async executeStage(
+        stageJobs: JobInPipeline[],
+        stageJobIndices: number[],
+        stageIndex: number,
+        totalStages: number,
+        ctx: PipelineExecutionContext,
+    ): Promise<boolean> {
+        while (true) {
+            const currentPipeline = await this.storage.findById(ctx.pipelineId);
+            if (!currentPipeline) {
+                throw new Error(`Pipeline ${ctx.pipelineId} not found`);
+            }
+
+            // Категоризируем jobs в этом stage
+            const pendingJobs: Array<{ jobInPipeline: JobInPipeline; jobIndex: number }> = [];
+            let hasAwaitingManual = false;
+            let allDone = true;
+
+            for (let i = 0; i < stageJobs.length; i++) {
+                const jobIndex = stageJobIndices[i];
+                const jobState = currentPipeline.jobs[jobIndex];
+
+                if (jobState?.status === 'done') {
+                    if (jobState.artifact !== undefined) {
+                        ctx.artifacts.set(stageJobs[i].job.name, jobState.artifact);
+                    }
+                } else if (jobState?.status === 'pending') {
+                    pendingJobs.push({ jobInPipeline: stageJobs[i], jobIndex });
+                    allDone = false;
+                } else if (jobState?.status === 'awaiting_manual') {
+                    hasAwaitingManual = true;
+                    allDone = false;
+                } else {
+                    allDone = false;
+                }
+            }
+
+            if (allDone) return true;
+
+            if (pendingJobs.length > 0) {
+                const success = await this.executePendingBatch(pendingJobs, stageJobs.length, stageIndex, totalStages, ctx);
+                if (!success) return false;
+                continue;
+            }
+
+            if (hasAwaitingManual) {
+                let blockingManualJobIndex = Infinity;
+                for (let i = 0; i < stageJobs.length; i++) {
+                    const jobIndex = stageJobIndices[i];
+                    if (currentPipeline.jobs[jobIndex]?.status === 'awaiting_manual') {
+                        blockingManualJobIndex = Math.min(blockingManualJobIndex, jobIndex);
+                    }
+                }
+                if (blockingManualJobIndex === Infinity) {
+                    throw new Error(
+                        `Pipeline ${ctx.pipelineId}: awaiting_manual expected in stage ${stageIndex} but none found`,
+                    );
+                }
+                await this.waitForManualJob(ctx.pipelineId, stageIndex, blockingManualJobIndex);
+                continue;
+            }
+
+            return true;
+        }
+    }
+
+    /**
+     * Выполняет batch pending jobs параллельно, сохраняет артефакты
+     *
+     * @returns true если все jobs успешны, false если есть ошибки
+     */
+    private async executePendingBatch(
+        pendingJobs: Array<{ jobInPipeline: JobInPipeline; jobIndex: number }>,
+        jobsInStage: number,
+        stageIndex: number,
+        totalStages: number,
+        ctx: PipelineExecutionContext,
+    ): Promise<boolean> {
+        this.logger.info(`Executing stage ${stageIndex + 1}/${totalStages}`, {
+            pipelineId: ctx.pipelineId,
+            jobsInStage,
+            jobsToExecute: pendingJobs.length,
+            parallel: pendingJobs.length > 1,
+        });
+
+        await Promise.all(
+            pendingJobs.map(({ jobIndex }) =>
+                this.storage.updateJobStatus(ctx.pipelineId, jobIndex, 'processing', new Date()),
+            ),
+        );
+
+        const results = await Promise.all(
+            pendingJobs.map(({ jobInPipeline, jobIndex }) =>
+                this.executeJob(ctx.pipelineId, jobInPipeline, jobIndex, ctx),
+            ),
+        );
+
+        const failedJobs = results.filter((r) => !r.success);
+        if (failedJobs.length > 0) {
+            await this.storage.updateStatus(ctx.pipelineId, 'error');
+            return false;
+        }
+
+        for (const result of results) {
+            if (result.success && result.artifact !== null) {
+                ctx.artifacts.set(result.jobDef.name, result.artifact);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Ставит pipeline в awaiting_manual и ждёт пробуждения от runManualJob
+     *
+     * @param blockingJobIndex — flat-индекс первой manual job в stage, которую нужно запустить (для getStatus / currentJobName)
+     */
+    private async waitForManualJob(
+        pipelineId: string,
+        stageIndex: number,
+        blockingJobIndex: number,
+    ): Promise<void> {
+        await this.storage.updateCurrentJobIndex(pipelineId, blockingJobIndex);
+        await this.storage.updateStatus(pipelineId, 'awaiting_manual');
+        this.logger.info('Pipeline awaiting manual job execution', {
+            pipelineId,
+            stageIndex: stageIndex + 1,
+            blockingJobIndex,
+        });
+
+        await new Promise<void>((resolve) => {
+            this.manualJobResolvers.set(pipelineId, resolve);
+        });
+
+        await this.storage.updateStatus(pipelineId, 'processing');
+    }
+
+    // ============================================================================
+    // Job Execution
+    // ============================================================================
+
+    /**
+     * Выполняет одну job с поддержкой retry
+     */
+    private async executeJob(
+        pipelineId: string,
+        jobInPipeline: JobInPipeline,
+        jobIndex: number,
+        ctx: PipelineExecutionContext,
+    ): Promise<
+        | { success: true; jobDef: JobInPipeline['job']; artifact: unknown; jobIndex: number }
+        | { success: false; jobDef: JobInPipeline['job']; error: string; jobIndex: number }
+    > {
+        const { job: jobDef, synapses, retries = 0, retryDelay = 1000 } = jobInPipeline;
+
+        const jobInput = synapses ? synapses(ctx.mapperContext) : ctx.defaultInput;
+        const options = ctx.jobOptions[jobDef.name];
+
+        await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options);
+
+        if (retries > 0) {
+            await this.storage.updateJobRetryCount(pipelineId, jobIndex, 0, retries);
+        }
+
+        const context: JobContext = {
+            pipelineId,
+            jobIndex,
+            logger: {
+                info: (msg, data) =>
+                    this.logger.info(msg, { pipelineId, jobName: jobDef.name, ...data }),
+                error: (msg, data) =>
+                    this.logger.error(msg, { pipelineId, jobName: jobDef.name, ...data }),
+                warn: (msg, data) =>
+                    this.logger.warn(msg, { pipelineId, jobName: jobDef.name, ...data }),
+            },
+        };
+
+        for (let attempt = 0; attempt <= retries; attempt++) {
+            if (attempt > 0) {
+                this.logger.warn(`Retrying job (attempt ${attempt + 1}/${retries + 1})`, {
+                    pipelineId,
+                    jobName: jobDef.name,
+                    retryDelay,
+                });
+
+                await delay(retryDelay);
+                await this.storage.updateJobRetryCount(pipelineId, jobIndex, attempt, retries);
+                await this.storage.updateJobStatus(pipelineId, jobIndex, 'processing');
+            }
+
+            try {
+                const artifact = await jobDef.execute(jobInput, options, context);
+                await this.storage.updateJobArtifact(pipelineId, jobIndex, artifact, new Date());
+                return { success: true as const, jobDef, artifact, jobIndex };
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+                const errorStack = error instanceof Error ? error.stack : undefined;
+                const isFinal = attempt >= retries;
+
+                this.logger.error(`Job execution failed (attempt ${attempt + 1}/${retries + 1})`, {
+                    pipelineId,
+                    jobName: jobDef.name,
+                    error: errorMessage,
+                    hasRetries: !isFinal,
+                });
+
+                await this.storage.appendJobError(
+                    pipelineId,
+                    jobIndex,
+                    { message: errorMessage, stack: errorStack, attempt },
+                    isFinal,
+                    isFinal ? new Date() : undefined,
+                );
+
+                if (!isFinal) continue;
+
+                return { success: false as const, jobDef, error: errorMessage, jobIndex };
+            }
+        }
+
+        return { success: false as const, jobDef, error: 'Unknown error', jobIndex };
     }
 
     /**
@@ -661,6 +748,83 @@ export class PipelineManager {
     }
 
     /**
+     * Запускает manual job — переводит её из awaiting_manual в pending
+     * и активирует execution loop (пробуждает или запускает заново)
+     *
+     * @param pipelineId - ID пайплайна
+     * @param jobName - имя manual job
+     * @param options - опции (onExecutionStart для serverless, если loop нужно перезапустить)
+     */
+    async runManualJob(
+        pipelineId: string,
+        jobName: string,
+        options?: StartPipelineOptions,
+    ): Promise<void> {
+        const pipeline = await this.storage.findById(pipelineId);
+
+        if (!pipeline) {
+            throw new Error(`Pipeline ${pipelineId} not found`);
+        }
+
+        const jobIndex = pipeline.jobs.findIndex((j) => j.name === jobName);
+        if (jobIndex === -1) {
+            throw new Error(`Job "${jobName}" not found in pipeline ${pipelineId}`);
+        }
+
+        const jobState = pipeline.jobs[jobIndex];
+        if (jobState.status !== 'awaiting_manual') {
+            throw new Error(
+                `Job "${jobName}" is not awaiting manual execution (status: ${jobState.status})`,
+            );
+        }
+
+        // Переводим job в pending
+        await this.storage.updateJobStatus(pipelineId, jobIndex, 'pending');
+
+        this.logger.info('Manual job promoted to pending', { pipelineId, jobName });
+
+        // Если pipeline в awaiting_manual — пробуждаем или перезапускаем
+        if (pipeline.status === 'awaiting_manual') {
+            const resolver = this.manualJobResolvers.get(pipelineId);
+            if (resolver) {
+                // Execution loop жив — пробуждаем
+                this.manualJobResolvers.delete(pipelineId);
+                resolver();
+            } else if (!this.activePipelines.has(pipelineId)) {
+                // Execution loop мёртв (перезапуск сервера) — запускаем заново с первого незавершённого stage,
+                // иначе runManualJob для «будущей» manual job (промоут до stage) пропустит более ранние паузы.
+                const config = this.getPipelineConfig(pipeline.pipelineType);
+                const flat = flattenStages(config.stages);
+                const latest = await this.storage.findById(pipelineId);
+                if (!latest) {
+                    throw new Error(`Pipeline ${pipelineId} not found`);
+                }
+                const startFromStageIndex = getEarliestIncompleteStageIndex(flat, latest.jobs);
+
+                await this.storage.updateStatus(pipelineId, 'processing');
+
+                const executionPromise = this.executePipeline(
+                    pipelineId,
+                    pipeline.pipelineType,
+                    startFromStageIndex,
+                ).catch((error) => {
+                    this.logger.error('Pipeline execution failed after manual job', {
+                        pipelineId,
+                        error,
+                    });
+                });
+
+                if (options?.onExecutionStart) {
+                    options.onExecutionStart(executionPromise);
+                }
+            }
+            // else: loop жив, но ещё не установил resolver — job уже pending,
+            // loop подхватит её в следующей итерации
+        }
+        // Если pipeline ещё processing — loop подхватит job при достижении stage
+    }
+
+    /**
      * Перезапускает пайплайн начиная с указанной job
      * 
      * Сбрасывает состояние выбранной job и всех последующих, затем запускает выполнение.
@@ -691,8 +855,8 @@ export class PipelineManager {
         }
 
         // Проверяем, что pipeline не в процессе выполнения
-        if (pipeline.status === 'processing') {
-            throw new Error(`Pipeline ${pipelineId} is currently processing, cannot restart`);
+        if (pipeline.status === 'processing' || pipeline.status === 'awaiting_manual') {
+            throw new Error(`Pipeline ${pipelineId} is currently ${pipeline.status}, cannot restart`);
         }
 
         const config = this.getPipelineConfig(pipeline.pipelineType);
@@ -707,32 +871,34 @@ export class PipelineManager {
         // Находим stageIndex для этой job (для передачи в executePipeline)
         const stageIndex = flat[jobIndex].stageIndex;
 
-        // Собираем индексы jobs для сброса:
-        // - указанная job
-        // - все jobs следующих stages
-        // НЕ сбрасываем другие done jobs того же stage
+        // Собираем индексы jobs для сброса и manual индексы из конфига
         const resetJobIndices = new Set<number>();
+        const manualJobIndices = new Set<number>();
+
         for (let i = 0; i < flat.length; i++) {
+            const isManual = flat[i].jobInPipeline.manual === true;
+
             if (i === jobIndex) {
-                // Указанная job — всегда сбрасываем
                 resetJobIndices.add(i);
             } else if (flat[i].stageIndex > stageIndex) {
-                // Job из следующего stage — сбрасываем
                 resetJobIndices.add(i);
             } else if (flat[i].stageIndex === stageIndex) {
-                // Другая job того же stage — сбрасываем только если не done
                 const jobState = pipeline.jobs[i];
                 if (jobState?.status !== 'done') {
                     resetJobIndices.add(i);
                 }
             }
-            // Jobs предыдущих stages не трогаем
+
+            if (isManual && resetJobIndices.has(i)) {
+                manualJobIndices.add(i);
+            }
         }
 
-        // Сбрасываем только нужные jobs
+        // Сбрасываем только нужные jobs (manual jobs получат awaiting_manual)
         await this.storage.resetJobs({
             pipelineId,
             resetJobIndices,
+            manualJobIndices,
             jobOptions: options?.jobOptions,
         });
 

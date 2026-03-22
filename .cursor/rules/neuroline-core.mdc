@@ -69,6 +69,7 @@ const config: PipelineConfig<MyInput> = {
         [jobB, jobC],            // Stage 2: параллельно
         { job: jobD, synapses }, // Stage 3: с трансформацией
         { job: unstableJob, synapses, retries: 2, retryDelay: 1500 }, // Stage 4: с retry
+        { job: approvalJob, synapses, manual: true }, // Stage 5: ждёт ручного запуска
     ],
     computeInputHash: (input) => `${input.userId}`, // Опционально
 };
@@ -94,6 +95,20 @@ Job может быть настроена на автоматический ret
 Интерфейс для хранилища. Реализации:
 - `InMemoryPipelineStorage` — для тестов
 - `MongoPipelineStorage` — для продакшена
+
+### Manual Jobs
+
+Job с `manual: true` создаётся со статусом `awaiting_manual` и ждёт ручного запуска:
+
+```typescript
+{ job: approvalJob, synapses: toApproval, manual: true }
+```
+
+- Pipeline переходит в `awaiting_manual` когда остаются только manual jobs в текущем stage
+- Смешанные stage (manual + авто) поддерживаются: авто jobs выполняются сразу
+- `runManualJob(pipelineId, jobName)` — промоутит job в `pending` и возобновляет выполнение
+- Manual job можно промоутить заранее — она выполнится автоматически при достижении stage
+- Watchdog игнорирует `awaiting_manual` jobs и pipelines
 
 ### Stale Jobs Watchdog
 

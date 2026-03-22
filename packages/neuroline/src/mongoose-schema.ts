@@ -1,6 +1,7 @@
 import { Schema as MongooseSchema } from 'mongoose';
 
 import type { MongoPipelineDocument, MongoPipelineJobState } from './mongo-storage';
+import { JOB_STATUSES, PIPELINE_STATUSES } from './types';
 
 /**
  * Mongoose схема состояния job
@@ -11,7 +12,7 @@ export const PipelineJobStateSchema = new MongooseSchema<MongoPipelineJobState>(
         status: {
             type: String,
             required: true,
-            enum: ['pending', 'processing', 'done', 'error'],
+            enum: [...JOB_STATUSES],
         },
         /** Входные данные job (результат synapses) */
         input: { type: MongooseSchema.Types.Mixed },
@@ -76,7 +77,7 @@ export const PipelineSchema = new MongooseSchema<MongoPipelineDocument>(
         status: {
             type: String,
             required: true,
-            enum: ['processing', 'done', 'error'],
+            enum: [...PIPELINE_STATUSES],
         },
         /** Индекс текущей job (0-based) */
         currentJobIndex: {

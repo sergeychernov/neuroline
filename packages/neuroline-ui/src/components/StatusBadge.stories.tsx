@@ -58,12 +58,28 @@ export const MediumSize: Story = {
 	},
 };
 
+/** Icon-only variant (compact pipeline cards) */
+export const IconVariant: Story = {
+	render: () => (
+		<Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+			<StatusBadge status="pending" variant="icon" />
+			<StatusBadge status="awaiting_manual" variant="icon" />
+			<StatusBadge status="processing" variant="icon" />
+			<StatusBadge status="done" variant="icon" />
+			<StatusBadge status="error" variant="icon" />
+		</Stack>
+	),
+};
+
 /** All statuses together */
 export const AllStatuses: Story = {
 	render: () => (
 		<Stack spacing={2}>
 			<Box>
 				<StatusBadge status="pending" size="small" />
+			</Box>
+			<Box>
+				<StatusBadge status="awaiting_manual" size="small" />
 			</Box>
 			<Box>
 				<StatusBadge status="processing" size="small" />

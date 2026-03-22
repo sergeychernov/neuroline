@@ -63,48 +63,67 @@ src/
 - `PipelineViewer` **не управляет внешним состоянием** и отображает только то, что пришло в `pipeline`.
 - Артефакты и подробности job рекомендуется показывать в `JobDetailsPanel` (по клику на job, после отдельного запроса в API).
 
-### JobNode и Retry
+### JobNode — Retry и Manual
 
-`JobNode` отображает кнопку retry с возможностью перезапуска:
+`JobNode` отображает кнопку retry для перезапуска и кнопку run для manual jobs:
 
 ```tsx
 <JobNode
     job={job}
     onClick={(job) => console.log('clicked', job)}
-    onRetry={(job) => restartPipeline(job.name)}  // callback для перезапуска
+    onRetry={(job) => restartPipeline(job.name)}
+    onRunManual={(job) => runManualJob(job.name)}
 />
 ```
+
+**Режим отображения карточки (`jobDisplay`):** тип `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
+
+- `details` (по умолчанию) — полное имя job, длительность при наличии.
+- `compact` — аббревиатура имени (`jobNameToAbbreviation`), без времени; полное имя в tooltip.
+- `one-line` — аббревиатура, блок в одну строку; время показывается при наличии; полное имя в tooltip.
+
+Тот же проп пробрасывают `StageColumn` и `PipelineViewer` (`jobDisplay` на viewer задаёт режим для всех нод).
 
 ```typescript
 interface JobNodeProps {
     job: JobDisplayInfo;
     isSelected?: boolean;
     onClick?: (job: JobDisplayInfo) => void;
-    onRetry?: (job: JobDisplayInfo) => void;  // callback при клике на кнопку retry
+    onRetry?: (job: JobDisplayInfo) => void;
+    onRunManual?: (job: JobDisplayInfo) => void;
+    jobDisplay?: JobNodeDisplayMode;
 }
 
 interface JobDisplayInfo {
     // ... другие поля
-    retryCount?: number;   // Количество выполненных ретраев
-    maxRetries?: number;   // Максимальное количество ретраев
+    manual?: boolean;
+    retryCount?: number;
+    maxRetries?: number;
 }
 ```
 
-- Кнопка retry видна если передан `onRetry` или настроены retries (`retryCount`/`maxRetries`)
-- Если нет информации о retries — показывается только иконка без label
-- Кнопка disabled при статусе `pending` или `processing`
-- При клике вызывает `onRetry(job)` с `stopPropagation()` (не триггерит `onClick` карточки)
+**Retry кнопка:**
+- Видна если передан `onRetry` или настроены retries (`retryCount`/`maxRetries`)
+- Disabled при статусе `pending` или `processing`
+- `stopPropagation()` — не триггерит `onClick` карточки
 
-### PipelineViewer с retry
+**Manual кнопка (зелёный треугольник):**
+- Видна только при `status === 'awaiting_manual'` И наличии `onRunManual`
+- Заменяет кнопку retry в этом состоянии
+- `stopPropagation()` — не триггерит `onClick` карточки
 
-`PipelineViewer` прокидывает `onJobRetry` в каждую `JobNode`:
+### PipelineViewer с retry и manual
+
+`PipelineViewer` прокидывает `onJobRetry` и `onJobRunManual` в каждую `JobNode`:
 
 ```tsx
 <PipelineViewer
     pipeline={pipeline}
     onJobClick={(job) => showDetails(job)}
-    onJobRetry={(job) => restartPipeline(job.name)}  // прокидывается в JobNode.onRetry
+    onJobRetry={(job) => restartPipeline(job.name)}
+    onJobRunManual={(job) => runManualJob(job.name)}
     selectedJobName={selectedJob?.name}
+    jobDisplay="compact"
 />
 ```
 

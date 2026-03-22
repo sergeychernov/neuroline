@@ -367,9 +367,10 @@ export class MongoPipelineStorage implements PipelineStorage {
     async resetJobs(options: {
         pipelineId: string;
         resetJobIndices?: Set<number>;
+        manualJobIndices?: Set<number>;
         jobOptions?: Record<string, unknown>;
     }): Promise<void> {
-        const { pipelineId, resetJobIndices, jobOptions } = options;
+        const { pipelineId, resetJobIndices, manualJobIndices, jobOptions } = options;
 
         // Сначала получаем документ, чтобы узнать количество jobs
         const doc = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
@@ -391,7 +392,7 @@ export class MongoPipelineStorage implements PipelineStorage {
         for (const i of indicesToReset) {
             if (i >= doc.jobs.length) continue;
 
-            update[`jobs.${i}.status`] = 'pending';
+            update[`jobs.${i}.status`] = manualJobIndices?.has(i) ? 'awaiting_manual' : 'pending';
             update[`jobs.${i}.artifact`] = undefined;
             update[`jobs.${i}.errors`] = [];
             update[`jobs.${i}.startedAt`] = undefined;

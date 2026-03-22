@@ -338,6 +338,67 @@ export async function handleGetPipeline(
 	}
 }
 
+/** Опции для запуска manual job */
+export interface HandleRunManualJobOptions {
+	/**
+	 * Callback для регистрации фонового выполнения в serverless окружении
+	 * Для Vercel/Next.js передайте waitUntil из next/server
+	 */
+	waitUntil?: (promise: Promise<unknown>) => void;
+}
+
+/**
+ * Хендлер для POST /pipeline?action=runManualJob&id=xxx — запуск manual job
+ *
+ * Body: { jobName: string }
+ *
+ * @param request - HTTP запрос
+ * @param manager - PipelineManager инстанс
+ * @param options - опции (waitUntil для serverless)
+ */
+export async function handleRunManualJob(
+	request: Request,
+	manager: PipelineManager,
+	options?: HandleRunManualJobOptions,
+): Promise<Response> {
+	try {
+		const { searchParams } = new URL(request.url);
+		const id = searchParams.get('id');
+
+		if (!id) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: 'id query parameter is required' },
+				{ status: 400 },
+			);
+		}
+
+		const body: { jobName?: string } = await request.json();
+
+		if (!body.jobName) {
+			return jsonResponse<ApiResponse>(
+				{ success: false, error: 'jobName is required' },
+				{ status: 400 },
+			);
+		}
+
+		await manager.runManualJob(id, body.jobName, {
+			onExecutionStart: options?.waitUntil,
+		});
+
+		return jsonResponse<ApiResponse>({
+			success: true,
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'Unknown error';
+		const status = message.includes('not found') ? 404 :
+			message.includes('not awaiting manual') ? 409 : 400;
+		return jsonResponse<ApiResponse>(
+			{ success: false, error: message },
+			{ status },
+		);
+	}
+}
+
 /** Опции для перезапуска pipeline */
 export interface HandleRestartPipelineOptions {
 	/**

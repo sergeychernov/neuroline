@@ -214,6 +214,55 @@ export class PipelineClient {
 	}
 
 	/**
+	 * Запускает manual job — переводит из awaiting_manual в pending и продолжает pipeline
+	 *
+	 * Требует enableDebugEndpoints: true на сервере (Next.js)
+	 * или adminGuards на сервере (NestJS).
+	 *
+	 * @param pipelineId - ID pipeline
+	 * @param jobName - имя manual job
+	 */
+	async runManualJob(
+		pipelineId: string,
+		jobName: string,
+	): Promise<void> {
+		const url = `${this.config.baseUrl}?action=runManualJob&id=${encodeURIComponent(pipelineId)}`;
+		const response = await this.config.fetch(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ jobName }),
+		});
+
+		const data: ApiResponse = await response.json();
+
+		if (!data.success) {
+			throw new Error(data.error ?? 'Failed to run manual job');
+		}
+	}
+
+	/**
+	 * Запускает manual job и сразу начинает polling до завершения pipeline
+	 *
+	 * @param pipelineId - ID pipeline
+	 * @param jobName - имя manual job
+	 */
+	async runManualJobAndPoll(
+		pipelineId: string,
+		jobName: string,
+		onUpdate?: PipelineUpdateCallback,
+		onError?: PipelineErrorCallback,
+	): Promise<PollingResult & { pipelineId: string }> {
+		await this.runManualJob(pipelineId, jobName);
+
+		const polling = this.poll(pipelineId, onUpdate, onError);
+
+		return {
+			...polling,
+			pipelineId,
+		};
+	}
+
+	/**
 	 * Перезапускает pipeline с указанной job (admin режим)
 	 * 
 	 * Требует enableDebugEndpoints: true на сервере (Next.js) 

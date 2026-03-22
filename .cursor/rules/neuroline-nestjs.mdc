@@ -108,6 +108,7 @@ API совместим с `neuroline/client` (query-параметр `action`):
 |--------|------|------|----------|
 | POST | `/<path>?action=startWithOptions` | `{ input, jobOptions }` | Запуск с явными jobOptions |
 | POST | `/<path>?action=retry&id=<id>` | `{ jobName, jobOptions? }` | Перезапуск pipeline с указанной job |
+| POST | `/<path>?action=runManualJob&id=<id>` | `{ jobName }` | Запуск manual job |
 | GET | `/<path>?action=job&id=<id>&jobName=<job>` | — | Данные job (input/options/artifact) |
 | GET | `/<path>?action=pipeline&id=<id>` | — | Полное состояние pipeline |
 

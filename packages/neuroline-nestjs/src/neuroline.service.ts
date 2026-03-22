@@ -86,6 +86,13 @@ export class NeurolineService {
 	}
 
 	/**
+	 * Запустить manual job — переводит из awaiting_manual в pending и продолжает pipeline
+	 */
+	async runManualJob(pipelineId: string, jobName: string): Promise<void> {
+		return this.manager.runManualJob(pipelineId, jobName);
+	}
+
+	/**
 	 * Получить полное состояние pipeline
 	 */
 	async getPipeline(pipelineId: string): Promise<PipelineState | null> {
