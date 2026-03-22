@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+
 import { describe, it, expect } from 'vitest';
 
 import type { PipelineConfig, JobDefinition } from '../types';
@@ -297,6 +299,87 @@ describe('PipelineManager', () => {
 			await expect(
 				manager.runManualJob(response.pipelineId, 'auto'),
 			).rejects.toThrow('not awaiting manual execution');
+		});
+
+		it('после «рестарта» runManualJob для поздней manual job начинает с первого незавершённого stage', async () => {
+			const storage = new InMemoryPipelineStorage();
+
+			const autoJob: JobDefinition<number, number> = {
+				name: 'auto-pre',
+				execute: async (input) => input + 1,
+			};
+
+			const manualA: JobDefinition<number, number> = {
+				name: 'manual-a',
+				execute: async (input) => input * 2,
+			};
+
+			const manualB: JobDefinition<{ v: number }, number> = {
+				name: 'manual-b',
+				execute: async (input) => input.v + 100,
+			};
+
+			const config: PipelineConfig<number> = {
+				name: 'recover-manual-order',
+				stages: [
+					asStageJob(autoJob),
+					{ job: asStageJob(manualA), manual: true },
+					{
+						job: asStageJob(manualB),
+						manual: true,
+						synapses: (ctx) => ({
+							v: ctx.getArtifact<number>('manual-a') ?? 0,
+						}),
+					},
+				],
+			};
+
+			const configHash = crypto
+				.createHash('sha256')
+				.update('auto-pre,manual-a,manual-b')
+				.digest('hex')
+				.slice(0, 16);
+
+			await storage.create({
+				pipelineId: 'recover-manual-pid',
+				pipelineType: 'recover-manual-order',
+				status: 'awaiting_manual',
+				currentJobIndex: 1,
+				input: 3,
+				jobs: [
+					{ name: 'auto-pre', status: 'done', errors: [], artifact: 4 },
+					{ name: 'manual-a', status: 'awaiting_manual', errors: [] },
+					{ name: 'manual-b', status: 'awaiting_manual', errors: [] },
+				],
+				configHash,
+			});
+
+			const manager = new PipelineManager({ storage });
+			manager.registerPipeline(config);
+
+			let executionPromise: Promise<void> | null = null;
+			await manager.runManualJob('recover-manual-pid', 'manual-b', {
+				onExecutionStart: (p) => {
+					executionPromise = p;
+				},
+			});
+
+			expect(executionPromise).not.toBeNull();
+
+			// Цикл дошёл до первой незавершённой manual job и снова выставил awaiting_manual
+			for (let i = 0; i < 100; i++) {
+				const p = await storage.findById('recover-manual-pid');
+				if (p?.status === 'awaiting_manual') break;
+				await new Promise((r) => setTimeout(r, 20));
+			}
+
+			await manager.runManualJob('recover-manual-pid', 'manual-a');
+			await executionPromise;
+
+			const finalPipeline = await storage.findById('recover-manual-pid');
+			expect(finalPipeline?.status).toBe('done');
+			expect(finalPipeline?.jobs[1].artifact).toBe(8);
+			expect(finalPipeline?.jobs[2].artifact).toBe(108);
 		});
 
 		it('промоут manual job до достижения stage — job выполняется автоматически', async () => {

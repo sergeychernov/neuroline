@@ -72,6 +72,19 @@ const flattenStages = (stages: PipelineStage[]): { jobInPipeline: JobInPipeline;
 };
 
 /**
+ * Минимальный индекс stage, где есть job не в статусе done (для recovery после рестарта процесса)
+ */
+const getEarliestIncompleteStageIndex = (flat: { stageIndex: number }[], jobs: JobState[]): number => {
+    let min = Infinity;
+    for (let i = 0; i < flat.length; i++) {
+        if (jobs[i]?.status !== 'done') {
+            min = Math.min(min, flat[i].stageIndex);
+        }
+    }
+    return min === Infinity ? 0 : min;
+};
+
+/**
  * Вычисляет хеш от входных данных
  */
 const computeDefaultHash = (input: unknown): string => {
@@ -758,17 +771,22 @@ export class PipelineManager {
                 this.manualJobResolvers.delete(pipelineId);
                 resolver();
             } else if (!this.activePipelines.has(pipelineId)) {
-                // Execution loop мёртв (перезапуск сервера) — запускаем заново
+                // Execution loop мёртв (перезапуск сервера) — запускаем заново с первого незавершённого stage,
+                // иначе runManualJob для «будущей» manual job (промоут до stage) пропустит более ранние паузы.
                 const config = this.getPipelineConfig(pipeline.pipelineType);
                 const flat = flattenStages(config.stages);
-                const stageIndex = flat[jobIndex].stageIndex;
+                const latest = await this.storage.findById(pipelineId);
+                if (!latest) {
+                    throw new Error(`Pipeline ${pipelineId} not found`);
+                }
+                const startFromStageIndex = getEarliestIncompleteStageIndex(flat, latest.jobs);
 
                 await this.storage.updateStatus(pipelineId, 'processing');
 
                 const executionPromise = this.executePipeline(
                     pipelineId,
                     pipeline.pipelineType,
-                    stageIndex,
+                    startFromStageIndex,
                 ).catch((error) => {
                     this.logger.error('Pipeline execution failed after manual job', {
                         pipelineId,
