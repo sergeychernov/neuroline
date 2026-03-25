@@ -45,7 +45,7 @@ export const PipelineViewerHeader: React.FC<PipelineViewerHeaderProps> = ({
 				<Box sx={{ mb: 1 }}>
 					<Box
 						sx={{
-							height: isCompact ? 3 : 4,
+							height: 4,
 							backgroundColor: 'rgba(124, 77, 255, 0.2)',
 							borderRadius: 2,
 							overflow: 'hidden',
