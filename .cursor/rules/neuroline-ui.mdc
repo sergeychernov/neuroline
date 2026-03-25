@@ -25,9 +25,23 @@ src/
 └── components/
     ├── PipelineViewer.tsx
     ├── PipelineViewer.stories.tsx
+    ├── StageColumnLayouts.stories.tsx
+    ├── layouts/
+    │   ├── pipeline-viewer/
+    │   │   ├── PipelineViewerPaper.tsx
+    │   │   ├── PipelineViewerHeader.tsx
+    │   │   ├── usePipelineViewerStats.ts
+    │   │   ├── pipelineViewerLayoutTypes.ts
+    │   │   ├── PipelineViewerDetailedLayout.tsx
+    │   │   ├── PipelineViewerCompactLayout.tsx
+    │   │   └── PipelineViewerVerticalLayout.tsx
+    │   └── stage-column/
+    │       ├── stageColumnDerived.ts
+    │       ├── StageColumnHeader.tsx
+    │       ├── StageColumnStackedLayout.tsx
+    │       └── StageColumnDenseLayout.tsx
     ├── JobNode.tsx
     ├── JobNode.stories.tsx
-    ├── StageColumn.tsx
     ├── StatusBadge.tsx
     └── job-details/
         ├── JobDetailsPanel.tsx
@@ -54,10 +68,13 @@ src/
 ```tsx
 <PipelineViewer
     pipeline={pipeline}
+    variant="detailed"
     selectedJobName={selectedJob?.name}
     onJobClick={(job) => console.log(job)}
 />
 ```
+
+**Вариант вёрстки (`variant`):** тип `PipelineViewerVariant` — `'detailed' | 'compact' | 'vertical'`. Реализация в `layouts/pipeline-viewer/`; внутри каждого layout задаётся вид карточек (`jobDisplay` для `JobNode`).
 
 Примечание:
 - `PipelineViewer` **не управляет внешним состоянием** и отображает только то, что пришло в `pipeline`.
@@ -82,7 +99,9 @@ src/
 - `compact` — аббревиатура имени (`jobNameToAbbreviation`), без времени; полное имя в tooltip.
 - `one-line` — аббревиатура, блок в одну строку; время показывается при наличии; полное имя в tooltip.
 
-Тот же проп пробрасывают `StageColumn` и `PipelineViewer` (`jobDisplay` на viewer задаёт режим для всех нод).
+У `PipelineViewer` режим карточек задаётся выбранным layout (`variant`), а не пропом `jobDisplay`.
+
+**Колонка stage:** примитивы в `layouts/stage-column/` (`StageColumnStackedLayout`, `StageColumnDenseLayout`, `getStageColumnDerived`, …). Все три `PipelineViewer*Layout` собирают их с `JobNode` напрямую; для Storybook — раздел **Layouts/StageColumn** (`StageColumnLayouts.stories.tsx`). Публичный экспорт этих примитивов из `index.ts` для кастомных экранов.
 
 ```typescript
 interface JobNodeProps {
@@ -123,7 +142,7 @@ interface JobDisplayInfo {
     onJobRetry={(job) => restartPipeline(job.name)}
     onJobRunManual={(job) => runManualJob(job.name)}
     selectedJobName={selectedJob?.name}
-    jobDisplay="compact"
+    variant="compact"
 />
 ```
 

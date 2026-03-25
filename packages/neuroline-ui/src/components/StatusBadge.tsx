@@ -7,6 +7,8 @@ export interface StatusBadgeProps {
   size?: 'small' | 'medium';
   /** `icon` — только компактная иконка без текста (для compact / one-line в JobNode) */
   variant?: 'default' | 'icon';
+  /** Не задавать нативный `title` у варианта `icon` (подсказку даёт родитель, например MUI Tooltip) */
+  suppressNativeTitle?: boolean;
 }
 
 const pulse = keyframes`
@@ -50,6 +52,11 @@ const statusConfig: Record<
     bgColor: 'rgba(255, 23, 68, 0.15)',
   },
 };
+
+/** Подпись статуса для aria / Tooltip (совпадает с подписью бейджа) */
+export function getStatusBadgeLabel(status: JobStatus | PipelineStatus): string {
+  return statusConfig[status].label;
+}
 
 /** Компактные SVG-иконки по статусу (viewBox 0 0 24 24) */
 const StatusGlyph: React.FC<{
@@ -104,6 +111,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   status,
   size = 'small',
   variant = 'default',
+  suppressNativeTitle = false,
 }) => {
   const config = statusConfig[status];
   const isIcon = variant === 'icon';
@@ -113,7 +121,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       <Chip
         icon={<StatusGlyph status={status} />}
         aria-label={config.label}
-        title={config.label}
+        title={suppressNativeTitle ? undefined : config.label}
         size="small"
         sx={{
           color: config.color,

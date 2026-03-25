@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes } from '@mui/material';
 import type { JobDisplayInfo, JobNodeDisplayMode } from '../types';
-import { StatusBadge } from './StatusBadge';
+import { StatusBadge, getStatusBadgeLabel } from './StatusBadge';
 
 /** Replay icon (inline to avoid tree-shaking issues) */
 const ReplayIcon: React.FC<{ sx?: object }> = ({ sx }) => (
@@ -31,6 +31,8 @@ export interface JobNodeProps {
    * one-line — аббревиатура, всё в одну строку (время показывается при наличии).
    */
   jobDisplay?: JobNodeDisplayMode;
+  /** Растянуть карточку на ширину родителя (например в StageColumnDenseLayout + one-line) */
+  fullWidth?: boolean;
 }
 
 /**
@@ -77,6 +79,9 @@ const glow = keyframes`
   }
 `;
 
+/** Как у Tooltip на Chip-кнопках retry / run manual: MUI, стрелка, те же задержка и анимация */
+const jobNodeChipTooltipProps = { arrow: true as const };
+
 const statusColors = {
   pending: {
     border: 'rgba(160, 160, 160, 0.3)',
@@ -115,11 +120,13 @@ export const JobNode: React.FC<JobNodeProps> = ({
   onRetry,
   onRunManual,
   jobDisplay = 'details',
+  fullWidth = false,
 }) => {
   const colors = statusColors[job.status];
   const isProcessing = job.status === 'processing';
   const isOneLine = jobDisplay === 'one-line';
   const isCompact = jobDisplay === 'compact';
+  const stretch = fullWidth && isOneLine;
   const useAbbrev = isCompact || isOneLine;
   const titleLabel = useAbbrev ? jobNameToAbbreviation(job.name) : job.name;
   const showDuration = !isCompact;
@@ -147,8 +154,10 @@ export const JobNode: React.FC<JobNodeProps> = ({
       onClick={() => onClick?.(job)}
       sx={{
         p: isOneLine ? 0.5 : isCompact ? 0.35 : 0.3,
-        minWidth: isOneLine ? 'auto' : isCompact ? 96 : 120,
-        maxWidth: isOneLine ? 520 : isCompact ? 168 : 220,
+        minWidth: stretch ? 0 : isOneLine ? 'auto' : isCompact ? 96 : 120,
+        maxWidth: stretch ? 'none' : isOneLine ? 520 : isCompact ? 168 : 220,
+        width: stretch ? '100%' : undefined,
+        boxSizing: stretch ? 'border-box' : undefined,
         backgroundColor: colors.bg,
         border: `0.5px solid ${colors.border}`,
         borderRadius: 0,
@@ -195,6 +204,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
           display: 'flex',
           flexDirection: isOneLine ? 'row' : 'column',
           alignItems: isOneLine ? 'center' : 'stretch',
+          justifyContent: stretch ? 'flex-start' : undefined,
           gap: isOneLine ? 1 : 0,
           width: '100%',
           minWidth: 0,
@@ -208,6 +218,9 @@ export const JobNode: React.FC<JobNodeProps> = ({
             justifyContent: 'space-between',
             mb: isOneLine ? 0 : isCompact ? 0.75 : 1.5,
             flexShrink: isOneLine ? 0 : undefined,
+            flex: stretch ? '1 1 auto' : undefined,
+            minWidth: stretch ? 0 : undefined,
+            overflow: stretch ? 'hidden' : undefined,
           }}
         >
           {useAbbrev ? (
@@ -222,8 +235,8 @@ export const JobNode: React.FC<JobNodeProps> = ({
                   lineHeight: 1.3,
                   letterSpacing: '0.06em',
                   cursor: 'inherit',
-                  display: 'inline-block',
-                  maxWidth: isOneLine ? 120 : '100%',
+                  display: stretch ? 'block' : 'inline-block',
+                  maxWidth: stretch ? 'none' : isOneLine ? 120 : '100%',
                 }}
                 fontSize={isCompact ? 10 : 12}
               >
@@ -254,34 +267,47 @@ export const JobNode: React.FC<JobNodeProps> = ({
             gap: isOneLine ? 0.5 : 1,
             mb: isOneLine ? 0 : isCompact ? 0.5 : 1,
             flexWrap: isOneLine ? 'nowrap' : 'wrap',
-            flex: isOneLine ? '1 1 auto' : undefined,
+            flex: isOneLine && !stretch ? '1 1 auto' : undefined,
+            flexShrink: stretch ? 0 : undefined,
             minWidth: 0,
+            ml: stretch ? 'auto' : undefined,
           }}
         >
         {job.errors.length > 0 ? (
           <Tooltip
+            {...jobNodeChipTooltipProps}
             title={
-              <Typography variant="caption" sx={{ whiteSpace: 'pre-line' }}>
-                {/* Показываем последнюю ошибку */}
-                {`${job.errors.at(-1)?.message ?? ''}\n${job.errors.at(-1)?.stack ?? ''}`}
-              </Typography>
+              [job.errors.at(-1)?.message, job.errors.at(-1)?.stack].filter(Boolean).join('\n') ||
+              getStatusBadgeLabel(job.status)
             }
-            arrow
+            slotProps={{
+              tooltip: {
+                sx: { whiteSpace: 'pre-line', maxWidth: 360 },
+              },
+            }}
           >
             <Box component="span">
               <StatusBadge
                 status={job.status}
                 size="small"
                 variant={useAbbrev ? 'icon' : 'default'}
+                suppressNativeTitle={useAbbrev}
+              />
+            </Box>
+          </Tooltip>
+        ) : useAbbrev ? (
+          <Tooltip {...jobNodeChipTooltipProps} title={getStatusBadgeLabel(job.status)}>
+            <Box component="span">
+              <StatusBadge
+                status={job.status}
+                size="small"
+                variant="icon"
+                suppressNativeTitle
               />
             </Box>
           </Tooltip>
         ) : (
-          <StatusBadge
-            status={job.status}
-            size="small"
-            variant={useAbbrev ? 'icon' : 'default'}
-          />
+          <StatusBadge status={job.status} size="small" variant="default" />
         )}
         {showDuration && duration && (
           <Typography
@@ -294,7 +320,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
         )}
         {/* Run manual button - show for awaiting_manual if onRunManual provided */}
         {job.status === 'awaiting_manual' && onRunManual && (
-          <Tooltip title="Click to run" arrow>
+          <Tooltip {...jobNodeChipTooltipProps} title="Click to run">
             <Chip
               icon={<PlayIcon sx={{ fontSize: 14 }} />}
               size="small"
@@ -337,6 +363,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
 
           return (
             <Tooltip
+              {...jobNodeChipTooltipProps}
               title={
                 job.status === 'pending'
                   ? 'Not started yet'
@@ -350,7 +377,6 @@ export const JobNode: React.FC<JobNodeProps> = ({
                         : 'Click to restart'
                       : `Retry ${job.retryCount ?? 0} of ${job.maxRetries ?? 0}`
               }
-              arrow
             >
               <Chip
                 icon={<ReplayIcon sx={{ fontSize: 14 }} />}
@@ -410,32 +436,36 @@ export const JobNode: React.FC<JobNodeProps> = ({
       </Box>
 
       {/* Decorative connectors like a neuron */}
-      <Box
-        sx={{
-          position: 'absolute',
-          left: -8,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          backgroundColor: colors.border,
-          border: `2px solid ${colors.bg}`,
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          right: -8,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          backgroundColor: job.status === 'done' ? '#00e676' : colors.border,
-          border: `2px solid ${colors.bg}`,
-        }}
-      />
+      {!stretch && (
+        <>
+          <Box
+            sx={{
+              position: 'absolute',
+              left: -8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: colors.border,
+              border: `2px solid ${colors.bg}`,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              right: -8,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: job.status === 'done' ? '#00e676' : colors.border,
+              border: `2px solid ${colors.bg}`,
+            }}
+          />
+        </>
+      )}
     </Paper>
   );
 };

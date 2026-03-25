@@ -1,10 +1,49 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { StageColumn } from './StageColumn';
-import type { StageDisplayInfo } from '../types';
+import React from 'react';
+import { fn } from 'storybook/test';
+import { JobNode } from './JobNode';
+import { getStageColumnDerived } from './layouts/stage-column/stageColumnDerived';
+import { StageColumnStackedLayout } from './layouts/stage-column/StageColumnStackedLayout';
+import { StageColumnDenseLayout } from './layouts/stage-column/StageColumnDenseLayout';
+import type { JobNodeDisplayMode, StageDisplayInfo } from '../types';
 
-const meta: Meta<typeof StageColumn> = {
-	component: StageColumn,
-	title: 'Components/StageColumn',
+/** Сборка колонки stage для демо в Storybook (как в PipelineViewer) */
+function StageColumnDemo(props: {
+	stage: StageDisplayInfo;
+	layout: 'stacked' | 'dense';
+	jobDisplay?: JobNodeDisplayMode;
+	selectedJobName?: string;
+}) {
+	const { stage, layout, jobDisplay = 'details', selectedJobName } = props;
+	const { isParallel, stageStatus } = getStageColumnDerived(stage);
+	const fullWidth = layout === 'dense' && jobDisplay === 'one-line';
+	const nodes = stage.jobs.map((job) => (
+		<JobNode
+			key={job.name}
+			job={job}
+			isSelected={job.name === selectedJobName}
+			onClick={fn()}
+			jobDisplay={jobDisplay}
+			fullWidth={fullWidth}
+		/>
+	));
+	if (layout === 'dense') {
+		return (
+			<StageColumnDenseLayout stage={stage} isParallel={isParallel} stageStatus={stageStatus}>
+				{nodes}
+			</StageColumnDenseLayout>
+		);
+	}
+	return (
+		<StageColumnStackedLayout stage={stage} isParallel={isParallel} stageStatus={stageStatus}>
+			{nodes}
+		</StageColumnStackedLayout>
+	);
+}
+
+const meta: Meta<typeof StageColumnDemo> = {
+	component: StageColumnDemo,
+	title: 'Layouts/StageColumn',
 	parameters: {
 		layout: 'centered',
 		backgrounds: {
@@ -12,14 +51,27 @@ const meta: Meta<typeof StageColumn> = {
 			values: [{ name: 'dark', value: '#0a0a12' }],
 		},
 	},
+	argTypes: {
+		layout: {
+			control: 'select',
+			options: ['stacked', 'dense'],
+		},
+		jobDisplay: {
+			control: 'select',
+			options: ['details', 'compact', 'one-line'],
+		},
+	},
+	args: {
+		layout: 'stacked',
+		jobDisplay: 'details',
+	},
 };
 
 export default meta;
-type Story = StoryObj<typeof StageColumn>;
+type Story = StoryObj<typeof StageColumnDemo>;
 
 const now = Date.now();
 
-/** Stage with one job */
 export const SingleJob: Story = {
 	args: {
 		stage: {
@@ -38,7 +90,31 @@ export const SingleJob: Story = {
 	},
 };
 
-/** Stage with parallel jobs */
+export const DenseLayout: Story = {
+	args: {
+		layout: 'dense',
+		jobDisplay: 'one-line',
+		stage: {
+			index: 1,
+			jobs: [
+				{
+					name: 'validate-schema',
+					status: 'done',
+					startedAt: new Date(now - 4000),
+					finishedAt: new Date(now - 2000),
+					errors: [],
+				},
+				{
+					name: 'notify-start',
+					status: 'processing',
+					startedAt: new Date(now - 4000),
+					errors: [],
+				},
+			],
+		},
+	},
+};
+
 export const ParallelJobs: Story = {
 	args: {
 		stage: {
@@ -65,7 +141,6 @@ export const ParallelJobs: Story = {
 	},
 };
 
-/** Stage in progress */
 export const Processing: Story = {
 	args: {
 		stage: {
@@ -82,7 +157,6 @@ export const Processing: Story = {
 	},
 };
 
-/** Stage with error */
 export const WithError: Story = {
 	args: {
 		stage: {
@@ -105,7 +179,6 @@ export const WithError: Story = {
 	},
 };
 
-/** Stage pending */
 export const Pending: Story = {
 	args: {
 		stage: {
@@ -121,7 +194,6 @@ export const Pending: Story = {
 	},
 };
 
-/** Stage with selected job */
 export const WithSelectedJob: Story = {
 	args: {
 		stage: {
@@ -147,7 +219,6 @@ export const WithSelectedJob: Story = {
 	},
 };
 
-/** Stage with artefacts */
 export const WithArtifacts: Story = {
 	args: {
 		stage: {
@@ -167,6 +238,5 @@ export const WithArtifacts: Story = {
 				},
 			],
 		},
-		showArtifacts: true,
 	},
 };
