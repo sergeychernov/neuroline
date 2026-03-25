@@ -24,7 +24,7 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 - **PipelineViewer** - visual representation of pipeline execution flow
 - **JobNode** - individual job status display with optional compact / one-line layouts (`jobDisplay`)
 - **JobDetailsPanel** - detailed job information with tabs for artefact, input, options, error
-- **StageColumn** - stage grouping with parallel job visualization
+- **Stage column layouts** — `StageColumnStackedLayout`, `StageColumnDenseLayout`, `getStageColumnDerived` (compose with `JobNode`)
 - **StatusBadge** - color-coded status indicators
 - **ArtifactView** - job artifact display
 - **InputView** - job input data display with edit button
@@ -126,16 +126,30 @@ import { PipelineViewer } from 'neuroline-ui';
 
 **Props:**
 
-| Prop              | Type                            | Default     | Description                                               |
-| ----------------- | ------------------------------- | ----------- | --------------------------------------------------------- |
-| `pipeline`        | `PipelineDisplayData`           | Required    | Pipeline data with stages                                 |
-| `onJobClick`      | `(job: JobDisplayInfo) => void` | -           | Click handler for job nodes                               |
-| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -           | Retry callback for failed jobs                            |
-| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -           | Run callback for manual jobs                              |
-| `selectedJobName` | `string`                        | -           | Name of currently selected job                            |
-| `jobDisplay`      | `JobNodeDisplayMode`            | `'details'` | How each job card is rendered (passed to every `JobNode`) |
+| Prop              | Type                            | Default      | Description                                                           |
+| ----------------- | ------------------------------- | ------------ | --------------------------------------------------------------------- |
+| `pipeline`        | `PipelineDisplayData`           | Required     | Pipeline data with stages                                             |
+| `onJobClick`      | `(job: JobDisplayInfo) => void` | -            | Click handler for job nodes                                           |
+| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -            | Retry callback for failed jobs                                        |
+| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -            | Run callback for manual jobs                                          |
+| `selectedJobName` | `string`                        | -            | Name of currently selected job                                        |
+| `variant`         | `PipelineViewerVariant`         | `'detailed'` | Overall layout: header density, stage grid, job card mode (see below) |
+
+#### Pipeline viewer variants (`variant`)
+
+Type: `PipelineViewerVariant` — `'detailed' | 'compact' | 'vertical'`.
+
+| Value      | Summary                                                            |
+| ---------- | ------------------------------------------------------------------ |
+| `detailed` | Full header, horizontal stages, job cards in `details` mode        |
+| `compact`  | Tighter header and stage row, horizontal flow, `compact` job cards |
+| `vertical` | Compact header, stages stacked vertically, `one-line` job cards    |
+
+Each variant is implemented as a separate layout component inside the package (`layouts/pipeline-viewer/`).
 
 #### Job display modes (`jobDisplay`)
+
+Used by **`JobNode`** and stage-column layouts when you compose columns manually (not `PipelineViewer` — the viewer picks card styling per variant in its layout).
 
 Type: `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
 
@@ -144,8 +158,6 @@ Type: `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
 | `details`  | Full `job.name`                    | Shown when `startedAt` is set | Default multi-line card                               |
 | `compact`  | Abbreviation from name (see below) | Hidden                        | Narrower card; full name in tooltip                   |
 | `one-line` | Abbreviation                       | Shown when available          | Title, status, chips in one row; full name in tooltip |
-
-Set `jobDisplay` on **`PipelineViewer`**, **`StageColumn`**, or **`JobNode`**. The viewer forwards the same mode to all nodes.
 
 **Abbreviation:** export **`jobNameToAbbreviation`** from `neuroline-ui`. It splits on `-`, `_`, `.`, `/`, spaces, and camelCase boundaries, then takes the first letter or digit of each segment (uppercase). Example: `very-long-job-name-that-might-need-wrapping` → `VLJNTMNW`. For a single segment, only the first alphanumeric character is used.
 
@@ -210,28 +222,28 @@ import { JobNode } from 'neuroline-ui';
 | `onRunManual` | `(job: JobDisplayInfo) => void` | -           | Run callback (shown for `awaiting_manual` jobs)                                                           |
 | `jobDisplay`  | `JobNodeDisplayMode`            | `'details'` | Card layout: `details`, `compact`, or `one-line` (see [Job display modes](#job-display-modes-jobdisplay)) |
 
-### StageColumn
+### Stage column layouts
 
-Stage grouping component for parallel jobs.
+Low-level pieces for a vertical stack of jobs under a stage header (used inside `PipelineViewer` layouts). Export: **`StageColumnStackedLayout`**, **`StageColumnDenseLayout`**, **`StageColumnHeader`**, **`getStageColumnDerived`**, **`STAGE_COLUMN_STATUS_COLORS`**.
 
 ```typescript
-import { StageColumn } from 'neuroline-ui';
+import {
+  StageColumnStackedLayout,
+  getStageColumnDerived,
+} from 'neuroline-ui';
+import { JobNode } from 'neuroline-ui';
 
-<StageColumn
-  stage={{
-    index: 1,
-    jobs: [
-      { name: 'job1', status: 'done' },
-      { name: 'job2', status: 'done' },
-    ],
-  }}
-  selectedJobName="job1"
-  onJobClick={(job) => console.log(job)}
-  jobDisplay="compact"
-/>
+const stage = { index: 0, jobs: [...] };
+const { isParallel, stageStatus } = getStageColumnDerived(stage);
+
+<StageColumnStackedLayout stage={stage} isParallel={isParallel} stageStatus={stageStatus}>
+  {stage.jobs.map((job) => (
+    <JobNode key={job.name} job={job} jobDisplay="details" onClick={...} />
+  ))}
+</StageColumnStackedLayout>
 ```
 
-Optional prop **`jobDisplay`** — same as on `JobNode` / `PipelineViewer` ([Job display modes](#job-display-modes-jobdisplay)).
+See Storybook **Layouts/StageColumn** for examples.
 
 ### StatusBadge
 
@@ -483,7 +495,7 @@ yarn add neuroline-ui @mui/material @emotion/react @emotion/styled @mui/icons-ma
 - **PipelineViewer** - визуальное представление процесса выполнения pipeline
 - **JobNode** - отображение статуса отдельной job; опционально компактный или однострочный вид (`jobDisplay`)
 - **JobDetailsPanel** - детальная информация о job с табами для artefact, input, options, error
-- **StageColumn** - группировка stage с визуализацией параллельных jobs
+- **Layouts stage-column** — `StageColumnStackedLayout`, `StageColumnDenseLayout`, `getStageColumnDerived` (в связке с `JobNode`)
 - **StatusBadge** - цветные индикаторы статуса
 - **ArtifactView** - отображение артефакта job
 - **InputView** - отображение входных данных job с кнопкой редактирования
@@ -585,16 +597,30 @@ import { PipelineViewer } from 'neuroline-ui';
 
 **Пропсы:**
 
-| Проп              | Тип                             | По умолчанию | Описание                                                           |
-| ----------------- | ------------------------------- | ------------ | ------------------------------------------------------------------ |
-| `pipeline`        | `PipelineDisplayData`           | Обязательно  | Данные pipeline со stages                                          |
-| `onJobClick`      | `(job: JobDisplayInfo) => void` | -            | Обработчик клика по job                                            |
-| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -            | Callback retry для упавших jobs                                    |
-| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -            | Callback запуска для manual jobs                                   |
-| `selectedJobName` | `string`                        | -            | Имя выбранной job                                                  |
-| `jobDisplay`      | `JobNodeDisplayMode`            | `'details'`  | Как рисуется каждая карточка job (пробрасывается во все `JobNode`) |
+| Проп              | Тип                             | По умолчанию | Описание                                                        |
+| ----------------- | ------------------------------- | ------------ | --------------------------------------------------------------- |
+| `pipeline`        | `PipelineDisplayData`           | Обязательно  | Данные pipeline со stages                                       |
+| `onJobClick`      | `(job: JobDisplayInfo) => void` | -            | Обработчик клика по job                                         |
+| `onJobRetry`      | `(job: JobDisplayInfo) => void` | -            | Callback retry для упавших jobs                                 |
+| `onJobRunManual`  | `(job: JobDisplayInfo) => void` | -            | Callback запуска для manual jobs                                |
+| `selectedJobName` | `string`                        | -            | Имя выбранной job                                               |
+| `variant`         | `PipelineViewerVariant`         | `'detailed'` | Общая вёрстка: шапка, сетка стадий, вид карточек job (см. ниже) |
+
+#### Варианты PipelineViewer (`variant`)
+
+Тип: `PipelineViewerVariant` — `'detailed' | 'compact' | 'vertical'`.
+
+| Значение   | Кратко                                                                     |
+| ---------- | -------------------------------------------------------------------------- |
+| `detailed` | Полная шапка, стадии в ряд по горизонтали, карточки job в режиме `details` |
+| `compact`  | Плотнее шапка и ряд стадий, горизонтальный поток, карточки `compact`       |
+| `vertical` | Компактная шапка, стадии столбцом, карточки `one-line`                     |
+
+Каждый вариант реализован отдельным layout-компонентом в пакете (`layouts/pipeline-viewer/`).
 
 #### Режимы отображения job (`jobDisplay`)
+
+Используются в **`JobNode`** и при ручной сборке колонок stage (не в `PipelineViewer` — вьюер задаёт вид карточек внутри выбранного layout).
 
 Тип: `JobNodeDisplayMode` — `'details' | 'compact' | 'one-line'`.
 
@@ -603,8 +629,6 @@ import { PipelineViewer } from 'neuroline-ui';
 | `details`  | Полное `job.name`             | Показывается, если задан `startedAt` | Карточка по умолчанию, несколько строк                   |
 | `compact`  | Аббревиатура имени (см. ниже) | Скрыта                               | Уже карточка; полное имя в tooltip                       |
 | `one-line` | Аббревиатура                  | Показывается при наличии             | Имя, статус и кнопки в одну строку; полное имя в tooltip |
-
-Задаётся на **`PipelineViewer`**, **`StageColumn`** или **`JobNode`**. Viewer передаёт один и тот же режим всем нодам.
 
 **Аббревиатура:** из пакета экспортируется **`jobNameToAbbreviation`**. Имя делится по `-`, `_`, `.`, `/`, пробелам и границам camelCase; из каждого сегмента берётся первая буква или цифра (в верхнем регистре). Пример: `very-long-job-name-that-might-need-wrapping` → `VLJNTMNW`. Если сегмент один — используется первая буква/цифра слова.
 
@@ -669,28 +693,28 @@ import { JobNode } from 'neuroline-ui';
 | `onRunManual` | `(job: JobDisplayInfo) => void` | -            | Callback запуска (для `awaiting_manual` jobs)                                                                        |
 | `jobDisplay`  | `JobNodeDisplayMode`            | `'details'`  | Вид карточки: `details`, `compact` или `one-line` (см. [Режимы отображения job](#режимы-отображения-job-jobdisplay)) |
 
-### StageColumn
+### Layouts колонки stage
 
-Компонент группировки stage для параллельных jobs.
+Низкоуровневые части для столбца jobs под заголовком stage (внутри layout’ов `PipelineViewer`). Экспорт: **`StageColumnStackedLayout`**, **`StageColumnDenseLayout`**, **`StageColumnHeader`**, **`getStageColumnDerived`**, **`STAGE_COLUMN_STATUS_COLORS`**.
 
 ```typescript
-import { StageColumn } from 'neuroline-ui';
+import {
+  StageColumnStackedLayout,
+  getStageColumnDerived,
+} from 'neuroline-ui';
+import { JobNode } from 'neuroline-ui';
 
-<StageColumn
-  stage={{
-    index: 1,
-    jobs: [
-      { name: 'job1', status: 'done' },
-      { name: 'job2', status: 'done' },
-    ],
-  }}
-  selectedJobName="job1"
-  onJobClick={(job) => console.log(job)}
-  jobDisplay="compact"
-/>
+const stage = { index: 0, jobs: [...] };
+const { isParallel, stageStatus } = getStageColumnDerived(stage);
+
+<StageColumnStackedLayout stage={stage} isParallel={isParallel} stageStatus={stageStatus}>
+  {stage.jobs.map((job) => (
+    <JobNode key={job.name} job={job} jobDisplay="details" onClick={...} />
+  ))}
+</StageColumnStackedLayout>
 ```
 
-Опциональный проп **`jobDisplay`** — как у `JobNode` / `PipelineViewer` ([Режимы отображения job](#режимы-отображения-job-jobdisplay)).
+Примеры в Storybook: **Layouts/StageColumn**.
 
 ### StatusBadge
 

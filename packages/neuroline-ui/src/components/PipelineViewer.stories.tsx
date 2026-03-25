@@ -13,6 +13,13 @@ const meta: Meta<typeof PipelineViewer> = {
   args: {
     onJobClick: fn(),
     onJobRetry: fn(),
+    variant: 'detailed',
+  },
+  argTypes: {
+    variant: {
+      control: 'select',
+      options: ['detailed', 'compact', 'vertical'],
+    },
   },
 };
 
@@ -242,17 +249,17 @@ export const Simple: Story = {
   },
 };
 
-export const CompactJobCards: Story = {
+export const VariantCompact: Story = {
   args: {
     pipeline: processingPipeline,
-    jobDisplay: 'compact',
+    variant: 'compact',
   },
 };
 
-export const OneLineJobCards: Story = {
+export const VariantVertical: Story = {
   args: {
     pipeline: processingPipeline,
-    jobDisplay: 'one-line',
+    variant: 'vertical',
   },
 };
 

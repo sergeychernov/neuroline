@@ -7,8 +7,11 @@ import type { JobError as CoreJobError, JobStatus, PipelineStatus } from 'neurol
 
 export type { JobStatus, PipelineStatus };
 
-/** Режим отображения ноды job (JobNode / PipelineViewer) */
+/** Режим отображения ноды job (JobNode) */
 export type JobNodeDisplayMode = 'compact' | 'one-line' | 'details';
+
+/** Вариант вёрстки PipelineViewer (шапка, сетка стадий, плотность job-карточек задаётся внутри layout) */
+export type PipelineViewerVariant = 'detailed' | 'compact' | 'vertical';
 
 /** Тип для сериализуемых данных */
 export type SerializableValue = Record<string, unknown> | string | number | boolean | null;
