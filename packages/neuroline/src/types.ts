@@ -91,14 +91,19 @@ export interface SynapseContext<TPipelineInput = unknown> {
 /**
  * Job в конфигурации pipeline с опциональным маппером входных данных
  */
-export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = unknown> {
+export interface JobInPipeline<
+    TPipelineInput = unknown,
+    TInput = unknown,
+    TOutput = unknown,
+    TOptions = unknown,
+> {
     /** Определение job */
     job: JobDefinition<TInput, TOutput, TOptions>;
     /**
      * Функция подготовки входных данных для job
      * Если не указана, job получает pipelineInput (для первого stage) или артефакт предыдущей job
      */
-    synapses?: (ctx: SynapseContext) => TInput;
+    synapses?: (ctx: SynapseContext<TPipelineInput>) => TInput;
     /**
      * Количество повторных попыток при ошибке (по умолчанию 0 — без ретраев)
      */
@@ -115,6 +120,10 @@ export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = u
     manual?: boolean;
 }
 
+/** JobInPipeline с фиксированным типом pipeline input и "любыми" job-типами */
+export type AnyJobInPipeline<TPipelineInput = unknown> =
+    JobInPipeline<TPipelineInput, any, any, any>;
+
 // ============================================================================
 // Stage Types
 // ============================================================================
@@ -124,14 +133,18 @@ export interface JobInPipeline<TInput = unknown, TOutput = unknown, TOptions = u
  * - JobDefinition: job без маппера (получает дефолтный input)
  * - JobInPipeline: job с кастомным synapses
  */
-export type StageItem = JobDefinition | JobInPipeline;
+export type StageItem<TPipelineInput = unknown> =
+    | JobDefinition<any, any, any>
+    | AnyJobInPipeline<TPipelineInput>;
 
 /**
  * Stage пайплайна - один элемент или массив для параллельного выполнения
  * - StageItem: одиночная job
  * - StageItem[]: массив jobs, выполняемых параллельно
  */
-export type PipelineStage = StageItem | StageItem[];
+export type PipelineStage<TPipelineInput = unknown> =
+    | StageItem<TPipelineInput>
+    | StageItem<TPipelineInput>[];
 
 // ============================================================================
 // Pipeline Config Types
@@ -147,7 +160,7 @@ export interface PipelineConfig<TInput = unknown> {
      * - одной job/JobInPipeline
      * - массивом jobs/JobInPipeline (выполняются параллельно внутри stage)
      */
-    stages: PipelineStage[];
+    stages: PipelineStage<TInput>[];
     /** Функция для вычисления хеша входных данных */
     computeInputHash?: (input: TInput) => string;
 }

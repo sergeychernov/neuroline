@@ -15,7 +15,7 @@ function jsonResponse<T>(data: T, init?: ResponseInit): Response {
 }
 
 /** Опции для запуска pipeline */
-export interface HandleStartPipelineOptions {
+export interface HandleStartPipelineOptions<TInput = unknown> {
 	/**
 	 * Callback для регистрации фонового выполнения в serverless окружении
 	 * Для Vercel/Next.js передайте waitUntil из next/server
@@ -30,7 +30,7 @@ export interface HandleStartPipelineOptions {
 	 * Асинхронная функция для получения jobOptions на основе input и request.
 	 * Используется только для базового POST endpoint.
 	 */
-	getJobOptions?: (input: unknown, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>;
+	getJobOptions?: (input: TInput, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>;
 }
 
 /**
@@ -44,11 +44,11 @@ export interface HandleStartPipelineOptions {
  * @param pipelineType - тип pipeline (определяется route)
  * @param options - опции запуска (waitUntil для serverless, getJobOptions)
  */
-export async function handleStartPipeline(
+export async function handleStartPipeline<TInput = unknown>(
 	request: Request,
 	manager: PipelineManager,
 	pipelineType: string,
-	options?: HandleStartPipelineOptions,
+	options?: HandleStartPipelineOptions<TInput>,
 ): Promise<Response> {
 	try {
 		const { searchParams } = new URL(request.url);
@@ -63,7 +63,7 @@ export async function handleStartPipeline(
 				);
 			}
 
-			const body: StartWithOptionsBody = await request.json();
+			const body: StartWithOptionsBody<TInput> = await request.json();
 
 			if (body.input === undefined) {
 				return jsonResponse<ApiResponse>(
@@ -90,7 +90,7 @@ export async function handleStartPipeline(
 		}
 
 		// Базовый режим: body = TInput
-		const input: unknown = await request.json();
+		const input = await request.json() as TInput;
 
 		// Получаем jobOptions через функцию из конфигурации
 		const jobOptions = options?.getJobOptions

@@ -10,6 +10,10 @@ NestJS module and controllers for Neuroline pipeline APIs with DI support.
 
 NestJS integration for Neuroline — dynamic module with full DI support for creating pipeline API controllers.
 
+## Changelog
+
+Detailed release notes and migration steps: [CHANGELOG](./CHANGELOG.md).
+
 ## Installation
 
 ```bash
@@ -65,6 +69,8 @@ import { AuthGuard } from './guards';
 })
 export class AppModule {}
 ```
+
+`pipeline` is typed as `PipelineConfig<TInput>`, so `getJobOptions(input, request)` gets the same `TInput`.
 
 ## Using NeurolineService
 
@@ -249,6 +255,10 @@ UNLICENSED
 
 Интеграция NestJS для Neuroline — динамический модуль с полной поддержкой DI для создания API-контроллеров.
 
+## Changelog
+
+Подробные заметки о релизах и миграции: [CHANGELOG](./CHANGELOG.md).
+
 ## Установка
 
 ```bash
@@ -304,6 +314,8 @@ import { AuthGuard } from './guards';
 })
 export class AppModule {}
 ```
+
+`pipeline` типизирован как `PipelineConfig<TInput>`, поэтому `getJobOptions(input, request)` получает тот же `TInput`.
 
 ## Использование NeurolineService
 

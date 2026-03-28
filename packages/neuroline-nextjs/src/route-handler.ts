@@ -16,7 +16,7 @@ export interface PipelineRouteHandlerOptions<TInput = unknown> {
 	/** Storage для списка */
 	storage: PipelineStorage;
 	/** Конфигурация pipeline для этого route */
-	pipeline: PipelineConfig;
+	pipeline: PipelineConfig<TInput>;
 	/**
 	 * Callback для регистрации фонового выполнения в serverless окружении
 	 * Для Vercel/Next.js передайте waitUntil из next/server
@@ -145,10 +145,10 @@ export function createPipelineRouteHandler<TInput = unknown>(
 				return handleRunManualJob(request, manager, { waitUntil });
 			}
 
-			return handleStartPipeline(request, manager, pipelineType, {
+			return handleStartPipeline<TInput>(request, manager, pipelineType, {
 				waitUntil,
 				enableAdminStart: enableDebugEndpoints,
-				getJobOptions: getJobOptions as ((input: unknown, request: Request) => Promise<Record<string, unknown>> | Record<string, unknown>) | undefined,
+				getJobOptions,
 			});
 		},
 

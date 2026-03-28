@@ -14,6 +14,10 @@ Framework-agnostic pipeline orchestration library with support for:
 - Type-safe jobs with synapses for data transformation
 - Idempotency (re-running with same input data returns existing pipeline)
 
+## Changelog
+
+Detailed release notes and migration steps: [CHANGELOG](./CHANGELOG.md).
+
 ## Installation
 
 ```bash
@@ -71,7 +75,7 @@ export const fetchDataJob: JobDefinition<MyJobInput, MyJobOutput, MyJobOptions> 
 ### 2. Pipeline Configuration
 
 ```typescript
-import type { PipelineConfig, SynapseContext } from 'neuroline';
+import type { PipelineConfig } from 'neuroline';
 import { fetchDataJob, processDataJob, saveResultJob } from './jobs';
 
 interface PipelineInput {
@@ -91,7 +95,7 @@ export const myPipelineConfig: PipelineConfig<PipelineInput> = {
       {
         job: processDataJob,
         // synapses transform data for the job
-        synapses: (ctx: SynapseContext<PipelineInput>) => ({
+        synapses: (ctx) => ({
           rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
           userId: ctx.pipelineInput.userId,
         }),
@@ -119,6 +123,8 @@ export const myPipelineConfig: PipelineConfig<PipelineInput> = {
   computeInputHash: (input) => `${input.userId}-${input.url}`,
 };
 ```
+
+`PipelineConfig<PipelineInput>` types both `computeInputHash(input)` and `ctx.pipelineInput` in every `synapses`.
 
 ### 3. Creating and Using PipelineManager
 
@@ -278,19 +284,21 @@ interface JobContext {
 ```typescript
 interface PipelineConfig<TInput> {
   name: string;
-  stages: PipelineStage[];
+  stages: PipelineStage<TInput>[];
   computeInputHash?: (input: TInput) => string;
 }
 
 // Stage: single job or array of jobs (parallel)
-type PipelineStage = StageItem | StageItem[];
+type PipelineStage<TPipelineInput> = StageItem<TPipelineInput> | StageItem<TPipelineInput>[];
 
 // StageItem: JobDefinition or JobInPipeline
-type StageItem = JobDefinition | JobInPipeline;
+type StageItem<TPipelineInput> =
+  | JobDefinition<any, any, any>
+  | JobInPipeline<TPipelineInput, any, any, any>;
 
-interface JobInPipeline<TInput, TOutput, TOptions> {
+interface JobInPipeline<TPipelineInput, TInput, TOutput, TOptions> {
   job: JobDefinition<TInput, TOutput, TOptions>;
-  synapses?: (ctx: SynapseContext) => TInput;
+  synapses?: (ctx: SynapseContext<TPipelineInput>) => TInput;
   retries?: number; // Количество ретраев при ошибке (по умолчанию: 0)
   retryDelay?: number; // Задержка между ретраями в мс (по умолчанию: 1000)
   manual?: boolean; // Job requires manual trigger (status: awaiting_manual)
@@ -766,6 +774,10 @@ UNLICENSED
 - Типобезопасных jobs с synapses для трансформации данных
 - Идемпотентности (повторный запуск с теми же входными данными возвращает существующий pipeline)
 
+## Changelog
+
+Подробные заметки о релизах и миграции: [CHANGELOG](./CHANGELOG.md).
+
 ## Установка
 
 ```bash
@@ -823,7 +835,7 @@ export const fetchDataJob: JobDefinition<MyJobInput, MyJobOutput, MyJobOptions> 
 ### 2. Конфигурация Pipeline
 
 ```typescript
-import type { PipelineConfig, SynapseContext } from 'neuroline';
+import type { PipelineConfig } from 'neuroline';
 import { fetchDataJob, processDataJob, saveResultJob } from './jobs';
 
 interface PipelineInput {
@@ -843,7 +855,7 @@ export const myPipelineConfig: PipelineConfig<PipelineInput> = {
       {
         job: processDataJob,
         // synapses трансформирует данные для job
-        synapses: (ctx: SynapseContext<PipelineInput>) => ({
+        synapses: (ctx) => ({
           rawData: ctx.getArtifact<{ data: string }>('fetch-data')?.data ?? '',
           userId: ctx.pipelineInput.userId,
         }),
@@ -871,6 +883,8 @@ export const myPipelineConfig: PipelineConfig<PipelineInput> = {
   computeInputHash: (input) => `${input.userId}-${input.url}`,
 };
 ```
+
+`PipelineConfig<PipelineInput>` типизирует и `computeInputHash(input)`, и `ctx.pipelineInput` во всех `synapses`.
 
 ### 3. Создание и использование PipelineManager
 
@@ -1030,19 +1044,21 @@ interface JobContext {
 ```typescript
 interface PipelineConfig<TInput> {
   name: string;
-  stages: PipelineStage[];
+  stages: PipelineStage<TInput>[];
   computeInputHash?: (input: TInput) => string;
 }
 
 // Stage: одна job или массив jobs (параллельно)
-type PipelineStage = StageItem | StageItem[];
+type PipelineStage<TPipelineInput> = StageItem<TPipelineInput> | StageItem<TPipelineInput>[];
 
 // StageItem: JobDefinition или JobInPipeline
-type StageItem = JobDefinition | JobInPipeline;
+type StageItem<TPipelineInput> =
+  | JobDefinition<any, any, any>
+  | JobInPipeline<TPipelineInput, any, any, any>;
 
-interface JobInPipeline<TInput, TOutput, TOptions> {
+interface JobInPipeline<TPipelineInput, TInput, TOutput, TOptions> {
   job: JobDefinition<TInput, TOutput, TOptions>;
-  synapses?: (ctx: SynapseContext) => TInput;
+  synapses?: (ctx: SynapseContext<TPipelineInput>) => TInput;
   retries?: number; // Количество ретраев при ошибке (по умолчанию: 0)
   retryDelay?: number; // Задержка между ретраями в мс (по умолчанию: 1000)
   manual?: boolean; // Job требует ручного запуска (статус: awaiting_manual)

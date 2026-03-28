@@ -13,7 +13,6 @@ import { waitUntil } from '@vercel/functions';
 import { createPipelineRouteHandler } from 'neuroline-nextjs';
 import { ensurePipelineStorageReady, getPipelineManager } from '@/lib/pipeline-server';
 import { manualDemoPipeline } from 'demo-pipelines';
-import type { PipelineConfig } from 'neuroline';
 
 export const maxDuration = 60;
 
@@ -22,7 +21,7 @@ const { manager, storage } = getPipelineManager();
 const handlers = createPipelineRouteHandler({
 	manager,
 	storage,
-	pipeline: manualDemoPipeline as PipelineConfig,
+	pipeline: manualDemoPipeline,
 	waitUntil,
 	enableDebugEndpoints: true,
 	getJobOptions: async () => ({

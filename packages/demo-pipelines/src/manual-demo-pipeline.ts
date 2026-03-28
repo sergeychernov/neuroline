@@ -1,4 +1,4 @@
-import type { PipelineConfig, JobInPipeline, PipelineStage } from 'neuroline';
+import type { PipelineConfig, SynapseContext } from 'neuroline';
 import { initJob, type InitJobArtifact } from './jobs/init-job';
 import { validateJob } from './jobs/validate-job';
 import { computeJob, type ComputeJobArtifact } from './jobs/compute-job';
@@ -10,22 +10,22 @@ import type { DemoPipelineInput } from './demo-pipeline';
 // Synapses
 // ============================================================================
 
-const inputToInit: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const inputToInit = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	return { seed: input.seed, name: input.name };
 };
 
-const initToValidate: JobInPipeline['synapses'] = (ctx) => {
+const initToValidate = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const a = ctx.getArtifact<InitJobArtifact>('init');
 	return { processId: a?.processId ?? 'unknown', inputSeed: a?.inputSeed ?? 0 };
 };
 
-const inputToCompute: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const inputToCompute = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	return { seed: input.seed, iterations: input.iterations ?? 10 };
 };
 
-const computeToTransform: JobInPipeline['synapses'] = (ctx) => {
+const computeToTransform = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	const computeArtifact = ctx.getArtifact<ComputeJobArtifact>('compute');
 	return {
@@ -34,7 +34,7 @@ const computeToTransform: JobInPipeline['synapses'] = (ctx) => {
 	};
 };
 
-const toFinalize: JobInPipeline['synapses'] = (ctx) => {
+const toFinalize = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	const computeArtifact = ctx.getArtifact<ComputeJobArtifact>('compute');
 	const transformArtifact = ctx.getArtifact<TransformJobArtifact>('transform');
@@ -71,7 +71,7 @@ export const manualDemoPipeline: PipelineConfig<DemoPipelineInput> = {
 		],
 		{ job: transformJob, synapses: computeToTransform, manual: true },
 		{ job: finalizeJob, synapses: toFinalize },
-	] as PipelineStage[],
+	],
 	computeInputHash: (input) =>
 		`manual_${input.seed}_${input.name}`,
 };

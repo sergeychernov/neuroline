@@ -20,7 +20,6 @@ import { waitUntil } from '@vercel/functions';
 import { createPipelineRouteHandler } from 'neuroline-nextjs';
 import { ensurePipelineStorageReady, getPipelineManager } from '@/lib/pipeline-server';
 import { demoPipeline } from 'demo-pipelines';
-import type { PipelineConfig } from 'neuroline';
 
 /**
  * Максимальное время выполнения функции (в секундах)
@@ -33,7 +32,7 @@ const { manager, storage } = getPipelineManager();
 const handlers = createPipelineRouteHandler({
 	manager,
 	storage,
-	pipeline: demoPipeline as PipelineConfig,
+	pipeline: demoPipeline,
 	// waitUntil позволяет продолжить выполнение pipeline после отправки ответа
 	// Это решает проблему "зависания" pipeline на Vercel
 	waitUntil,
