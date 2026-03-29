@@ -46,7 +46,7 @@ export interface PipelineControllerOptions<TInput = unknown> {
 	/** Путь контроллера (например, 'api/v1/my-pipeline') */
 	path: string;
 	/** Конфигурация pipeline из neuroline */
-	pipeline: PipelineConfig;
+	pipeline: PipelineConfig<TInput>;
 	/** Guards для всего контроллера (опционально) */
 	guards?: Type[];
 	/**

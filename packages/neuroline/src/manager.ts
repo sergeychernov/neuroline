@@ -7,6 +7,7 @@ import type {
     PipelineStage,
     StageItem,
     JobInPipeline,
+    AnyJobInPipeline,
     JobState,
     JobStatus,
     JobContext,
@@ -34,14 +35,18 @@ const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /**
  * Проверяет, является ли элемент JobInPipeline (имеет поле job)
  */
-const isJobInPipeline = (item: StageItem): item is JobInPipeline => {
+const isJobInPipeline = <TPipelineInput = unknown>(
+    item: StageItem<TPipelineInput>,
+): item is AnyJobInPipeline<TPipelineInput> => {
     return 'job' in item && typeof item.job === 'object' && 'name' in item.job;
 };
 
 /**
  * Нормализует StageItem в JobInPipeline
  */
-const normalizeStageItem = (item: StageItem): JobInPipeline => {
+const normalizeStageItem = <TPipelineInput = unknown>(
+    item: StageItem<TPipelineInput>,
+): AnyJobInPipeline<TPipelineInput> => {
     if (isJobInPipeline(item)) {
         return item;
     }
@@ -52,7 +57,9 @@ const normalizeStageItem = (item: StageItem): JobInPipeline => {
 /**
  * Нормализует stage в массив JobInPipeline
  */
-const normalizeStage = (stage: PipelineStage): JobInPipeline[] => {
+const normalizeStage = <TPipelineInput = unknown>(
+    stage: PipelineStage<TPipelineInput>,
+): AnyJobInPipeline<TPipelineInput>[] => {
     const items = Array.isArray(stage) ? stage : [stage];
     return items.map(normalizeStageItem);
 };
@@ -60,8 +67,10 @@ const normalizeStage = (stage: PipelineStage): JobInPipeline[] => {
 /**
  * Преобразует stages в плоский список jobs с метаданными
  */
-const flattenStages = (stages: PipelineStage[]): { jobInPipeline: JobInPipeline; stageIndex: number }[] => {
-    const result: { jobInPipeline: JobInPipeline; stageIndex: number }[] = [];
+const flattenStages = <TPipelineInput = unknown>(
+    stages: PipelineStage<TPipelineInput>[],
+): { jobInPipeline: AnyJobInPipeline<TPipelineInput>; stageIndex: number }[] => {
+    const result: { jobInPipeline: AnyJobInPipeline<TPipelineInput>; stageIndex: number }[] = [];
     stages.forEach((stage, stageIndex) => {
         const jobs = normalizeStage(stage);
         jobs.forEach((jobInPipeline) => {
@@ -96,7 +105,7 @@ const computeDefaultHash = (input: unknown): string => {
  * Вычисляет хеш структуры pipeline (имена jobs в порядке выполнения)
  * Используется для инвалидации при изменении конфигурации
  */
-const computeConfigHash = (stages: PipelineStage[]): string => {
+const computeConfigHash = <TPipelineInput = unknown>(stages: PipelineStage<TPipelineInput>[]): string => {
     const flatJobs = flattenStages(stages);
     const jobNames = flatJobs.map(({ jobInPipeline }) => jobInPipeline.job.name);
     return crypto.createHash('sha256').update(jobNames.join(',')).digest('hex').slice(0, 16);

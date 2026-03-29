@@ -9,6 +9,10 @@ Next.js App Router handlers for Neuroline pipeline APIs.
 
 Next.js App Router integration for Neuroline - provides route handlers for API routes.
 
+## Changelog
+
+Detailed release notes and migration steps: [CHANGELOG](./CHANGELOG.md).
+
 ## Installation
 
 ```bash
@@ -292,7 +296,7 @@ export function PipelineDemo() {
 createPipelineRouteHandler({
   manager: PipelineManager, // Required - pipeline manager instance
   storage: PipelineStorage, // Required - storage for job details and list
-  pipeline: PipelineConfig, // Required - pipeline config for this route
+  pipeline: PipelineConfig<TInput>, // Required - typed pipeline config for this route
   enableDebugEndpoints: false, // Optional - enable action=job and action=pipeline (default: false)
 });
 ```
@@ -348,7 +352,9 @@ Creates GET and POST handlers for Next.js App Router.
 
 - `manager: PipelineManager` - Required. The pipeline manager instance.
 - `storage: PipelineStorage` - Required. Storage for job details and list operations.
-- `pipeline: PipelineConfig` - Required. Pipeline config for this route.
+- `pipeline: PipelineConfig<TInput>` - Required. Pipeline config for this route.
+
+`TInput` is inferred from `pipeline`, so `getJobOptions(input, request)` receives the same input type.
 
 **Returns:**
 
@@ -403,6 +409,10 @@ UNLICENSED
 [![GitHub](https://img.shields.io/badge/GitHub-sergeychernov/neuroline-black)](https://github.com/sergeychernov/neuroline)
 
 Интеграция с Next.js App Router для Neuroline - предоставляет обработчики маршрутов для API.
+
+## Changelog
+
+Подробные заметки о релизах и миграции: [CHANGELOG](./CHANGELOG.md).
 
 ## Установка
 
@@ -705,7 +715,7 @@ export function PipelineDemo() {
 createPipelineRouteHandler({
   manager: PipelineManager, // Обязательно - экземпляр pipeline manager
   storage: PipelineStorage, // Обязательно - хранилище для деталей job и списка
-  pipeline: PipelineConfig, // Обязательно - конфиг pipeline для этого route
+  pipeline: PipelineConfig<TInput>, // Обязательно - типизированный конфиг pipeline для этого route
   enableDebugEndpoints: false, // Опционально - включить action=job и action=pipeline (по умолчанию: false)
 });
 ```
@@ -761,7 +771,9 @@ const manager = new PipelineManager({ storage });
 
 - `manager: PipelineManager` - Обязательно. Экземпляр pipeline manager.
 - `storage: PipelineStorage` - Обязательно. Хранилище для деталей job и операций списка.
-- `pipeline: PipelineConfig` - Обязательно. Конфиг pipeline для этого route.
+- `pipeline: PipelineConfig<TInput>` - Обязательно. Конфиг pipeline для этого route.
+
+`TInput` выводится из `pipeline`, поэтому `getJobOptions(input, request)` получает тот же тип входа.
 
 **Возвращает:**
 

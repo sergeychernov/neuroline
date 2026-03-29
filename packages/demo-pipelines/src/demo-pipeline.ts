@@ -1,4 +1,4 @@
-import type { PipelineConfig, JobInPipeline, PipelineStage } from 'neuroline';
+import type { PipelineConfig, SynapseContext } from 'neuroline';
 import { initJob, type InitJobArtifact } from './jobs/init-job';
 import { validateJob } from './jobs/validate-job';
 import { computeJob, type ComputeJobArtifact } from './jobs/compute-job';
@@ -36,8 +36,8 @@ export interface DemoPipelineInput {
  * Synapse: PipelineInput -> Init
  * Передаёт seed и name из входных данных pipeline
  */
-const inputToInit: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const inputToInit = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	return {
 		seed: input.seed,
 		name: input.name,
@@ -48,7 +48,7 @@ const inputToInit: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Init -> Validate
  * Передаёт processId и seed из артефакта init job
  */
-const initToValidate: JobInPipeline['synapses'] = (ctx) => {
+const initToValidate = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	return {
 		processId: initArtifact?.processId ?? 'unknown',
@@ -60,8 +60,8 @@ const initToValidate: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Init -> Compute
  * Передаёт seed и iterations из pipelineInput
  */
-const inputToCompute: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const inputToCompute = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	return {
 		seed: input.seed,
 		iterations: input.iterations ?? 10,
@@ -72,7 +72,7 @@ const inputToCompute: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Compute -> Transform
  * Передаёт промежуточные значения из compute job
  */
-const computeToTransform: JobInPipeline['synapses'] = (ctx) => {
+const computeToTransform = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	const computeArtifact = ctx.getArtifact<ComputeJobArtifact>('compute');
 	return {
@@ -85,8 +85,8 @@ const computeToTransform: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Transform -> Failing
  * Передаёт processId и флаг shouldFail из pipelineInput
  */
-const toFailing: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const toFailing = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	return {
 		processId: initArtifact?.processId ?? 'unknown',
@@ -98,8 +98,8 @@ const toFailing: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Transform -> Unstable
  * Передаёт processId и количество падений для демонстрации retry
  */
-const toUnstable: JobInPipeline['synapses'] = (ctx) => {
-	const input = ctx.pipelineInput as DemoPipelineInput;
+const toUnstable = (ctx: SynapseContext<DemoPipelineInput>) => {
+	const input = ctx.pipelineInput;
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	return {
 		processId: initArtifact?.processId ?? 'unknown',
@@ -111,7 +111,7 @@ const toUnstable: JobInPipeline['synapses'] = (ctx) => {
  * Synapse: Failing -> Finalize
  * Собирает данные из всех предыдущих jobs
  */
-const toFinalize: JobInPipeline['synapses'] = (ctx) => {
+const toFinalize = (ctx: SynapseContext<DemoPipelineInput>) => {
 	const initArtifact = ctx.getArtifact<InitJobArtifact>('init');
 	const computeArtifact = ctx.getArtifact<ComputeJobArtifact>('compute');
 	const transformArtifact = ctx.getArtifact<TransformJobArtifact>('transform');
@@ -163,7 +163,7 @@ export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
 
 		// Stage 5: Финализация
 		{ job: finalizeJob, synapses: toFinalize },
-	] as PipelineStage[],
+	],
 	computeInputHash: (input) => 
 		`demo_${input.seed}_${input.name}_${input.fail ? 'fail' : 'ok'}_unstable${input.unstableFailCount ?? 0}`,
 };
