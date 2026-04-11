@@ -95,12 +95,14 @@ export interface PipelineStorage {
      * @param jobIndex - индекс job
      * @param input - входные данные job (результат synapses)
      * @param options - опции job
+     * @param inputHash - хеш входных данных для кеширования (опционально)
      */
     updateJobInput(
         pipelineId: string,
         jobIndex: number,
         input: unknown,
         options?: unknown,
+        inputHash?: string,
     ): Promise<void>;
 
     /**
@@ -151,6 +153,18 @@ export interface PipelineStorage {
         /** Новые опции для jobs (полностью заменяют существующие) */
         jobOptions?: Record<string, unknown>;
     }): Promise<void>;
+
+    /**
+     * Найти кешированный артефакт cacheable job по имени и хешу входных данных.
+     * Кеш не привязан к pipelineId — удаление pipeline не удаляет кеш.
+     */
+    findCachedArtifact(jobName: string, inputHash: string): Promise<{ artifact: unknown } | null>;
+
+    /**
+     * Сохранить артефакт cacheable job в кеш.
+     * При совпадении ключа { jobName, inputHash } — перезаписывает.
+     */
+    saveCachedArtifact(jobName: string, inputHash: string, artifact: unknown): Promise<void>;
 }
 
 /**
@@ -158,6 +172,7 @@ export interface PipelineStorage {
  */
 export class InMemoryPipelineStorage implements PipelineStorage {
     private readonly pipelines = new Map<string, PipelineState>();
+    private readonly jobCache = new Map<string, unknown>();
 
     async findById(pipelineId: string): Promise<PipelineState | null> {
         return this.pipelines.get(pipelineId) ?? null;
@@ -288,12 +303,16 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         jobIndex: number,
         input: unknown,
         options?: unknown,
+        inputHash?: string,
     ): Promise<void> {
         const pipeline = this.pipelines.get(pipelineId);
         if (pipeline && pipeline.jobs[jobIndex]) {
             pipeline.jobs[jobIndex].input = input;
             if (options !== undefined) {
                 pipeline.jobs[jobIndex].options = options;
+            }
+            if (inputHash !== undefined) {
+                pipeline.jobs[jobIndex].inputHash = inputHash;
             }
             pipeline.updatedAt = new Date();
         }
@@ -397,9 +416,20 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         pipeline.updatedAt = new Date();
     }
 
+    async findCachedArtifact(jobName: string, inputHash: string): Promise<{ artifact: unknown } | null> {
+        const key = `${jobName}::${inputHash}`;
+        if (!this.jobCache.has(key)) return null;
+        return { artifact: this.jobCache.get(key) };
+    }
+
+    async saveCachedArtifact(jobName: string, inputHash: string, artifact: unknown): Promise<void> {
+        this.jobCache.set(`${jobName}::${inputHash}`, artifact);
+    }
+
     /** Для тестов: очистить все данные */
     clear(): void {
         this.pipelines.clear();
+        this.jobCache.clear();
     }
 
     /** Для тестов: получить все пайплайны */
@@ -407,5 +437,3 @@ export class InMemoryPipelineStorage implements PipelineStorage {
         return Array.from(this.pipelines.values());
     }
 }
-
-

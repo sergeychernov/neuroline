@@ -102,6 +102,14 @@ const computeDefaultHash = (input: unknown): string => {
 };
 
 /**
+ * Вычисляет хеш входных данных job для кеширования
+ */
+const computeJobHash = (jobName: string, input: unknown, options: unknown): string => {
+    const json = JSON.stringify({ jobName, input, options });
+    return crypto.createHash('sha256').update(json).digest('hex').slice(0, 16);
+};
+
+/**
  * Вычисляет хеш структуры pipeline (имена jobs в порядке выполнения)
  * Используется для инвалидации при изменении конфигурации
  */
@@ -122,6 +130,8 @@ interface PipelineExecutionContext {
     readonly mapperContext: SynapseContext;
     readonly jobOptions: Record<string, unknown>;
     defaultInput: unknown;
+    /** Индекс job, для которой нужно пропустить кеш (при restart конкретной job) */
+    readonly forceExecuteJobIndex?: number;
 }
 
 // ============================================================================
@@ -321,11 +331,12 @@ export class PipelineManager {
         pipelineId: string,
         pipelineType: string,
         startFromStageIndex = 0,
+        forceExecuteJobIndex?: number,
     ): Promise<void> {
         this.activePipelines.add(pipelineId);
 
         try {
-            await this.executePipelineInner(pipelineId, pipelineType, startFromStageIndex);
+            await this.executePipelineInner(pipelineId, pipelineType, startFromStageIndex, forceExecuteJobIndex);
         } finally {
             this.activePipelines.delete(pipelineId);
             this.manualJobResolvers.delete(pipelineId);
@@ -336,6 +347,7 @@ export class PipelineManager {
         pipelineId: string,
         pipelineType: string,
         startFromStageIndex: number,
+        forceExecuteJobIndex?: number,
     ): Promise<void> {
         const config = this.getPipelineConfig(pipelineType);
         const pipeline = await this.storage.findById(pipelineId);
@@ -357,6 +369,7 @@ export class PipelineManager {
             },
             jobOptions: pipeline.jobOptions ?? {},
             defaultInput: pipelineInput,
+            forceExecuteJobIndex,
         };
 
         let flatJobIndex = 0;
@@ -577,12 +590,28 @@ export class PipelineManager {
         | { success: true; jobDef: JobInPipeline['job']; artifact: unknown; jobIndex: number }
         | { success: false; jobDef: JobInPipeline['job']; error: string; jobIndex: number }
     > {
-        const { job: jobDef, synapses, retries = 0, retryDelay = 1000 } = jobInPipeline;
+        const { job: jobDef, synapses, retries = 0, retryDelay = 1000, cacheable } = jobInPipeline;
 
         const jobInput = synapses ? synapses(ctx.mapperContext) : ctx.defaultInput;
         const options = ctx.jobOptions[jobDef.name];
 
-        await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options);
+        const inputHash = cacheable ? computeJobHash(jobDef.name, jobInput, options) : undefined;
+
+        await this.storage.updateJobInput(pipelineId, jobIndex, jobInput, options, inputHash);
+
+        // Проверяем кеш для cacheable jobs (пропускаем при force-перезапуске конкретной job)
+        if (cacheable && inputHash && jobIndex !== ctx.forceExecuteJobIndex) {
+            const cached = await this.storage.findCachedArtifact(jobDef.name, inputHash);
+            if (cached) {
+                this.logger.info('Job cache hit, restoring artifact', {
+                    pipelineId,
+                    jobName: jobDef.name,
+                    inputHash,
+                });
+                await this.storage.updateJobArtifact(pipelineId, jobIndex, cached.artifact, new Date());
+                return { success: true as const, jobDef, artifact: cached.artifact, jobIndex };
+            }
+        }
 
         if (retries > 0) {
             await this.storage.updateJobRetryCount(pipelineId, jobIndex, 0, retries);
@@ -617,6 +646,11 @@ export class PipelineManager {
             try {
                 const artifact = await jobDef.execute(jobInput, options, context);
                 await this.storage.updateJobArtifact(pipelineId, jobIndex, artifact, new Date());
+
+                if (cacheable && inputHash) {
+                    await this.storage.saveCachedArtifact(jobDef.name, inputHash, artifact);
+                }
+
                 return { success: true as const, jobDef, artifact, jobIndex };
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
@@ -927,6 +961,7 @@ export class PipelineManager {
             pipelineId,
             pipeline.pipelineType,
             stageIndex,
+            jobIndex,
         ).catch((error) => {
             this.logger.error('Pipeline restart execution failed', { pipelineId, error });
         });

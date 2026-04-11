@@ -37,6 +37,8 @@ export const PipelineJobStateSchema = new MongooseSchema<MongoPipelineJobState>(
             ],
             default: [],
         },
+        /** Хеш входных данных для кеширования */
+        inputHash: { type: String },
         startedAt: { type: Date },
         finishedAt: { type: Date },
         /** Количество выполненных ретраев */
@@ -132,4 +134,28 @@ PipelineSchema.index(
         name: 'processing_jobs_watchdog',
     },
 );
+
+// ============================================================================
+// Job Cache Schema (отдельная коллекция для кеша артефактов cacheable jobs)
+// ============================================================================
+
+import type { MongoJobCacheDocument } from './mongo-storage';
+
+/**
+ * Mongoose схема кеша артефактов.
+ * Хранится отдельно от pipeline — удаление pipeline не удаляет кеш.
+ * Ключ: { jobName, inputHash }.
+ */
+export const JobCacheSchema = new MongooseSchema<MongoJobCacheDocument>(
+    {
+        jobName: { type: String, required: true },
+        inputHash: { type: String, required: true },
+        artifact: { type: MongooseSchema.Types.Mixed },
+    },
+    {
+        timestamps: { createdAt: true, updatedAt: false },
+    },
+);
+
+JobCacheSchema.index({ jobName: 1, inputHash: 1 }, { unique: true });
 

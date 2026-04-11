@@ -90,11 +90,24 @@ Job может быть настроена на автоматический ret
 
 - `retryCount` и `maxRetries` сохраняются в `JobState` для мониторинга
 
+### Cacheable Jobs
+
+Job с `cacheable: true` кеширует артефакт через `PipelineStorage`. При совпадении `inputHash` (хеш jobName + input + options) результат берётся из кеша без повторного выполнения.
+
+```typescript
+{ job: expensiveJob, synapses, cacheable: true }
+```
+
+Кеш **глобальный** по `jobName` — разделяется между всеми pipeline, использующими эту job (имя job = реализация). При изменении реализации job необходимо очистить кеш вручную.
+Встроен в `PipelineStorage` — приложению не нужно ничего дополнительно настраивать.
+
 ### PipelineStorage
 
-Интерфейс для хранилища. Реализации:
-- `InMemoryPipelineStorage` — для тестов
-- `MongoPipelineStorage` — для продакшена
+Интерфейс для хранилища. Jobs хранятся embedded в документе pipeline.
+Кеш артефактов для cacheable jobs встроен (`findCachedArtifact`/`saveCachedArtifact`), хранится отдельно от pipeline — удаление pipeline **не** удаляет кеш.
+Реализации:
+- `InMemoryPipelineStorage` — для тестов (кеш в Map)
+- `MongoPipelineStorage` — для продакшена (кеш в отдельной коллекции `job_caches`)
 
 ### Manual Jobs
 
@@ -173,6 +186,14 @@ const polling = await client.restartAndPoll(
 3. **Типизация обязательна** — `JobDefinition<TInput, TOutput, TOptions>`
 4. **Имена jobs уникальны** в рамках pipeline
 5. **synapses** — единственный способ получить данные из других jobs
+
+## Кеширование
+
+- `inputHash` = hash(jobName + input + options) — дедупликация артефактов
+- Cache **глобальный**: ключ — `{ jobName, inputHash }`, без привязки к `pipelineType`. Одна и та же job переиспользует кеш во всех pipeline — имя job = реализация
+- Cache встроен в `PipelineStorage` (`findCachedArtifact`/`saveCachedArtifact`), живёт независимо от pipeline
+- Приложению не нужно ничего дополнительно настраивать — достаточно `cacheable: true` в конфиге job
+- **Инвалидация кеша при смене реализации**: если код `execute` изменился, необходимо либо очистить кеш (коллекцию `job_caches` / `jobCache` Map), либо перезапустить все pipeline с этой job
 
 ## Идемпотентность
 

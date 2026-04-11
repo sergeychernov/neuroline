@@ -1,7 +1,8 @@
-import type { Model, Document } from 'mongoose';
+import type { Model, Document, Connection } from 'mongoose';
 
 import type { PipelineStorage, PaginationParams, PaginatedResult } from './storage';
 import type { PipelineState, JobStatus, PipelineStatus, JobError } from './types';
+import { JobCacheSchema } from './mongoose-schema';
 
 /**
  * Интерфейс состояния job в MongoDB документе
@@ -14,6 +15,8 @@ export interface MongoPipelineJobState {
     /** Опции job */
     options?: unknown;
     artifact?: unknown;
+    /** Хеш входных данных для кеширования */
+    inputHash?: string;
     /** История ошибок (включая промежуточные при ретраях) */
     errors?: Array<{ message: string; stack?: string; attempt?: number; logs?: string[]; data?: unknown }>;
     startedAt?: Date;
@@ -39,6 +42,16 @@ export interface MongoPipelineDocument extends Document {
     configHash?: string;
     createdAt?: Date;
     updatedAt?: Date;
+}
+
+/**
+ * Интерфейс документа кеша артефактов в MongoDB
+ */
+export interface MongoJobCacheDocument extends Document {
+    jobName: string;
+    inputHash: string;
+    artifact?: unknown;
+    createdAt?: Date;
 }
 
 /**
@@ -90,7 +103,13 @@ export const sanitizeForMongo = (value: unknown): unknown => {
  * ```
  */
 export class MongoPipelineStorage implements PipelineStorage {
-    constructor(private readonly pipelineModel: Model<MongoPipelineDocument>) { }
+    private readonly cacheModel: Model<MongoJobCacheDocument>;
+
+    constructor(private readonly pipelineModel: Model<MongoPipelineDocument>) {
+        const conn: Connection = pipelineModel.db;
+        this.cacheModel = (conn.models.JobCache as Model<MongoJobCacheDocument>) ??
+            conn.model<MongoJobCacheDocument>('JobCache', JobCacheSchema);
+    }
 
     async findById(pipelineId: string): Promise<PipelineState | null> {
         const doc = await this.pipelineModel.findOne({ pipelineId }).lean().exec();
@@ -103,12 +122,13 @@ export class MongoPipelineStorage implements PipelineStorage {
             currentJobIndex: doc.currentJobIndex,
             input: doc.input,
             jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
-            jobs: doc.jobs.map((j) => ({
+            jobs: (doc.jobs ?? []).map((j) => ({
                 name: j.name,
                 status: j.status,
                 input: j.input,
                 options: j.options,
                 artifact: j.artifact,
+                inputHash: j.inputHash,
                 errors: j.errors ?? [],
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
@@ -149,12 +169,13 @@ export class MongoPipelineStorage implements PipelineStorage {
             currentJobIndex: doc.currentJobIndex,
             input: doc.input,
             jobOptions: doc.jobOptions as Record<string, unknown> | undefined,
-            jobs: doc.jobs.map((j) => ({
+            jobs: (doc.jobs ?? []).map((j) => ({
                 name: j.name,
                 status: j.status,
                 input: j.input,
                 options: j.options,
                 artifact: j.artifact,
+                inputHash: j.inputHash,
                 errors: j.errors ?? [],
                 startedAt: j.startedAt,
                 finishedAt: j.finishedAt,
@@ -293,6 +314,7 @@ export class MongoPipelineStorage implements PipelineStorage {
         jobIndex: number,
         input: unknown,
         options?: unknown,
+        inputHash?: string,
     ): Promise<void> {
         const update: Record<string, unknown> = {
             [`jobs.${jobIndex}.input`]: sanitizeForMongo(input),
@@ -300,6 +322,10 @@ export class MongoPipelineStorage implements PipelineStorage {
 
         if (options !== undefined) {
             update[`jobs.${jobIndex}.options`] = sanitizeForMongo(options);
+        }
+
+        if (inputHash !== undefined) {
+            update[`jobs.${jobIndex}.inputHash`] = inputHash;
         }
 
         await this.pipelineModel.updateOne({ pipelineId }, update).exec();
@@ -407,6 +433,20 @@ export class MongoPipelineStorage implements PipelineStorage {
         }
 
         await this.pipelineModel.updateOne({ pipelineId }, { $set: update }).exec();
+    }
+
+    async findCachedArtifact(jobName: string, inputHash: string): Promise<{ artifact: unknown } | null> {
+        const doc = await this.cacheModel.findOne({ jobName, inputHash }).lean().exec();
+        if (!doc) return null;
+        return { artifact: doc.artifact };
+    }
+
+    async saveCachedArtifact(jobName: string, inputHash: string, artifact: unknown): Promise<void> {
+        await this.cacheModel.updateOne(
+            { jobName, inputHash },
+            { $set: { artifact: sanitizeForMongo(artifact) } },
+            { upsert: true },
+        ).exec();
     }
 }
 

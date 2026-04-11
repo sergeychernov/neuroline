@@ -38,6 +38,10 @@ export {
 	type FinalizeJobInput,
 	type FinalizeJobArtifact,
 	type FinalizeJobOptions,
+	prepareConfigJob,
+	type PrepareConfigJobInput,
+	type PrepareConfigJobArtifact,
+	type PrepareConfigJobOptions,
 } from './jobs';
 
 // ============================================================================

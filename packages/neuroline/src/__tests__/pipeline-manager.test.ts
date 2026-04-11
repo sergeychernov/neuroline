@@ -177,6 +177,146 @@ describe('PipelineManager', () => {
 		expect(status.error?.jobName).toBe('fail-job');
 	});
 
+	it('дедуплицирует cacheable job через встроенный кеш storage', async () => {
+		const storage = new InMemoryPipelineStorage();
+		const manager = new PipelineManager({ storage });
+
+		let executeCount = 0;
+
+		const cacheableJob: JobDefinition<number, number> = {
+			name: 'cacheable-job',
+			execute: async (input) => {
+				executeCount++;
+				return input * 10;
+			},
+		};
+
+		const config: PipelineConfig<number> = {
+			name: 'cache-test',
+			stages: [
+				{ job: asStageJob(cacheableJob), cacheable: true },
+			],
+		};
+
+		manager.registerPipeline(config);
+
+		const first = await runPipeline(manager, 'cache-test', 5);
+		expect(executeCount).toBe(1);
+
+		const pipeline1 = await storage.findById(first.pipelineId);
+		expect(pipeline1?.jobs[0].artifact).toBe(50);
+		expect(pipeline1?.jobs[0].inputHash).toBeDefined();
+
+		// Удаляем pipeline и запускаем заново с тем же input
+		await storage.delete(first.pipelineId);
+
+		const second = await runPipeline(manager, 'cache-test', 5);
+
+		// Job не должна выполняться повторно — результат из кеша
+		expect(executeCount).toBe(1);
+
+		const pipeline2 = await storage.findById(second.pipelineId);
+		expect(pipeline2?.jobs[0].artifact).toBe(50);
+	});
+
+	it('downstream job получает артефакт cacheable job из кеша через synapses', async () => {
+		const storage = new InMemoryPipelineStorage();
+		const manager = new PipelineManager({ storage });
+
+		let cacheableExecuteCount = 0;
+
+		const cacheableJob: JobDefinition<number, { value: number }> = {
+			name: 'cacheable-job',
+			execute: async (input) => {
+				cacheableExecuteCount++;
+				return { value: input * 10 };
+			},
+		};
+
+		const downstreamJob: JobDefinition<{ upstream: number }, number> = {
+			name: 'downstream-job',
+			execute: async (input) => input.upstream + 1,
+		};
+
+		const config: PipelineConfig<number> = {
+			name: 'cache-synapse-test',
+			stages: [
+				{ job: asStageJob(cacheableJob), cacheable: true },
+				{
+					job: asStageJob(downstreamJob),
+					synapses: (ctx) => ({
+						upstream: ctx.getArtifact<{ value: number }>('cacheable-job')?.value ?? 0,
+					}),
+				},
+			],
+		};
+
+		manager.registerPipeline(config);
+
+		const first = await runPipeline(manager, 'cache-synapse-test', 5);
+		expect(cacheableExecuteCount).toBe(1);
+
+		const pipeline1 = await storage.findById(first.pipelineId);
+		expect(pipeline1?.jobs[0].artifact).toEqual({ value: 50 });
+		expect(pipeline1?.jobs[1].artifact).toBe(51);
+
+		await storage.delete(first.pipelineId);
+
+		const second = await runPipeline(manager, 'cache-synapse-test', 5);
+
+		expect(cacheableExecuteCount).toBe(1);
+
+		const pipeline2 = await storage.findById(second.pipelineId);
+		expect(pipeline2?.jobs[0].artifact).toEqual({ value: 50 });
+		expect(pipeline2?.jobs[1].artifact).toBe(51);
+	});
+
+	it('restart cacheable job перевыполняет и обновляет кеш', async () => {
+		const storage = new InMemoryPipelineStorage();
+		const manager = new PipelineManager({ storage });
+
+		let executeCount = 0;
+
+		const cacheableJob: JobDefinition<number, number> = {
+			name: 'cacheable-job',
+			execute: async (input) => {
+				executeCount++;
+				return input * 10 + executeCount;
+			},
+		};
+
+		const config: PipelineConfig<number> = {
+			name: 'restart-cache-test',
+			stages: [
+				{ job: asStageJob(cacheableJob), cacheable: true },
+			],
+		};
+
+		manager.registerPipeline(config);
+
+		const first = await runPipeline(manager, 'restart-cache-test', 5);
+		expect(executeCount).toBe(1);
+
+		const pipeline1 = await storage.findById(first.pipelineId);
+		expect(pipeline1?.jobs[0].artifact).toBe(51);
+
+		// Restart — cacheable job должна перевыполниться, несмотря на наличие кеша
+		let restartPromise: Promise<void> | null = null;
+		await manager.restartPipelineFromJob(first.pipelineId, 'cacheable-job', {
+			onExecutionStart: (p) => { restartPromise = p; },
+		});
+		await restartPromise;
+
+		expect(executeCount).toBe(2);
+
+		const pipeline2 = await storage.findById(first.pipelineId);
+		expect(pipeline2?.jobs[0].artifact).toBe(52);
+
+		// Кеш должен быть обновлён новым артефактом
+		const cached = await storage.findCachedArtifact('cacheable-job', pipeline2!.jobs[0].inputHash!);
+		expect(cached?.artifact).toBe(52);
+	});
+
 	describe('manual jobs', () => {
 		it('manual job получает статус awaiting_manual при создании pipeline', async () => {
 			const storage = new InMemoryPipelineStorage();
