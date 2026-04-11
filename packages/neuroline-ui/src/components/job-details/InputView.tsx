@@ -39,12 +39,12 @@ export const InputView: React.FC<InputViewProps> = ({ input, onEditClick }) => {
 					<IconButton
 						size="small"
 						onClick={onEditClick}
-						sx={(theme) => ({
-							color: 'secondary.main',
-							'&:hover': {
-								backgroundColor: alpha(theme.palette.secondary.main, 0.1),
-							},
-						})}
+					sx={(theme) => ({
+						color: theme.palette.secondary.main,
+						'&:hover': {
+							backgroundColor: alpha(theme.palette.secondary.main, 0.1),
+						},
+					})}
 					>
 						<EditIcon fontSize="small" />
 					</IconButton>
@@ -59,7 +59,7 @@ export const InputView: React.FC<InputViewProps> = ({ input, onEditClick }) => {
 							: alpha(theme.palette.common.black, 0.06),
 					fontFamily: 'monospace',
 					fontSize: '0.8rem',
-					color: 'secondary.main',
+					color: theme.palette.secondary.main,
 					whiteSpace: 'pre-wrap',
 					wordBreak: 'break-all',
 					maxHeight: 300,

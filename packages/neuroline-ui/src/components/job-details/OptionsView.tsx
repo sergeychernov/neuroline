@@ -39,12 +39,12 @@ export const OptionsView: React.FC<OptionsViewProps> = ({ options, onEditClick }
 					<IconButton
 						size="small"
 						onClick={onEditClick}
-						sx={(theme) => ({
-							color: 'primary.main',
-							'&:hover': {
-								backgroundColor: alpha(theme.palette.primary.main, 0.1),
-							},
-						})}
+					sx={(theme) => ({
+						color: theme.palette.primary.main,
+						'&:hover': {
+							backgroundColor: alpha(theme.palette.primary.main, 0.1),
+						},
+					})}
 					>
 						<EditIcon fontSize="small" />
 					</IconButton>
@@ -59,7 +59,7 @@ export const OptionsView: React.FC<OptionsViewProps> = ({ options, onEditClick }
 							: alpha(theme.palette.common.black, 0.06),
 					fontFamily: 'monospace',
 					fontSize: '0.8rem',
-					color: 'primary.main',
+					color: theme.palette.primary.main,
 					whiteSpace: 'pre-wrap',
 					wordBreak: 'break-all',
 					maxHeight: 300,
