@@ -1,5 +1,7 @@
 import React from 'react';
-import { Chip, SvgIcon, keyframes } from '@mui/material';
+import { Chip, SvgIcon, keyframes, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import type { JobStatus, PipelineStatus } from '../types';
 
 export interface StatusBadgeProps {
@@ -22,40 +24,83 @@ const spinCw = keyframes`
   100% { transform: rotate(360deg); }
 `;
 
-const statusConfig: Record<
+const statusBadgeLabels: Record<JobStatus | PipelineStatus, string> = {
+  pending: 'Pending',
+  awaiting_manual: 'Awaiting manual',
+  processing: 'Processing',
+  done: 'Done',
+  error: 'Error',
+};
+
+/** Визуал для тёмной темы (неон) */
+const statusBadgeDarkVisuals: Record<
   JobStatus | PipelineStatus,
-  { label: string; color: string; bgColor: string }
+  { color: string; bgColor: string }
 > = {
   pending: {
-    label: 'Pending',
     color: '#a0a0a0',
     bgColor: 'rgba(160, 160, 160, 0.15)',
   },
   awaiting_manual: {
-    label: 'Awaiting manual',
     color: '#ffab00',
     bgColor: 'rgba(255, 171, 0, 0.15)',
   },
   processing: {
-    label: 'Processing',
     color: '#00e5ff',
     bgColor: 'rgba(0, 229, 255, 0.15)',
   },
   done: {
-    label: 'Done',
     color: '#00e676',
     bgColor: 'rgba(0, 230, 118, 0.15)',
   },
   error: {
-    label: 'Error',
     color: '#ff1744',
     bgColor: 'rgba(255, 23, 68, 0.15)',
   },
 };
 
+function getStatusBadgeVisuals(
+  theme: Theme,
+  status: JobStatus | PipelineStatus,
+): { color: string; bgColor: string } {
+  if (theme.palette.mode === 'dark') {
+    return statusBadgeDarkVisuals[status];
+  }
+  const p = theme.palette;
+  switch (status) {
+    case 'pending':
+      return {
+        color: p.text.secondary,
+        bgColor: alpha(p.common.black, 0.08),
+      };
+    case 'awaiting_manual':
+      return {
+        color: p.warning.dark,
+        bgColor: alpha(p.warning.main, 0.2),
+      };
+    case 'processing':
+      return {
+        color: p.secondary.dark,
+        bgColor: alpha(p.secondary.main, 0.2),
+      };
+    case 'done':
+      return {
+        color: p.success.dark,
+        bgColor: alpha(p.success.main, 0.2),
+      };
+    case 'error':
+      return {
+        color: p.error.dark,
+        bgColor: alpha(p.error.main, 0.16),
+      };
+    default:
+      return statusBadgeDarkVisuals[status];
+  }
+}
+
 /** Подпись статуса для aria / Tooltip (совпадает с подписью бейджа) */
 export function getStatusBadgeLabel(status: JobStatus | PipelineStatus): string {
-  return statusConfig[status].label;
+  return statusBadgeLabels[status];
 }
 
 /** Компактные SVG-иконки по статусу (viewBox 0 0 24 24) */
@@ -113,20 +158,22 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   variant = 'default',
   suppressNativeTitle = false,
 }) => {
-  const config = statusConfig[status];
+  const theme = useTheme();
+  const visuals = getStatusBadgeVisuals(theme, status);
+  const label = statusBadgeLabels[status];
   const isIcon = variant === 'icon';
 
   if (isIcon) {
     return (
       <Chip
         icon={<StatusGlyph status={status} />}
-        aria-label={config.label}
-        title={suppressNativeTitle ? undefined : config.label}
+        aria-label={label}
+        title={suppressNativeTitle ? undefined : label}
         size="small"
         sx={{
-          color: config.color,
-          backgroundColor: config.bgColor,
-          border: `1px solid ${config.color}40`,
+          color: visuals.color,
+          backgroundColor: visuals.bgColor,
+          border: `1px solid ${alpha(visuals.color, 0.45)}`,
           height: 20,
           minWidth: 20,
           width: 20,
@@ -147,12 +194,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   return (
     <Chip
-      label={config.label}
+      label={label}
       size={size}
       sx={{
-        color: config.color,
-        backgroundColor: config.bgColor,
-        border: `1px solid ${config.color}40`,
+        color: visuals.color,
+        backgroundColor: visuals.bgColor,
+        border: `1px solid ${alpha(visuals.color, 0.45)}`,
         fontWeight: 600,
         fontSize: size === 'small' ? '0.625rem' : '0.75rem',
         height: size === 'small' ? 20 : 24,

@@ -1,62 +1,64 @@
 import type { Preview } from '@storybook/react-vite';
-import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import { CssBaseline, ThemeProvider } from '@mui/material';
 import React from 'react';
-
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: {
-      main: '#7c4dff',
-    },
-    secondary: {
-      main: '#00e5ff',
-    },
-    background: {
-      default: '#0a0a0f',
-      paper: '#13131a',
-    },
-  },
-  typography: {
-    fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-  },
-});
+import { createNeurolineTheme, type NeurolineThemeMode } from '../src/theme';
 
 const preview: Preview = {
-  tags: ['autodocs'],
-  parameters: {
-    controls: {
-      matchers: {
-        color: /(background|color)$/i,
-        date: /Date$/i,
-      },
-    },
-    backgrounds: {
-      default: 'dark',
-      values: [
-        { name: 'dark', value: '#0a0a0f' },
-        { name: 'light', value: '#ffffff' },
-      ],
-    },
-    docs: {
-      canvas: {
-        background: '#0a0a0f',
-      },
-    },
-  },
-  decorators: [
-    (Story) =>
-      React.createElement(
-        ThemeProvider,
-        { theme },
-        React.createElement(CssBaseline),
-        React.createElement(
-          'div',
-          { style: { backgroundColor: '#0a0a0f', padding: '20px', minHeight: '100px' } },
-          React.createElement(Story)
-        )
-      ),
-  ],
+	tags: ['autodocs'],
+	globalTypes: {
+		neurolineTheme: {
+			description: 'Тема MUI для компонентов',
+			defaultValue: 'dark',
+			toolbar: {
+				title: 'Тема',
+				icon: 'contrast',
+				items: [
+					{ value: 'dark', title: 'Тёмная', icon: 'moon' },
+					{ value: 'light', title: 'Светлая', icon: 'sun' },
+				],
+				dynamicTitle: true,
+			},
+		},
+	},
+	parameters: {
+		controls: {
+			matchers: {
+				color: /(background|color)$/i,
+				date: /Date$/i,
+			},
+		},
+		backgrounds: {
+			default: 'canvas',
+			values: [
+				{ name: 'canvas', value: 'transparent' },
+				{ name: 'dark', value: '#0a0a0f' },
+				{ name: 'light', value: '#f4f4f8' },
+			],
+		},
+		docs: {
+			canvas: {
+				background: 'transparent',
+			},
+		},
+	},
+	decorators: [
+		(Story, context) => {
+			const raw = context.globals.neurolineTheme as string | undefined;
+			const mode: NeurolineThemeMode = raw === 'light' ? 'light' : 'dark';
+			const theme = createNeurolineTheme(mode);
+			const bg = theme.palette.background.default;
+			return React.createElement(
+				ThemeProvider,
+				{ theme },
+				React.createElement(CssBaseline),
+				React.createElement(
+					'div',
+					{ style: { backgroundColor: bg, padding: '20px', minHeight: '100px' } },
+					React.createElement(Story),
+				),
+			);
+		},
+	],
 };
 
 export default preview;
-
