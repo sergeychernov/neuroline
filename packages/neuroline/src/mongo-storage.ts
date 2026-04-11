@@ -408,31 +408,38 @@ export class MongoPipelineStorage implements PipelineStorage {
         // currentJobIndex = минимальный индекс из сбрасываемых
         const minIndex = indicesToReset.size > 0 ? Math.min(...indicesToReset) : 0;
 
-        // Формируем обновления
-        const update: Record<string, unknown> = {
+        // Формируем обновления ($set для значений, $unset для удаляемых полей)
+        const setUpdate: Record<string, unknown> = {
             status: 'processing',
             currentJobIndex: minIndex,
         };
+        const unsetUpdate: Record<string, 1> = {};
 
         // Сбрасываем указанные jobs
         for (const i of indicesToReset) {
             if (i >= doc.jobs.length) continue;
 
-            update[`jobs.${i}.status`] = manualJobIndices?.has(i) ? 'awaiting_manual' : 'pending';
-            update[`jobs.${i}.artifact`] = undefined;
-            update[`jobs.${i}.errors`] = [];
-            update[`jobs.${i}.startedAt`] = undefined;
-            update[`jobs.${i}.finishedAt`] = undefined;
-            update[`jobs.${i}.retryCount`] = undefined;
-            update[`jobs.${i}.maxRetries`] = undefined;
+            setUpdate[`jobs.${i}.status`] = manualJobIndices?.has(i) ? 'awaiting_manual' : 'pending';
+            setUpdate[`jobs.${i}.errors`] = [];
+            unsetUpdate[`jobs.${i}.artifact`] = 1;
+            unsetUpdate[`jobs.${i}.startedAt`] = 1;
+            unsetUpdate[`jobs.${i}.finishedAt`] = 1;
+            unsetUpdate[`jobs.${i}.retryCount`] = 1;
+            unsetUpdate[`jobs.${i}.maxRetries`] = 1;
+            unsetUpdate[`jobs.${i}.inputHash`] = 1;
         }
 
         // Новые jobOptions полностью заменяют существующие
         if (jobOptions) {
-            update.jobOptions = sanitizeForMongo(jobOptions);
+            setUpdate.jobOptions = sanitizeForMongo(jobOptions);
         }
 
-        await this.pipelineModel.updateOne({ pipelineId }, { $set: update }).exec();
+        const mongoUpdate: Record<string, unknown> = { $set: setUpdate };
+        if (Object.keys(unsetUpdate).length > 0) {
+            mongoUpdate.$unset = unsetUpdate;
+        }
+
+        await this.pipelineModel.updateOne({ pipelineId }, mongoUpdate).exec();
     }
 
     async findCachedArtifact(jobName: string, inputHash: string): Promise<{ artifact: unknown } | null> {
