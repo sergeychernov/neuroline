@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography, IconButton, Stack, SvgIcon } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { SerializableValue } from '../../types';
 
 /** Edit icon (inline to avoid tree-shaking issues) */
@@ -38,29 +39,32 @@ export const InputView: React.FC<InputViewProps> = ({ input, onEditClick }) => {
 					<IconButton
 						size="small"
 						onClick={onEditClick}
-						sx={{
-							color: '#00e5ff',
+						sx={(theme) => ({
+							color: 'secondary.main',
 							'&:hover': {
-								backgroundColor: 'rgba(0, 229, 255, 0.1)',
+								backgroundColor: alpha(theme.palette.secondary.main, 0.1),
 							},
-						}}
+						})}
 					>
 						<EditIcon fontSize="small" />
 					</IconButton>
 				)}
 			</Stack>
 			<Paper
-				sx={{
+				sx={(theme) => ({
 					p: 2,
-					backgroundColor: 'rgba(0, 0, 0, 0.3)',
+					backgroundColor:
+						theme.palette.mode === 'dark'
+							? 'rgba(0, 0, 0, 0.3)'
+							: alpha(theme.palette.common.black, 0.06),
 					fontFamily: 'monospace',
 					fontSize: '0.8rem',
-					color: '#00e5ff',
+					color: 'secondary.main',
 					whiteSpace: 'pre-wrap',
 					wordBreak: 'break-all',
 					maxHeight: 300,
 					overflow: 'auto',
-				}}
+				})}
 			>
 				{typeof input === 'object'
 					? JSON.stringify(input, null, 2)

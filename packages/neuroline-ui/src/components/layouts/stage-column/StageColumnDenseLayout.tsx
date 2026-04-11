@@ -1,10 +1,11 @@
 import React from 'react';
-import { Box } from '@mui/material';
+import { Box, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { StageDisplayInfo } from '../../../types';
 import {
 	STAGE_COLUMN_DENSE_INSET,
 	STAGE_COLUMN_DENSE_VERTICAL_GUTTER,
-	STAGE_COLUMN_STATUS_COLORS,
+	getStageColumnStatusColor,
 	type StageColumnAggregateStatus,
 } from './stageColumnDerived';
 import { StageColumnHeader } from './StageColumnHeader';
@@ -29,20 +30,24 @@ export const StageColumnDenseLayout: React.FC<StageColumnDenseLayoutProps> = ({
 	children,
 	fillHorizontal = false,
 }) => {
-	const color = STAGE_COLUMN_STATUS_COLORS[stageStatus];
+	const theme = useTheme();
+	const color = getStageColumnStatusColor(theme, stageStatus);
 
 	return (
 		<Box
-			sx={{
+			sx={(theme) => ({
 				display: fillHorizontal ? 'grid' : 'inline-grid',
 				gridTemplateColumns: fillHorizontal ? 'minmax(0, 1fr)' : 'minmax(0, max-content)',
 				width: fillHorizontal ? '100%' : undefined,
 				maxWidth: '100%',
-				backgroundColor: 'rgba(19, 19, 26, 0.75)',
+				backgroundColor:
+					theme.palette.mode === 'dark'
+						? 'rgba(19, 19, 26, 0.75)'
+						: alpha(theme.palette.common.black, 0.045),
 				border: `1px solid ${color}40`,
 				borderRadius: 1,
 				overflow: 'hidden',
-			}}
+			})}
 		>
 			<StageColumnHeader
 				stage={stage}

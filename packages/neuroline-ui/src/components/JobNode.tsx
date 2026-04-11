@@ -1,5 +1,7 @@
-import React from 'react';
-import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes } from '@mui/material';
+import React, { useMemo } from 'react';
+import { Box, Typography, Paper, Tooltip, Chip, SvgIcon, keyframes, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 import type { JobDisplayInfo, JobNodeDisplayMode } from '../types';
 import { StatusBadge, getStatusBadgeLabel } from './StatusBadge';
 
@@ -61,15 +63,6 @@ export function jobNameToAbbreviation(name: string): string {
     .join('');
 }
 
-const pulse = keyframes`
-  0%, 100% { 
-    box-shadow: 0 0 0 0 rgba(0, 229, 255, 0.4);
-  }
-  50% { 
-    box-shadow: 0 0 0 10px rgba(0, 229, 255, 0);
-  }
-`;
-
 const glow = keyframes`
   0%, 100% { 
     filter: brightness(1);
@@ -110,6 +103,44 @@ const statusColors = {
   },
 };
 
+function jobNodeStatusSurface(
+  theme: Theme,
+  status: JobDisplayInfo['status'],
+): { border: string; bg: string; glow: string } {
+  if (theme.palette.mode === 'dark') {
+    return statusColors[status];
+  }
+  const p = theme.palette;
+  const light: Record<JobDisplayInfo['status'], { border: string; bg: string; glow: string }> = {
+    pending: {
+      border: alpha(p.text.secondary, 0.55),
+      bg: alpha(p.common.black, 0.06),
+      glow: 'transparent',
+    },
+    awaiting_manual: {
+      border: alpha(p.warning.dark, 0.78),
+      bg: alpha(p.warning.main, 0.16),
+      glow: alpha(p.warning.dark, 0.38),
+    },
+    processing: {
+      border: alpha(p.secondary.dark, 0.88),
+      bg: alpha(p.secondary.main, 0.14),
+      glow: alpha(p.secondary.dark, 0.42),
+    },
+    done: {
+      border: alpha(p.success.dark, 0.88),
+      bg: alpha(p.success.main, 0.14),
+      glow: alpha(p.success.dark, 0.35),
+    },
+    error: {
+      border: alpha(p.error.dark, 0.88),
+      bg: alpha(p.error.main, 0.12),
+      glow: alpha(p.error.dark, 0.42),
+    },
+  };
+  return light[status];
+}
+
 /**
  * "Neuron" component for rendering a single job
  */
@@ -122,7 +153,20 @@ export const JobNode: React.FC<JobNodeProps> = ({
   jobDisplay = 'details',
   fullWidth = false,
 }) => {
-  const colors = statusColors[job.status];
+  const theme = useTheme();
+  const colors = jobNodeStatusSurface(theme, job.status);
+  const processingPulse = useMemo(
+    () =>
+      keyframes`
+  0%, 100% { 
+    box-shadow: 0 0 0 0 ${alpha(theme.palette.secondary.main, theme.palette.mode === 'light' ? 0.32 : 0.4)};
+  }
+  50% { 
+    box-shadow: 0 0 0 10px ${alpha(theme.palette.secondary.main, 0)};
+  }
+`,
+    [theme.palette.mode, theme.palette.secondary.main],
+  );
   const isProcessing = job.status === 'processing';
   const isOneLine = jobDisplay === 'one-line';
   const isCompact = jobDisplay === 'compact';
@@ -152,7 +196,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
     <Paper
       elevation={0}
       onClick={() => onClick?.(job)}
-      sx={{
+      sx={(t) => ({
         p: isOneLine ? 0.5 : isCompact ? 0.35 : 0.3,
         minWidth: stretch ? 0 : isOneLine ? 'auto' : isCompact ? 96 : 120,
         maxWidth: stretch ? 'none' : isOneLine ? 520 : isCompact ? 168 : 220,
@@ -165,10 +209,10 @@ export const JobNode: React.FC<JobNodeProps> = ({
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         position: 'relative',
         overflow: 'hidden',
-        animation: isProcessing ? `${pulse} 2s ease-in-out infinite` : undefined,
+        animation: isProcessing ? `${processingPulse} 2s ease-in-out infinite` : undefined,
         boxShadow: isSelected
           ? `0 0 20px ${colors.glow}, inset 0 0 30px ${colors.glow}`
-          : `0 4px 20px rgba(0, 0, 0, 0.3)`,
+          : `0 4px 20px ${t.palette.mode === 'light' ? alpha(t.palette.common.black, 0.12) : 'rgba(0, 0, 0, 0.3)'}`,
         transform: isSelected ? 'scale(1.02)' : 'scale(1)',
         '&:hover': onClick
           ? {
@@ -186,18 +230,18 @@ export const JobNode: React.FC<JobNodeProps> = ({
           height: 3,
           background:
             job.status === 'done'
-              ? 'linear-gradient(90deg, #00e676, #00e5ff)'
+              ? `linear-gradient(90deg, ${t.palette.success.main}, ${t.palette.secondary.main})`
               : job.status === 'processing'
-                ? 'linear-gradient(90deg, #00e5ff, #7c4dff, #00e5ff)'
+                ? `linear-gradient(90deg, ${t.palette.secondary.main}, ${t.palette.primary.main}, ${t.palette.secondary.main})`
                 : job.status === 'awaiting_manual'
-                  ? 'linear-gradient(90deg, #ffab00, #ffc107)'
+                  ? `linear-gradient(90deg, ${t.palette.warning.main}, #ffc107)`
                   : job.status === 'error'
-                    ? 'linear-gradient(90deg, #ff1744, #ff5722)'
+                    ? `linear-gradient(90deg, ${t.palette.error.main}, #ff5722)`
                     : 'transparent',
           backgroundSize: isProcessing ? '200% 100%' : '100% 100%',
           animation: isProcessing ? `${glow} 1.5s linear infinite` : undefined,
         },
-      }}
+      })}
     >
       <Box
         sx={{
@@ -231,7 +275,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
                 noWrap={isOneLine}
                 sx={{
                   fontWeight: 700,
-                  color: '#fff',
+                  color: 'text.primary',
                   lineHeight: 1.3,
                   letterSpacing: '0.06em',
                   cursor: 'inherit',
@@ -248,7 +292,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
               variant="body1"
               sx={{
                 fontWeight: 700,
-                color: '#fff',
+                color: 'text.primary',
                 wordBreak: 'break-word',
                 lineHeight: 1.3,
               }}
@@ -452,7 +496,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
             }}
           />
           <Box
-            sx={{
+            sx={(t) => ({
               position: 'absolute',
               right: -8,
               top: '50%',
@@ -460,9 +504,9 @@ export const JobNode: React.FC<JobNodeProps> = ({
               width: 8,
               height: 8,
               borderRadius: '50%',
-              backgroundColor: job.status === 'done' ? '#00e676' : colors.border,
+              backgroundColor: job.status === 'done' ? t.palette.success.main : colors.border,
               border: `2px solid ${colors.bg}`,
-            }}
+            })}
           />
         </>
       )}

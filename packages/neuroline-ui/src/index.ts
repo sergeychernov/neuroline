@@ -16,6 +16,7 @@ export * from './components/job-details/InputView';
 export * from './components/job-details/OptionsView';
 export {
 	getStageColumnDerived,
+	getStageColumnStatusColor,
 	STAGE_COLUMN_DENSE_INSET,
 	STAGE_COLUMN_DENSE_VERTICAL_GUTTER,
 	STAGE_COLUMN_STATUS_COLORS,

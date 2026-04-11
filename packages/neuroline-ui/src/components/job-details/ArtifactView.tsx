@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Paper, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { SerializableValue } from '../../types';
 
 export interface ArtifactViewProps {
@@ -25,17 +26,20 @@ export const ArtifactView: React.FC<ArtifactViewProps> = ({ artifact }) => {
 				Execution result:
 			</Typography>
 			<Paper
-				sx={{
+				sx={(theme) => ({
 					p: 2,
-					backgroundColor: 'rgba(0, 0, 0, 0.3)',
+					backgroundColor:
+						theme.palette.mode === 'dark'
+							? 'rgba(0, 0, 0, 0.3)'
+							: alpha(theme.palette.common.black, 0.06),
 					fontFamily: 'monospace',
 					fontSize: '0.8rem',
-					color: '#00e676',
+					color: theme.palette.success.main,
 					whiteSpace: 'pre-wrap',
 					wordBreak: 'break-all',
 					maxHeight: 300,
 					overflow: 'auto',
-				}}
+				})}
 			>
 				{typeof artifact === 'object'
 					? JSON.stringify(artifact, null, 2)

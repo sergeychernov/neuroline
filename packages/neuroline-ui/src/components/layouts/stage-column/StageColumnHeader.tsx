@@ -1,9 +1,10 @@
 import React from 'react';
-import { Box, Typography, Paper } from '@mui/material';
+import { Box, Typography, Paper, useTheme } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import type { StageDisplayInfo } from '../../../types';
 import {
 	STAGE_COLUMN_DENSE_INSET,
-	STAGE_COLUMN_STATUS_COLORS,
+	getStageColumnStatusColor,
 	type StageColumnAggregateStatus,
 } from './stageColumnDerived';
 
@@ -25,8 +26,9 @@ export const StageColumnHeader: React.FC<StageColumnHeaderProps> = ({
 	density,
 	embedded = false,
 }) => {
+	const theme = useTheme();
 	const isDense = density === 'dense';
-	const color = STAGE_COLUMN_STATUS_COLORS[stageStatus];
+	const color = getStageColumnStatusColor(theme, stageStatus);
 
 	const title = (
 		<Typography
@@ -45,14 +47,14 @@ export const StageColumnHeader: React.FC<StageColumnHeaderProps> = ({
 			{isParallel && (
 				<Box
 					component="span"
-					sx={{
+					sx={(theme) => ({
 						ml: isDense ? 0.5 : 1,
 						px: isDense ? 0.35 : 0.5,
 						py: isDense ? 0.1 : 0.25,
-						backgroundColor: 'rgba(124, 77, 255, 0.2)',
+						backgroundColor: alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.14),
 						borderRadius: 0.5,
 						fontSize: isDense ? '0.55rem' : '0.6rem',
-					}}
+					})}
 				>
 					∥ {stage.jobs.length}
 				</Box>
@@ -81,13 +83,16 @@ export const StageColumnHeader: React.FC<StageColumnHeaderProps> = ({
 	return (
 		<Paper
 			elevation={0}
-			sx={{
+			sx={(theme) => ({
 				px: isDense ? 1.5 : 2,
 				py: isDense ? 0.35 : 0.5,
-				backgroundColor: 'rgba(19, 19, 26, 0.6)',
+				backgroundColor:
+					theme.palette.mode === 'dark'
+						? 'rgba(19, 19, 26, 0.6)'
+						: alpha(theme.palette.common.black, 0.04),
 				border: `1px solid ${color}30`,
 				borderRadius: 2,
-			}}
+			})}
 		>
 			{title}
 		</Paper>
