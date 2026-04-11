@@ -72,7 +72,7 @@ export const StageColumnHeader: React.FC<StageColumnHeaderProps> = ({
 					...(isDense
 						? { pt: STAGE_COLUMN_DENSE_INSET, pb: 0 }
 						: { py: 0.75 }),
-					borderBottom: `1px solid ${color}22`,
+					borderBottom: `1px solid ${alpha(color, 0.13)}`,
 				}}
 			>
 				{title}
@@ -90,7 +90,7 @@ export const StageColumnHeader: React.FC<StageColumnHeaderProps> = ({
 					theme.palette.mode === 'dark'
 						? 'rgba(19, 19, 26, 0.6)'
 						: alpha(theme.palette.common.black, 0.04),
-				border: `1px solid ${color}30`,
+				border: `1px solid ${alpha(color, 0.19)}`,
 				borderRadius: 2,
 			})}
 		>

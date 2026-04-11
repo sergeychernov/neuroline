@@ -44,7 +44,7 @@ export const StageColumnDenseLayout: React.FC<StageColumnDenseLayoutProps> = ({
 					theme.palette.mode === 'dark'
 						? 'rgba(19, 19, 26, 0.75)'
 						: alpha(theme.palette.common.black, 0.045),
-				border: `1px solid ${color}40`,
+				border: `1px solid ${alpha(color, 0.25)}`,
 				borderRadius: 1,
 				overflow: 'hidden',
 			})}
