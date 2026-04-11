@@ -10,3 +10,4 @@ export { transformJob, type TransformJobInput, type TransformJobArtifact, type T
 export { failingJob, type FailingJobInput, type FailingJobArtifact, type FailingJobOptions } from './failing-job';
 export { unstableJob, type UnstableJobInput, type UnstableJobArtifact, type UnstableJobOptions } from './unstable-job';
 export { finalizeJob, type FinalizeJobInput, type FinalizeJobArtifact, type FinalizeJobOptions } from './finalize-job';
+export { prepareConfigJob, type PrepareConfigJobInput, type PrepareConfigJobArtifact, type PrepareConfigJobOptions } from './prepare-config-job';

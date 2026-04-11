@@ -118,6 +118,11 @@ export interface JobInPipeline<
      * Для запуска используется метод PipelineManager.runManualJob().
      */
     manual?: boolean;
+    /**
+     * Включает кеширование результата job через JobCacheStorage.
+     * При совпадении inputHash результат берётся из кеша без повторного выполнения.
+     */
+    cacheable?: boolean;
 }
 
 /** JobInPipeline с фиксированным типом pipeline input и "любыми" job-типами */
@@ -269,6 +274,8 @@ export interface JobState<TInput = unknown, TOutput = unknown, TOptions = unknow
     options?: TOptions;
     /** Артефакт (результат выполнения) */
     artifact?: TOutput;
+    /** Хеш входных данных job (для кеширования через JobCacheStorage) */
+    inputHash?: string;
     /** История ошибок (пустой массив, если ошибок нет) */
     errors: Array<JobError>;
     /** Время начала выполнения */

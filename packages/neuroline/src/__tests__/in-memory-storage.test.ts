@@ -45,6 +45,20 @@ describe('InMemoryPipelineStorage', () => {
 		expect(updated?.jobs[0].errors?.at(-1)?.message).toContain('timed out');
 	});
 
+	it('сохраняет inputHash при updateJobInput', async () => {
+		const storage = new InMemoryPipelineStorage();
+
+		await storage.create(createState({
+			pipelineId: 'hash-test',
+			jobs: [{ name: 'job-1', status: 'pending', errors: [] }],
+		}));
+
+		await storage.updateJobInput('hash-test', 0, { data: 'test' }, undefined, 'abc123');
+
+		const pipeline = await storage.findById('hash-test');
+		expect(pipeline?.jobs[0].inputHash).toBe('abc123');
+	});
+
 	it('поддерживает пагинацию и фильтрацию по типу', async () => {
 		const storage = new InMemoryPipelineStorage();
 
@@ -60,5 +74,22 @@ describe('InMemoryPipelineStorage', () => {
 		const filtered = await storage.findAll({ pipelineType: 'type-a' });
 		expect(filtered.total).toBe(2);
 		expect(filtered.items.every((item) => item.pipelineType === 'type-a')).toBe(true);
+	});
+});
+
+describe('InMemoryPipelineStorage — job cache', () => {
+	it('сохраняет и находит кешированный артефакт', async () => {
+		const storage = new InMemoryPipelineStorage();
+
+		expect(await storage.findCachedArtifact('job', 'hash1')).toBeNull();
+
+		await storage.saveCachedArtifact('job', 'hash1', { result: 42 });
+
+		const found = await storage.findCachedArtifact('job', 'hash1');
+		expect(found).not.toBeNull();
+		expect(found?.artifact).toEqual({ result: 42 });
+
+		expect(await storage.findCachedArtifact('job', 'hash2')).toBeNull();
+		expect(await storage.findCachedArtifact('other-job', 'hash1')).toBeNull();
 	});
 });

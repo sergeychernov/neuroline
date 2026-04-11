@@ -6,6 +6,7 @@ import { transformJob, type TransformJobArtifact } from './jobs/transform-job';
 import { failingJob } from './jobs/failing-job';
 import { unstableJob } from './jobs/unstable-job';
 import { finalizeJob } from './jobs/finalize-job';
+import { prepareConfigJob } from './jobs/prepare-config-job';
 
 // ============================================================================
 // Pipeline Input Types
@@ -31,6 +32,14 @@ export interface DemoPipelineInput {
 // ============================================================================
 // Synapses (трансформация данных между jobs)
 // ============================================================================
+
+/**
+ * Synapse: PipelineInput -> PrepareConfig
+ * Передаёт только iterations — стабильный параметр для кеширования
+ */
+const inputToPrepareConfig = (ctx: SynapseContext<DemoPipelineInput>) => ({
+	iterations: ctx.pipelineInput.iterations ?? 10,
+});
 
 /**
  * Synapse: PipelineInput -> Init
@@ -130,26 +139,32 @@ const toFinalize = (ctx: SynapseContext<DemoPipelineInput>) => {
  * Demo Pipeline — демонстрация работы neuroline
  *
  * Структура stages:
- * 1. [init] - инициализация (1 сек)
+ * 1. [init, prepare-config (cacheable)] - параллельно инициализация и подготовка конфигурации
  * 2. [validate, compute] - параллельно валидация и вычисления (1 сек)
  * 3. [transform] - трансформация данных (1.2 сек)
  * 4. [unstable-task, failing-task] - параллельно: нестабильная (с retry) и условно падающая
  * 5. [finalize] - финализация и сборка результата (1 сек)
  *
+ * prepare-config отмечена как cacheable — при повторном запуске с тем же iterations
+ * результат берётся из кеша мгновенно (без 2-секундной задержки).
+ *
  * Если input.fail === true, pipeline упадёт на stage 4
  * unstable-task имеет 2 ретрая — если unstableFailCount <= 2, задача завершится успешно
- * Общее время: ~5-6 секунд (при успехе)
+ * Общее время: ~5-6 секунд (при успехе, ~3-4 при cache hit на prepare-config)
  */
 export const demoPipeline: PipelineConfig<DemoPipelineInput> = {
 	name: 'demo-pipeline',
 	stages: [
-		// Stage 1: Инициализация
-		{ job: initJob, synapses: inputToInit },
+		// Stage 1: Параллельно инициализация и подготовка конфигурации (cacheable)
+		[
+			{ job: initJob, synapses: inputToInit },
+			{ job: prepareConfigJob, synapses: inputToPrepareConfig, cacheable: true },
+		],
 
 		// Stage 2: Параллельно валидация и вычисления
 		[
 			{ job: validateJob, synapses: initToValidate },
-			{ job: computeJob, synapses: inputToCompute },
+			{ job: computeJob, synapses: inputToCompute, cacheable: true },
 		],
 
 		// Stage 3: Трансформация данных
