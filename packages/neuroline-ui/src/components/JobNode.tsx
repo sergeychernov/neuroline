@@ -106,34 +106,46 @@ const statusColors = {
 function jobNodeStatusSurface(
   theme: Theme,
   status: JobDisplayInfo['status'],
-): { border: string; bg: string; glow: string } {
+): { border: string; hoverBorder: string; bg: string; glow: string } {
   if (theme.palette.mode === 'dark') {
-    return statusColors[status];
+    const dark = statusColors[status];
+    return {
+      ...dark,
+      hoverBorder: dark.border.replace('0.3', '0.6').replace('0.5', '0.8'),
+    };
   }
   const p = theme.palette;
-  const light: Record<JobDisplayInfo['status'], { border: string; bg: string; glow: string }> = {
+  const light: Record<
+    JobDisplayInfo['status'],
+    { border: string; hoverBorder: string; bg: string; glow: string }
+  > = {
     pending: {
       border: alpha(p.text.secondary, 0.55),
+      hoverBorder: alpha(p.text.secondary, 0.85),
       bg: alpha(p.common.black, 0.06),
       glow: 'transparent',
     },
     awaiting_manual: {
       border: alpha(p.warning.dark, 0.78),
+      hoverBorder: alpha(p.warning.dark, 1),
       bg: alpha(p.warning.main, 0.16),
       glow: alpha(p.warning.dark, 0.38),
     },
     processing: {
       border: alpha(p.secondary.dark, 0.88),
+      hoverBorder: alpha(p.secondary.dark, 1),
       bg: alpha(p.secondary.main, 0.14),
       glow: alpha(p.secondary.dark, 0.42),
     },
     done: {
       border: alpha(p.success.dark, 0.88),
+      hoverBorder: alpha(p.success.dark, 1),
       bg: alpha(p.success.main, 0.14),
       glow: alpha(p.success.dark, 0.35),
     },
     error: {
       border: alpha(p.error.dark, 0.88),
+      hoverBorder: alpha(p.error.dark, 1),
       bg: alpha(p.error.main, 0.12),
       glow: alpha(p.error.dark, 0.42),
     },
@@ -218,7 +230,7 @@ export const JobNode: React.FC<JobNodeProps> = ({
           ? {
             transform: 'scale(1.03)',
             boxShadow: `0 0 25px ${colors.glow}`,
-            borderColor: colors.border.replace('0.3', '0.6').replace('0.5', '0.8'),
+            borderColor: colors.hoverBorder,
           }
           : {},
         '&::before': {
@@ -234,9 +246,9 @@ export const JobNode: React.FC<JobNodeProps> = ({
               : job.status === 'processing'
                 ? `linear-gradient(90deg, ${t.palette.secondary.main}, ${t.palette.primary.main}, ${t.palette.secondary.main})`
                 : job.status === 'awaiting_manual'
-                  ? `linear-gradient(90deg, ${t.palette.warning.main}, #ffc107)`
+                  ? `linear-gradient(90deg, ${t.palette.warning.main}, ${t.palette.warning.light})`
                   : job.status === 'error'
-                    ? `linear-gradient(90deg, ${t.palette.error.main}, #ff5722)`
+                    ? `linear-gradient(90deg, ${t.palette.error.main}, ${t.palette.error.light})`
                     : 'transparent',
           backgroundSize: isProcessing ? '200% 100%' : '100% 100%',
           animation: isProcessing ? `${glow} 1.5s linear infinite` : undefined,
