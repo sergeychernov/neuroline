@@ -12,6 +12,7 @@ Framework-agnostic pipeline orchestration library with support for:
 - Sequential and parallel job execution
 - Persistent state storage (MongoDB, in-memory, or custom)
 - Type-safe jobs with synapses for data transformation
+- Cacheable jobs (skip re-execution on identical input)
 - Idempotency (re-running with same input data returns existing pipeline)
 
 ## Changelog
@@ -479,6 +480,32 @@ await client.runManualJob(pipelineId, 'approval');
 const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
 ```
 
+## Cacheable Jobs
+
+Jobs can be marked as `cacheable` to skip re-execution when the same input has been processed before. The cache key is `{ jobName, inputHash }`, where `inputHash = SHA-256(jobName + input + options)`.
+
+```typescript
+const config: PipelineConfig = {
+  name: 'my-pipeline',
+  stages: [
+    // Cacheable job — result is stored in cache after first execution
+    { job: expensiveJob, synapses: toExpensive, cacheable: true },
+    // Regular job — always executes
+    normalJob,
+  ],
+};
+```
+
+- `cacheable: true` in `JobInPipeline` — enables caching for the job
+- Cache is **global by `jobName`** — shared across all pipelines that use the same job (job name = implementation)
+- Cache is independent of pipeline lifecycle — deleting a pipeline does **not** clear the cache
+- `restartPipelineFromJob` bypasses the cache for the restarted job and updates it with the new result
+- Storage implementations:
+  - `InMemoryPipelineStorage` — cache stored in a `Map`
+  - `MongoPipelineStorage` — cache stored in a separate `job_caches` collection
+
+**Cache invalidation:** if the `execute` implementation changes, the cache must be cleared manually (drop the `job_caches` collection or call `storage.clear()` for in-memory).
+
 ## Stale Jobs Watchdog
 
 When a process crashes during job execution, the job may remain in `processing` status forever ("stale job"). The watchdog monitors and automatically times out such jobs.
@@ -772,6 +799,7 @@ UNLICENSED
 - Последовательного и параллельного выполнения jobs
 - Персистентного хранения состояния (MongoDB, in-memory, или кастомное)
 - Типобезопасных jobs с synapses для трансформации данных
+- Кеширования jobs (пропуск повторного выполнения при идентичных входных данных)
 - Идемпотентности (повторный запуск с теми же входными данными возвращает существующий pipeline)
 
 ## Changelog
@@ -1238,6 +1266,32 @@ await client.runManualJob(pipelineId, 'approval');
 // Или с polling в одном вызове
 const polling = await client.runManualJobAndPoll(pipelineId, 'approval', onUpdate, onError);
 ```
+
+## Cacheable Jobs
+
+Jobs можно пометить как `cacheable`, чтобы пропускать повторное выполнение при тех же входных данных. Ключ кеша — `{ jobName, inputHash }`, где `inputHash = SHA-256(jobName + input + options)`.
+
+```typescript
+const config: PipelineConfig = {
+  name: 'my-pipeline',
+  stages: [
+    // Cacheable job — результат сохраняется в кеш после первого выполнения
+    { job: expensiveJob, synapses: toExpensive, cacheable: true },
+    // Обычная job — выполняется всегда
+    normalJob,
+  ],
+};
+```
+
+- `cacheable: true` в `JobInPipeline` — включает кеширование для job
+- Кеш **глобальный по `jobName`** — разделяется между всеми pipeline, использующими эту job (имя job = реализация)
+- Кеш не зависит от жизненного цикла pipeline — удаление pipeline **не** очищает кеш
+- `restartPipelineFromJob` обходит кеш для перезапускаемой job и обновляет его новым результатом
+- Реализации в storage:
+  - `InMemoryPipelineStorage` — кеш в `Map`
+  - `MongoPipelineStorage` — кеш в отдельной коллекции `job_caches`
+
+**Инвалидация кеша:** если реализация `execute` изменилась, кеш необходимо очистить вручную (удалить коллекцию `job_caches` или вызвать `storage.clear()` для in-memory).
 
 ## Stale Jobs Watchdog
 

@@ -98,7 +98,8 @@ Job с `cacheable: true` кеширует артефакт через `PipelineS
 { job: expensiveJob, synapses, cacheable: true }
 ```
 
-Кеш встроен в `PipelineStorage` — приложению не нужно ничего дополнительно настраивать.
+Кеш **глобальный** по `jobName` — разделяется между всеми pipeline, использующими эту job (имя job = реализация). При изменении реализации job необходимо очистить кеш вручную.
+Встроен в `PipelineStorage` — приложению не нужно ничего дополнительно настраивать.
 
 ### PipelineStorage
 
@@ -189,8 +190,10 @@ const polling = await client.restartAndPoll(
 ## Кеширование
 
 - `inputHash` = hash(jobName + input + options) — дедупликация артефактов
+- Cache **глобальный**: ключ — `{ jobName, inputHash }`, без привязки к `pipelineType`. Одна и та же job переиспользует кеш во всех pipeline — имя job = реализация
 - Cache встроен в `PipelineStorage` (`findCachedArtifact`/`saveCachedArtifact`), живёт независимо от pipeline
 - Приложению не нужно ничего дополнительно настраивать — достаточно `cacheable: true` в конфиге job
+- **Инвалидация кеша при смене реализации**: если код `execute` изменился, необходимо либо очистить кеш (коллекцию `job_caches` / `jobCache` Map), либо перезапустить все pipeline с этой job
 
 ## Идемпотентность
 
